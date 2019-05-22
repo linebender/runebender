@@ -11,5 +11,8 @@ druid-shell = { git="https://github.com/xi-editor/druid/", rev="f0148cf3358ecb30
 kurbo = "0.2.1"
 piet = "0.0.2"
 piet-common = "0.0.2"
-#font-rs = { git="https://github.com/raphlinus/font-rs", rev="5ef0f71a0c7a8f33632140e8a6326998a1640450" }
-font-rs = { path="../font-rs", features=["kurbo"] }
+
+[dependencies.font-rs]
+git = "https://github.com/raphlinus/font-rs"
+rev = "788e8b523956b5c7addedb7fb524f22c53fe07dd"
+features = ["kurbo"]

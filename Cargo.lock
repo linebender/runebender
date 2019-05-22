@@ -252,6 +252,7 @@ dependencies = [
 [[package]]
 name = "font-rs"
 version = "0.1.3"
+source = "git+https://github.com/raphlinus/font-rs?rev=788e8b523956b5c7addedb7fb524f22c53fe07dd#788e8b523956b5c7addedb7fb524f22c53fe07dd"
 dependencies = [
  "kurbo 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -593,7 +594,7 @@ version = "0.1.0"
 dependencies = [
  "druid 0.2.0 (git+https://github.com/xi-editor/druid/?rev=f0148cf3358ecb309746fff1c79c31282f33ed80)",
  "druid-shell 0.2.0 (git+https://github.com/xi-editor/druid/?rev=f0148cf3358ecb309746fff1c79c31282f33ed80)",
- "font-rs 0.1.3",
+ "font-rs 0.1.3 (git+https://github.com/raphlinus/font-rs?rev=788e8b523956b5c7addedb7fb524f22c53fe07dd)",
  "kurbo 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "piet 0.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "piet-common 0.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -854,6 +855,7 @@ dependencies = [
 "checksum env_logger 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b61fa891024a945da30a9581546e8cfaf5602c7b3f4c137a2805cf388f92075a"
 "checksum failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "795bd83d3abeb9220f257e597aa0080a508b27533824adf336529648f6abf7e2"
 "checksum failure_derive 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "ea1063915fd7ef4309e222a5a07cf9c319fb9c7836b1f89b85458672dbb127e1"
+"checksum font-rs 0.1.3 (git+https://github.com/raphlinus/font-rs?rev=788e8b523956b5c7addedb7fb524f22c53fe07dd)" = "<none>"
 "checksum foreign-types 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "f6f339eb8adc052cd2ca78910fda869aefa38d22d5cb648e6485e4d3fc06f3b1"
 "checksum foreign-types-shared 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 "checksum fuchsia-cprng 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a06f77d526c1a601b7c4cdd98f54b5eaabffc14d5f2f0296febdc7f357c6d3ba"

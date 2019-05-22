@@ -1,3 +1,5 @@
+// Copyright 2019 the Runebender authors.
+
 use kurbo::Affine;
 use piet::RenderContext;
 
