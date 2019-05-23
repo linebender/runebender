@@ -10,13 +10,17 @@ use druid_shell::platform::WindowBuilder;
 use druid_shell::win_main;
 
 use druid::{
-    BoxConstraints, Geometry, Id, LayoutCtx, LayoutResult, PaintCtx, Ui, UiMain, UiState, Widget,
+    BoxConstraints, Geometry, HandlerCtx, Id, LayoutCtx, LayoutResult, MouseEvent, PaintCtx,
+    Ui, UiMain, UiState, Widget,
 };
 
 struct GlyphEditor {
     glyph: Glyph,
     path: BezPath,
     height: f32,
+    controls: Vec<Circle>,
+    mouse_pos: Option<Vec2>,
+    in_point: bool,
 }
 
 impl GlyphEditor {
@@ -29,7 +33,7 @@ impl GlyphEditor {
             .unwrap_or(false) { 4000. } else { 1000. };
 
         let path = glyph.outline.as_ref().map(|o| make_path(&o.contours)).unwrap_or_default();
-        GlyphEditor { glyph, height, path }
+        GlyphEditor { glyph, height, path, controls: Vec::new(), mouse_pos: None, in_point: false, }
     }
 
     fn ui(self, ctx: &mut Ui) -> Id {
@@ -45,6 +49,7 @@ impl Widget for GlyphEditor {
         let baseline_fg = ctx.render_ctx.solid_brush(0x00_80_f0_ff).unwrap();
         let fg = ctx.render_ctx.solid_brush(0xf0_f0_ea_ff).unwrap();
         let control_point_fg = ctx.render_ctx.solid_brush(0x70_80_7a_ff).unwrap();
+        let active_point_fg = ctx.render_ctx.solid_brush(0xf0_80_7a_ff).unwrap();
 
         let scale = (geom.size.1 / self.height * 0.65).min(1.0).max(0.2);
         println!("scale {}", scale);
@@ -54,14 +59,41 @@ impl Widget for GlyphEditor {
         ctx.render_ctx.stroke(line, &baseline_fg, 0.5, None);
         ctx.render_ctx.stroke(affine * &self.path, &fg, 1.0, None);
 
+        self.controls.clear();
         for shape in self.glyph.outline.as_ref().iter().map(|o| o.contours.iter()).flatten() {
             for point in shape.points.iter() {
                 println!("{:?}", point);
-                let color = if point.typ == PointType::OffCurve { &control_point_fg } else { &fg };
+                let mut color = if point.typ == PointType::OffCurve { &control_point_fg } else { &fg };
                 let circ = Circle::new((l_pad + (point.x * scale) as f64, (baseline - (point.y * scale) as f64)), 8.0 * scale as f64);
+                self.controls.push(circ);
+
+                if self.mouse_pos.map(|v2| is_inside(circ, v2)).unwrap_or(false) {
+                    color = &active_point_fg;
+                }
+
                 ctx.render_ctx.fill(circ, color, FillRule::NonZero);
             }
         }
+    }
+
+    fn mouse(&mut self, event: &MouseEvent, ctx: &mut HandlerCtx) -> bool {
+        eprintln!("({}, {})", event.x, event.y);
+        true
+    }
+
+    fn mouse_moved(&mut self, x: f32, y: f32, ctx: &mut HandlerCtx) {
+        let v2 = (x as f64, y as f64).into();
+        self.mouse_pos = Some(v2);
+        if self.controls.iter().any(|c| is_inside(*c, v2)) {
+            if !self.in_point {
+                ctx.invalidate();
+                self.in_point = true;
+            }
+        } else if self.in_point {
+            ctx.invalidate();
+            self.in_point = false;
+        }
+        eprintln!("({}, {})", x, y);
     }
 
     fn layout(
@@ -78,6 +110,11 @@ impl Widget for GlyphEditor {
 fn build_ui(ui: &mut UiState, glyph: Glyph) {
     let root_id = GlyphEditor::new(glyph).ui(ui);
     ui.set_root(root_id);
+}
+
+fn is_inside(circle: Circle, point: Vec2) -> bool {
+    let center = circle.center;
+    ((point.x - center.x).powi(2) + (point.y - center.y).powi(2)).sqrt() <= circle.radius
 }
 
 fn main() {
