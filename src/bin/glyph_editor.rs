@@ -8,24 +8,45 @@ use piet::{FillRule, RenderContext};
 
 use druid_shell::platform::WindowBuilder;
 use druid_shell::win_main;
+use druid_shell::window::MouseButton;
 
 use druid::{
     BoxConstraints, Geometry, HandlerCtx, Id, LayoutCtx, LayoutResult, MouseEvent, PaintCtx,
     Ui, UiMain, UiState, Widget,
 };
 
+type PointId = usize;
+
+const BASELINE_COLOR: u32 =  0x00_80_f0_ff;
+const OUTLINE_COLOR: u32 =  0xfa_fa_fa_ff;
+const POINT_COLOR_NORMAL: u32 =  0xf0_f0_ea_ff;
+const POINT_COLOR_CONTROL: u32 =  0x70_80_7a_ff;
+const POINT_COLOR_HOVER: u32 =  0xf0_80_7a_ff;
+const POINT_COLOR_DRAG: u32 =  0xff_40_3a_ff;
+
+
 struct GlyphEditor {
     glyph: Glyph,
     path: BezPath,
     height: f32,
-    controls: Vec<Circle>,
-    mouse_pos: Option<Vec2>,
-    in_point: bool,
+    controls: Vec<(Circle, PointId)>,
+    mouse: MouseState,
+    /// for mapping a point in the widget to a point in the glyph
+    /// would be nice if affine could translate a single point?
+    translate_fn: Box<dyn Fn(Vec2) -> Vec2>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum MouseState {
+    Normal,
+    Hover(PointId),
+    Drag { point: PointId, start: Vec2, current: Vec2 },
 }
 
 impl GlyphEditor {
     fn new(glyph: Glyph) -> Self {
         // assume glyph height is 1000 or 4000 'units'
+        // TODO: get the actual height from the UFO file
         let height = if glyph.outline.as_ref()
             .map(|o| o.contours.iter()
                  .flat_map(|c| c.points.iter().map(|p| p.y))
@@ -33,7 +54,25 @@ impl GlyphEditor {
             .unwrap_or(false) { 4000. } else { 1000. };
 
         let path = glyph.outline.as_ref().map(|o| make_path(&o.contours)).unwrap_or_default();
-        GlyphEditor { glyph, height, path, controls: Vec::new(), mouse_pos: None, in_point: false, }
+        GlyphEditor {
+            glyph,
+            height,
+            path,
+            controls: Vec::new(),
+            mouse: MouseState::Normal,
+            translate_fn: Box::new(|pt| pt),
+        }
+    }
+
+
+    fn update_point(&mut self, point: PointId, new_pos: Vec2) {
+        let glyph_point = ( self.translate_fn )(new_pos);
+        if let Some(p) = self.glyph.outline.as_mut().iter_mut().flat_map(|o| o.contours.iter_mut()).flat_map(|c| c.points.iter_mut()).nth(point) {
+            p.x = glyph_point.x as f32;
+            p.y = glyph_point.y as f32;
+        }
+
+        self.path = self.glyph.outline.as_ref().map(|o| make_path(&o.contours)).unwrap_or_default();
     }
 
     fn ui(self, ctx: &mut Ui) -> Id {
@@ -46,54 +85,106 @@ impl Widget for GlyphEditor {
         let baseline = (geom.size.1 * 0.66) as f64;
         let l_pad = 100.;
 
-        let baseline_fg = ctx.render_ctx.solid_brush(0x00_80_f0_ff).unwrap();
-        let fg = ctx.render_ctx.solid_brush(0xf0_f0_ea_ff).unwrap();
-        let control_point_fg = ctx.render_ctx.solid_brush(0x70_80_7a_ff).unwrap();
-        let active_point_fg = ctx.render_ctx.solid_brush(0xf0_80_7a_ff).unwrap();
+        let baseline_clr = ctx.render_ctx.solid_brush(BASELINE_COLOR).unwrap();
+        let outline_clr = ctx.render_ctx.solid_brush(OUTLINE_COLOR).unwrap();
+        let point_clr = ctx.render_ctx.solid_brush(POINT_COLOR_NORMAL).unwrap();
+        let control_point_clr = ctx.render_ctx.solid_brush(POINT_COLOR_CONTROL).unwrap();
+        let hover_point_clr = ctx.render_ctx.solid_brush(POINT_COLOR_HOVER).unwrap();
+        let drag_point_clr = ctx.render_ctx.solid_brush(POINT_COLOR_DRAG).unwrap();
 
         let scale = (geom.size.1 / self.height * 0.65).min(1.0).max(0.2);
         println!("scale {}", scale);
         let affine = Affine::new([scale as f64, 0.0, 0.0, -scale as f64, l_pad, baseline]);
 
         let line = Line::new((0., baseline), (geom.size.0 as f64, baseline));
-        ctx.render_ctx.stroke(line, &baseline_fg, 0.5, None);
-        ctx.render_ctx.stroke(affine * &self.path, &fg, 1.0, None);
+        ctx.render_ctx.stroke(line, &baseline_clr, 0.5, None);
+        ctx.render_ctx.stroke(affine * &self.path, &outline_clr, 1.0, None);
+
+        // stash a fn to get our glyph points from our visual points
+        // TODO: this would be nice if we could just stash the affine and compute the inverse
+        self.translate_fn = Box::new(move |pt| {
+            let x = (pt.x  - l_pad) / scale as f64;
+            let y = (pt.y - baseline) / -scale as f64;
+            (x, y).into()
+        });
 
         self.controls.clear();
+        let mut id = 0;
+
         for shape in self.glyph.outline.as_ref().iter().map(|o| o.contours.iter()).flatten() {
             for point in shape.points.iter() {
-                println!("{:?}", point);
-                let mut color = if point.typ == PointType::OffCurve { &control_point_fg } else { &fg };
-                let circ = Circle::new((l_pad + (point.x * scale) as f64, (baseline - (point.y * scale) as f64)), 8.0 * scale as f64);
-                self.controls.push(circ);
+                //println!("{:?}", point);
+                let is_control = point.typ == PointType::OffCurve;
+                let color = match (self.mouse, is_control) {
+                    (MouseState::Drag { point, .. }, _) if point == id => &drag_point_clr,
+                    (MouseState::Hover(point), _) if point == id => &hover_point_clr,
+                    (_, true)  => &control_point_clr,
+                    (_, false) => &point_clr,
+                };
 
-                if self.mouse_pos.map(|v2| is_inside(circ, v2)).unwrap_or(false) {
-                    color = &active_point_fg;
-                }
+                let point: Vec2 = (point.x as f64, point.y as f64).into();
+                let point = affine * point;
+                let rad = (10.0 * scale as f64).min(8.0).max(4.0);
+                let circ = Circle::new(point, rad);
+                self.controls.push((circ, id));
 
                 ctx.render_ctx.fill(circ, color, FillRule::NonZero);
+                id += 1;
             }
         }
     }
 
     fn mouse(&mut self, event: &MouseEvent, ctx: &mut HandlerCtx) -> bool {
-        eprintln!("({}, {})", event.x, event.y);
+        eprintln!("{:?}{}: ({}, {})", event.which, event.count, event.x, event.y);
+        const MIN_DRAG_DISTANCE: f64 = 5.0;
+        let v2 = (event.x as f64, event.y as f64).into();
+        let new_state = match self.mouse {
+            MouseState::Normal | MouseState::Hover(_) if event.which == MouseButton::Left && event.count == 1 => {
+                if let Some((circ, point)) = self.controls.iter().find(|(c, _)| is_inside(*c, v2)) {
+                    MouseState::Drag { point: *point, start: circ.center, current: v2 }
+                } else {
+                    MouseState::Normal
+                }
+            }
+            MouseState::Drag { point, start, current } if event.count == 0 => {
+                let success = distance(start, current) >= MIN_DRAG_DISTANCE;
+                if success {
+                    self.update_point(point, current);
+                    MouseState::Hover(point)
+                } else {
+                    self.update_point(point, start);
+                    MouseState::Normal
+                }
+            }
+            _ => MouseState::Normal,
+        };
+
+        if new_state != self.mouse {
+            ctx.invalidate();
+        }
+
+        self.mouse = new_state;
         true
     }
 
     fn mouse_moved(&mut self, x: f32, y: f32, ctx: &mut HandlerCtx) {
         let v2 = (x as f64, y as f64).into();
-        self.mouse_pos = Some(v2);
-        if self.controls.iter().any(|c| is_inside(*c, v2)) {
-            if !self.in_point {
-                ctx.invalidate();
-                self.in_point = true;
+        let new_state = match self.mouse {
+            MouseState::Drag { point, start, .. } => {
+                self.update_point(point, v2);
+                MouseState::Drag { point, start, current: v2 }
             }
-        } else if self.in_point {
+            _ => match self.controls.iter().find(|(c, _)| is_inside(*c, v2)).map(|(_, id)| id) {
+                Some(id) => MouseState::Hover(*id),
+                None => MouseState::Normal,
+            }
+        };
+
+        if new_state != self.mouse {
             ctx.invalidate();
-            self.in_point = false;
         }
-        eprintln!("({}, {})", x, y);
+
+        self.mouse = new_state;
     }
 
     fn layout(
@@ -112,9 +203,14 @@ fn build_ui(ui: &mut UiState, glyph: Glyph) {
     ui.set_root(root_id);
 }
 
+#[inline]
 fn is_inside(circle: Circle, point: Vec2) -> bool {
-    let center = circle.center;
-    ((point.x - center.x).powi(2) + (point.y - center.y).powi(2)).sqrt() <= circle.radius
+    distance(point, circle.center) <= circle.radius
+}
+
+#[inline]
+fn distance(p1: Vec2, p2: Vec2) -> f64 {
+    ((p1.x - p2.x).powi(2) + (p1.y - p2.y).powi(2)).sqrt()
 }
 
 fn main() {
