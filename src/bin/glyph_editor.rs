@@ -2,17 +2,15 @@
 
 //! A quick demonstration of loading and displaying a UFO glyph.
 
-use kurbo::{Affine, Circle, Line, BezPath, Vec2};
-use piet::{RenderContext, FillRule};
-use norad::{glyph::{PointType, Contour, ContourPoint}, Glyph};
+use kurbo::{Affine, BezPath, Circle, Line, Vec2};
+use norad::glyph::{Contour, ContourPoint, Glyph, PointType};
+use piet::{FillRule, RenderContext};
 
 use druid_shell::platform::WindowBuilder;
 use druid_shell::win_main;
 
-use druid::widget::Widget;
 use druid::{
-    BoxConstraints, Geometry, Id, LayoutCtx, LayoutResult, PaintCtx,
-    UiMain, UiState,
+    BoxConstraints, Geometry, Id, LayoutCtx, LayoutResult, PaintCtx, Ui, UiMain, UiState, Widget,
 };
 
 struct GlyphEditor {
@@ -23,7 +21,7 @@ struct GlyphEditor {
 
 impl GlyphEditor {
     fn new(glyph: Glyph) -> Self {
-        // assume glyph height is 1000 or 2000 units
+        // assume glyph height is 1000 or 4000 'units'
         let height = if glyph.outline.as_ref()
             .map(|o| o.contours.iter()
                  .flat_map(|c| c.points.iter().map(|p| p.y))
@@ -33,26 +31,27 @@ impl GlyphEditor {
         let path = glyph.outline.as_ref().map(|o| make_path(&o.contours)).unwrap_or_default();
         GlyphEditor { glyph, height, path }
     }
+
+    fn ui(self, ctx: &mut Ui) -> Id {
+        ctx.add(self, &[])
+    }
 }
 
 impl Widget for GlyphEditor {
     fn paint(&mut self, ctx: &mut PaintCtx, geom: &Geometry) {
-
-        let baseline = (geom.size.1  * 0.66) as f64;
+        let baseline = (geom.size.1 * 0.66) as f64;
         let l_pad = 100.;
 
         let baseline_fg = ctx.render_ctx.solid_brush(0x00_80_f0_ff).unwrap();
         let fg = ctx.render_ctx.solid_brush(0xf0_f0_ea_ff).unwrap();
         let control_point_fg = ctx.render_ctx.solid_brush(0x70_80_7a_ff).unwrap();
 
-        let scale = ( geom.size.1 / self.height * 0.65).min(1.0).max(0.2);
+        let scale = (geom.size.1 / self.height * 0.65).min(1.0).max(0.2);
         println!("scale {}", scale);
         let affine = Affine::new([scale as f64, 0.0, 0.0, -scale as f64, l_pad, baseline]);
 
         let line = Line::new((0., baseline), (geom.size.0 as f64, baseline));
         ctx.render_ctx.stroke(line, &baseline_fg, 0.5, None);
-
-
         ctx.render_ctx.stroke(affine * &self.path, &fg, 1.0, None);
 
         for shape in self.glyph.outline.as_ref().iter().map(|o| o.contours.iter()).flatten() {
@@ -76,6 +75,11 @@ impl Widget for GlyphEditor {
     }
 }
 
+fn build_ui(ui: &mut UiState, glyph: Glyph) {
+    let root_id = GlyphEditor::new(glyph).ui(ui);
+    ui.set_root(root_id);
+}
+
 fn main() {
     let glyph_path = match std::env::args().skip(1).next() {
         Some(arg) => arg,
@@ -94,9 +98,7 @@ fn main() {
     let mut builder = WindowBuilder::new();
     let mut state = UiState::new();
 
-    let root = GlyphEditor::new(glyph);
-    let root_id = state.add(root, &[]);
-    state.set_root(root_id);
+    build_ui(&mut state, glyph);
 
     builder.set_handler(Box::new(UiMain::new(state)));
     builder.set_title("Ufo Toy");
@@ -107,7 +109,6 @@ fn main() {
 }
 
 fn make_path(contours: &[Contour]) -> BezPath {
-
     /// An outline can have multiple contours, which correspond to subpaths
     fn add_contour(path: &mut BezPath, contour: &Contour) {
         let mut close: Option<&ContourPoint> = None;
@@ -128,7 +129,7 @@ fn make_path(contours: &[Contour]) -> BezPath {
                 (Some(one), None) => path.quadto(one, to_point),
                 (Some(one), Some(two)) => path.curveto(one, two, to_point),
                 (None, None) => path.lineto(to_point),
-                _illegal => debug_assert!(false, "existence of second point implies first"),
+                _illegal => panic!("existence of second point implies first"),
             }
         };
 
@@ -161,4 +162,3 @@ fn make_path(contours: &[Contour]) -> BezPath {
     contours.iter().for_each(|c| add_contour(&mut path, c));
     path
 }
-
