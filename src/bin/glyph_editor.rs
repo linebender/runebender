@@ -15,6 +15,7 @@ use druid::{
     Ui, UiMain, UiState, Widget,
 };
 
+//HACK: currently we just use the point's "overall index" as an id.
 type PointId = usize;
 
 const BASELINE_COLOR: u32 =  0x00_80_f0_ff;
@@ -32,7 +33,7 @@ struct GlyphEditor {
     controls: Vec<(Circle, PointId)>,
     mouse: MouseState,
     /// for mapping a point in the widget to a point in the glyph
-    /// would be nice if affine could translate a single point?
+    // TODO: how do I get the inverse of an affine?
     translate_fn: Box<dyn Fn(Vec2) -> Vec2>,
 }
 
@@ -111,10 +112,27 @@ impl Widget for GlyphEditor {
         self.controls.clear();
         let mut id = 0;
 
+        let mut control_guides = BezPath::new();
+
         for shape in self.glyph.outline.as_ref().iter().map(|o| o.contours.iter()).flatten() {
+            if shape.points.is_empty() { continue };
+            let last = shape.points.last().unwrap();
+            // the last seen control point, and it whether or not it was 'on curve' or not.
+            // because we wrap around, we can start at the end
+            let mut last_point = (Vec2::new(last.x as f64, last.y as f64), last.typ == PointType::OffCurve);
+
             for point in shape.points.iter() {
-                //println!("{:?}", point);
+                println!("{:?}", point);
                 let is_control = point.typ == PointType::OffCurve;
+                let point: Vec2 = (point.x as f64, point.y as f64).into();
+
+                if last_point.1 != is_control {
+                    control_guides.moveto(last_point.0);
+                    control_guides.lineto(point);
+                }
+
+                last_point = (point, is_control);
+
                 let color = match (self.mouse, is_control) {
                     (MouseState::Drag { point, .. }, _) if point == id => &drag_point_clr,
                     (MouseState::Hover(point), _) if point == id => &hover_point_clr,
@@ -122,7 +140,6 @@ impl Widget for GlyphEditor {
                     (_, false) => &point_clr,
                 };
 
-                let point: Vec2 = (point.x as f64, point.y as f64).into();
                 let point = affine * point;
                 let rad = (10.0 * scale as f64).min(8.0).max(4.0);
                 let circ = Circle::new(point, rad);
@@ -132,6 +149,7 @@ impl Widget for GlyphEditor {
                 id += 1;
             }
         }
+        ctx.render_ctx.stroke(affine * control_guides, &control_point_clr, 1.0, None);
     }
 
     fn mouse(&mut self, event: &MouseEvent, ctx: &mut HandlerCtx) -> bool {
@@ -141,6 +159,7 @@ impl Widget for GlyphEditor {
         let new_state = match self.mouse {
             MouseState::Normal | MouseState::Hover(_) if event.which == MouseButton::Left && event.count == 1 => {
                 if let Some((circ, point)) = self.controls.iter().find(|(c, _)| is_inside(*c, v2)) {
+                    eprintln!("dragging point {}", point);
                     MouseState::Drag { point: *point, start: circ.center, current: v2 }
                 } else {
                     MouseState::Normal
