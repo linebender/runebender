@@ -274,25 +274,25 @@ fn make_path(contours: &[Contour]) -> BezPath {
         }
 
         let mut idx = 1;
-        let mut controls: (Option<Vec2>, Option<Vec2>) = (None, None);
+        let mut controls = Vec::with_capacity(2);
 
-        let mut add_curve = |to_point: Vec2, controls: &mut (Option<Vec2>, Option<Vec2>)| {
-            match (controls.0.take(), controls.1.take()) {
-                (Some(one), None) => path.quadto(one, to_point),
-                (Some(one), Some(two)) => path.curveto(one, two, to_point),
-                (None, None) => path.lineto(to_point),
+        let mut add_curve = |to_point: Vec2, controls: &mut Vec<Vec2>| {
+            match controls.as_slice() {
+                &[] => path.lineto(to_point),
+                &[a] => path.quadto(a, to_point),
+                &[a, b] => path.curveto(a, b, to_point),
                 _illegal => panic!("existence of second point implies first"),
-            }
+            };
+            controls.clear();
         };
 
         while idx < contour.points.len() {
             let next = &contour.points[idx];
             let point: Vec2 = (next.x as f64, next.y as f64).into();
             match next.typ {
-                PointType::OffCurve if controls.0.is_none() => controls.0 = Some(point.into()),
-                PointType::OffCurve => controls.1 = Some(point.into()),
+                PointType::OffCurve => controls.push(point),
                 PointType::Line => {
-                    debug_assert!(controls.0.is_none(), "line type cannot follow offcurve");
+                    debug_assert!(controls.is_empty(), "line type cannot follow offcurve");
                     add_curve(point, &mut controls);
                 }
                 PointType::Curve => add_curve(point, &mut controls),
