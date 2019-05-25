@@ -19,6 +19,9 @@ use druid::widget::MouseButton;
 
 #[path="../widgets/grid.rs"]
 mod grid;
+
+#[path="../widgets/glyph.rs"]
+mod glyph_widget;
 //HACK: currently we just use the point's "overall index" as an id.
 type PointId = usize;
 
@@ -58,7 +61,7 @@ impl GlyphEditor {
                  .any(|h| h > 1000.))
             .unwrap_or(false) { 4000. } else { 1000. };
 
-        let path = glyph.outline.as_ref().map(|o| make_path(&o.contours)).unwrap_or_default();
+        let path = glyph_widget::path_for_glyph(&glyph);
         GlyphEditor {
             glyph,
             height,
@@ -77,7 +80,8 @@ impl GlyphEditor {
             p.y = glyph_point.y as f32;
         }
 
-        self.path = self.glyph.outline.as_ref().map(|o| make_path(&o.contours)).unwrap_or_default();
+        //self.path = self.glyph.outline.as_ref().map(|o| (&o.contours)).unwrap_or_default();
+        self.path = glyph_widget::path_for_glyph(&self.glyph);
     }
 
     fn ui(self, ctx: &mut Ui) -> Id {
@@ -264,57 +268,3 @@ fn main() {
     run_loop.run();
 }
 
-fn make_path(contours: &[Contour]) -> BezPath {
-    /// An outline can have multiple contours, which correspond to subpaths
-    fn add_contour(path: &mut BezPath, contour: &Contour) {
-        let mut close: Option<&ContourPoint> = None;
-
-        if contour.points.is_empty() { return; }
-
-        let first = &contour.points[0];
-        path.moveto((first.x as f64, first.y as f64));
-        if first.typ != PointType::Move {
-            close = Some(first);
-        }
-
-        let mut idx = 1;
-        let mut controls = Vec::with_capacity(2);
-
-        let mut add_curve = |to_point: Vec2, controls: &mut Vec<Vec2>| {
-            match controls.as_slice() {
-                &[] => path.lineto(to_point),
-                &[a] => path.quadto(a, to_point),
-                &[a, b] => path.curveto(a, b, to_point),
-                _illegal => panic!("existence of second point implies first"),
-            };
-            controls.clear();
-        };
-
-        while idx < contour.points.len() {
-            let next = &contour.points[idx];
-            let point: Vec2 = (next.x as f64, next.y as f64).into();
-            match next.typ {
-                PointType::OffCurve => controls.push(point),
-                PointType::Line => {
-                    debug_assert!(controls.is_empty(), "line type cannot follow offcurve");
-                    add_curve(point, &mut controls);
-                }
-                PointType::Curve => add_curve(point, &mut controls),
-                PointType::QCurve => {
-                    eprintln!("TODO: handle qcurve");
-                    add_curve(point, &mut controls);
-                }
-                PointType::Move => debug_assert!(false, "illegal move point in path?"),
-            }
-            idx += 1;
-        }
-
-        if let Some(to_close) = close.take() {
-            add_curve((to_close.x as f64, to_close.y as f64).into(), &mut controls);
-        }
-    }
-
-    let mut path = BezPath::new();
-    contours.iter().for_each(|c| add_contour(&mut path, c));
-    path
-}

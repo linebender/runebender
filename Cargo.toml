@@ -20,4 +20,5 @@ rev = "788e8b523956b5c7addedb7fb524f22c53fe07dd"
 features = ["kurbo"]
 
 [dependencies.norad]
-git = "https://github.com/linebender/norad"
+path = "../norad"
+#git = "https://github.com/linebender/norad"

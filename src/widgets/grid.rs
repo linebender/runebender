@@ -1,5 +1,5 @@
 use kurbo::Rect;
-use piet::{FillRule, FontBuilder, RenderContext, Text, TextLayoutBuilder};
+use piet::{FillRule, RenderContext};
 
 use druid::widget::Widget;
 use druid::{BoxConstraints, Geometry, LayoutResult, HandlerCtx, Id, LayoutCtx, MouseEvent, PaintCtx, Ui};
@@ -82,20 +82,6 @@ impl Widget for Grid {
         self.layout.row_count += 1;
         LayoutResult::RequestChild(next_child, BoxConstraints::tight((self.item_size.width, self.item_size.height)))
     }
-
-    fn paint(&mut self, paint_ctx: &mut PaintCtx, geom: &Geometry) {
-        let bg_color = 0xff_aa_aa_ff;
-        let brush = paint_ctx.render_ctx.solid_brush(bg_color).unwrap();
-        let (x, y) = geom.pos;
-        let (width, height) = geom.size;
-        let rect = Rect::new(
-            x as f64,
-            y as f64,
-            x as f64 + width as f64,
-            y as f64 + height as f64,
-            );
-        paint_ctx.render_ctx.fill(rect, &brush, FillRule::NonZero);
-    }
 }
 
 pub struct Clickable {}
@@ -169,7 +155,6 @@ impl Widget for Clickable {
     }
 
     fn on_hot_changed(&mut self, _hot: bool, ctx: &mut HandlerCtx) {
-        dbg!(_hot);
         ctx.invalidate();
     }
 }
