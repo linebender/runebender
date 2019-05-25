@@ -8,13 +8,17 @@ use piet::{FillRule, RenderContext};
 
 use druid_shell::platform::WindowBuilder;
 use druid_shell::win_main;
-use druid_shell::window::MouseButton;
+//use druid_shell::window::MouseButton;
 
 use druid::{
     BoxConstraints, Geometry, HandlerCtx, Id, LayoutCtx, LayoutResult, MouseEvent, PaintCtx,
     Ui, UiMain, UiState, Widget,
 };
 
+use druid::widget::MouseButton;
+
+#[path="../widgets/grid.rs"]
+mod grid;
 //HACK: currently we just use the point's "overall index" as an id.
 type PointId = usize;
 
