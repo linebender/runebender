@@ -4,8 +4,13 @@ use kurbo::{Affine, BezPath, Rect, Shape, Vec2};
 use norad::glyph::{Contour, ContourPoint, Glyph, PointType};
 use piet::{FillRule, RenderContext};
 use druid::{
-    BoxConstraints, Geometry, HandlerCtx, Id, LayoutResult, LayoutCtx, PaintCtx, Ui, Widget,
+    BoxConstraints, Geometry, HandlerCtx, Id, LayoutResult, LayoutCtx, MouseEvent, PaintCtx, Ui, Widget,
 };
+
+//const CELL_BG_COLOR: u32 =  0x_24_24_24_ff;
+const GLYPH_COLOR: u32 =  0x6a_6a_6a_ff;
+const HIGHLIGHT_COLOR: u32 =  0xfa_fa_fa_ff;
+const ON_CLICK_COLOR: u32 =  0x_24_24_84_ff;
 
 pub struct GlyphWidget {
     glyph: Glyph,
@@ -37,12 +42,14 @@ impl Widget for GlyphWidget {
             y as f64 + height as f64,
             );
 
-        let bg_color = 0x_24_24_24_ff;
-        let brush = ctx.render_ctx.solid_brush(bg_color).unwrap();
-        ctx.render_ctx.fill(rect, &brush, FillRule::NonZero);
+        if is_active {
+            let brush = ctx.render_ctx.solid_brush(ON_CLICK_COLOR).unwrap();
+            ctx.render_ctx.fill(rect, &brush, FillRule::NonZero);
+        }
 
         let bb = self.path.bounding_box();
-        let scale = geom.size.1 as f64 / (bb.height() * 1.36);
+        let scale = geom.size.1 as f64 / 1000.;
+        let scale = scale * 0.85; // some margins around glyphs
         let scaled_width = bb.width() * scale as f64;
         let l_pad = ((geom.size.0 as f64 - scaled_width) / 2.).round();
         let baseline = (geom.size.1 * 0.16) as f64;
@@ -52,14 +59,16 @@ impl Widget for GlyphWidget {
                                  0.0,
                                  -scale as f64,
                                  x as f64 + l_pad,
-                                 baseline + y as f64 + bb.height() * scale
+                                 (height +  y) as f64 - baseline, // + bb.height() * scale
         ]);
-        let fg = ctx.render_ctx.solid_brush(0xfa_fa_fa_ff).unwrap();
-        let fill = ctx.render_ctx.solid_brush(0x4a_4a_5a_ff).unwrap();
+        let fill_color = if is_active { HIGHLIGHT_COLOR } else { GLYPH_COLOR };
+        let fill = ctx.render_ctx.solid_brush(fill_color).unwrap();
         ctx.render_ctx.fill(affine * &self.path, &fill, FillRule::NonZero);
         if is_hot {
-            ctx.render_ctx.stroke(affine * &self.path, &fg, 0.5, None);
-            ctx.render_ctx.stroke(rect, &fg, 0.5, None);
+            let outline_color = ctx.render_ctx.solid_brush(HIGHLIGHT_COLOR).unwrap();
+            //eprintln!("{} {:?} x{} {:?}", self.glyph.name, bb, scale, rect);
+            ctx.render_ctx.stroke(affine * &self.path, &outline_color, 0.5, None);
+            ctx.render_ctx.stroke(rect, &outline_color, 0.5, None);
         }
     }
 
@@ -75,6 +84,19 @@ impl Widget for GlyphWidget {
 
     fn on_hot_changed(&mut self, _hot: bool, ctx: &mut HandlerCtx) {
         ctx.invalidate();
+    }
+
+    fn mouse(&mut self, event: &MouseEvent, ctx: &mut HandlerCtx) -> bool {
+        if event.count > 0 {
+            ctx.set_active(true);
+        } else {
+            ctx.set_active(false);
+            if ctx.is_hot() {
+                ctx.send_event(true);
+            }
+        }
+        ctx.invalidate();
+        true
     }
 }
 
