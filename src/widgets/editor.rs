@@ -1,4 +1,6 @@
-use kurbo::{Affine, BezPath, Circle, Line, Vec2};
+use std::collections::HashSet;
+
+use kurbo::{Affine, BezPath, Circle, Line, Rect, Shape, Vec2};
 use norad::glyph::{Glyph, PointType};
 use piet::{FillRule, RenderContext};
 
@@ -21,6 +23,7 @@ const POINT_COLOR_NORMAL: u32 =  0xf0_f0_ea_ff;
 const POINT_COLOR_CONTROL: u32 =  0x70_80_7a_ff;
 const POINT_COLOR_HOVER: u32 =  0xf0_80_7a_ff;
 const POINT_COLOR_DRAG: u32 =  0xff_40_3a_ff;
+const RECT_SELECT_BODY_COLOR: u32 = 0x28_28_60_80;
 
 
 pub struct GlyphEditor {
@@ -28,6 +31,7 @@ pub struct GlyphEditor {
     path: BezPath,
     height: f32,
     controls: Vec<(Circle, PointId)>,
+    selected: HashSet<PointId>,
     mouse: MouseState,
     /// for mapping a point in the widget to a point in the glyph
     // TODO: how do I get the inverse of an affine?
@@ -39,6 +43,7 @@ enum MouseState {
     Normal,
     Hover(PointId),
     Drag { point: PointId, start: Vec2, current: Vec2 },
+    RectSelect { start: Vec2, current: Vec2 },
 }
 
 impl GlyphEditor {
@@ -57,6 +62,7 @@ impl GlyphEditor {
             height,
             path,
             controls: Vec::new(),
+            selected: HashSet::new(),
             mouse: MouseState::Normal,
             translate_fn: Box::new(|pt| pt),
         }
@@ -90,6 +96,7 @@ impl Widget for GlyphEditor {
         let control_point_clr = ctx.render_ctx.solid_brush(POINT_COLOR_CONTROL).unwrap();
         let hover_point_clr = ctx.render_ctx.solid_brush(POINT_COLOR_HOVER).unwrap();
         let drag_point_clr = ctx.render_ctx.solid_brush(POINT_COLOR_DRAG).unwrap();
+        let select_rect_clr = ctx.render_ctx.solid_brush(RECT_SELECT_BODY_COLOR).unwrap();
 
         let scale = (geom.size.1 / self.height * 0.65).min(1.0).max(0.2);
         println!("scale {}", scale);
@@ -144,23 +151,39 @@ impl Widget for GlyphEditor {
                 self.controls.push((circ, id));
 
                 ctx.render_ctx.fill(circ, color, FillRule::NonZero);
+
+                if self.selected.contains(&id) {
+                    let bbox = circ.bounding_box();
+                    let bbox = inset_rect(bbox, 2.0, 2.0);
+                    ctx.render_ctx.stroke(bbox, &outline_clr, 0.5, None);
+                }
                 id += 1;
             }
         }
         ctx.render_ctx.stroke(affine * control_guides, &control_point_clr, 1.0, None);
+
+        if let MouseState::RectSelect { start, current } = self.mouse {
+            let rect = Rect::from_points(start, current);
+            ctx.render_ctx.fill(rect, &select_rect_clr, FillRule::NonZero);
+            ctx.render_ctx.stroke(rect, &outline_clr, 0.5, None);
+        }
     }
 
     fn mouse(&mut self, event: &MouseEvent, ctx: &mut HandlerCtx) -> bool {
         eprintln!("{:?}{}: ({}, {})", event.which, event.count, event.x, event.y);
         const MIN_DRAG_DISTANCE: f64 = 5.0;
         let v2 = (event.x as f64, event.y as f64).into();
+        let clicked_control = self.controls.iter().find(|(c, _)| is_inside(*c, v2));
+
         let new_state = match self.mouse {
             MouseState::Normal | MouseState::Hover(_) if event.which == MouseButton::Left && event.count == 1 => {
-                if let Some((circ, point)) = self.controls.iter().find(|(c, _)| is_inside(*c, v2)) {
+                self.selected.clear();
+                if let Some((circ, point)) =  clicked_control.as_ref() {
+                    self.selected.insert(*point);
                     eprintln!("dragging point {}", point);
                     MouseState::Drag { point: *point, start: circ.center, current: v2 }
                 } else {
-                    MouseState::Normal
+                    MouseState::RectSelect { start: v2, current: v2 }
                 }
             }
             MouseState::Drag { point, start, current } if event.count == 0 => {
@@ -191,6 +214,15 @@ impl Widget for GlyphEditor {
                 self.update_point(point, v2);
                 MouseState::Drag { point, start, current: v2 }
             }
+            MouseState::RectSelect { start, .. } => {
+                let new_rect = Rect::from_points(start, v2).abs();
+                self.selected = self.controls.iter()
+                    .filter(|(c, _)| is_inside_rect(new_rect, c.center))
+                    .map(|(_, id)| *id)
+                    .collect();
+
+                MouseState::RectSelect { start, current: v2 }
+            }
             _ => match self.controls.iter().find(|(c, _)| is_inside(*c, v2)).map(|(_, id)| id) {
                 Some(id) => MouseState::Hover(*id),
                 None => MouseState::Normal,
@@ -218,6 +250,17 @@ impl Widget for GlyphEditor {
 #[inline]
 fn is_inside(circle: Circle, point: Vec2) -> bool {
     distance(point, circle.center) <= circle.radius
+}
+
+#[inline]
+fn is_inside_rect(rect: Rect, point: Vec2) -> bool {
+    point.x >= rect.x0 && point.x <= rect.x1 && point.y >= rect.y0 && point.y <= rect.y1
+}
+
+/// inset each edge of the rect by some distance
+fn inset_rect(rect: Rect, dx: f64, dy: f64) -> Rect {
+    let Rect { x0, x1, y0, y1 } = rect;
+    Rect { x0: x0 - dx, x1: x1 + dx, y0: y0 - dy, y1: y1 + dy  }
 }
 
 #[inline]
