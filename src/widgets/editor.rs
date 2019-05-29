@@ -5,8 +5,8 @@ use norad::glyph::{Glyph, PointType};
 use piet::{FillRule, RenderContext};
 
 use druid::{
-    BoxConstraints, Geometry, HandlerCtx, Id, LayoutCtx, LayoutResult, MouseEvent, PaintCtx,
-    Ui, Widget,
+    BoxConstraints, Geometry, HandlerCtx, Id, KeyEvent, KeyVariant, LayoutCtx, LayoutResult,
+    MouseEvent, PaintCtx, Ui, Widget,
 };
 
 use druid::widget::MouseButton;
@@ -24,6 +24,11 @@ const POINT_COLOR_CONTROL: u32 =  0x70_80_7a_ff;
 const POINT_COLOR_HOVER: u32 =  0xf0_80_7a_ff;
 const POINT_COLOR_DRAG: u32 =  0xff_40_3a_ff;
 const RECT_SELECT_BODY_COLOR: u32 = 0x28_28_60_80;
+
+const LEFT_ARROW: char = '\u{f702}';
+const UP_ARROW: char = '\u{f700}';
+const RIGHT_ARROW: char = '\u{f703}';
+const DOWN_ARROW: char = '\u{f701}';
 
 
 pub struct GlyphEditor {
@@ -76,9 +81,25 @@ impl GlyphEditor {
             p.y = glyph_point.y as f32;
         }
 
-        //self.path = self.glyph.outline.as_ref().map(|o| (&o.contours)).unwrap_or_default();
         self.path = glyph_widget::path_for_glyph(&self.glyph);
     }
+
+    fn nudge_selection(&mut self, key: char, count: f32) {
+        let sels: Vec<_> = self.selected.iter().cloned().collect();
+        for point in sels.iter() {
+            if let Some(p) = self.glyph.outline.as_mut().iter_mut().flat_map(|o| o.contours.iter_mut()).flat_map(|c| c.points.iter_mut()).nth(*point) {
+                match key {
+                    LEFT_ARROW => p.x -= count,
+                    RIGHT_ARROW => p.x += count,
+                    UP_ARROW => p.y += count,
+                    DOWN_ARROW => p.y -= count,
+                    _other => panic!("illegal key for nudge: {}", _other),
+                }
+            }
+        }
+        self.path = glyph_widget::path_for_glyph(&self.glyph);
+    }
+
 
     pub fn ui(self, ctx: &mut Ui) -> Id {
         ctx.add(self, &[])
@@ -234,6 +255,19 @@ impl Widget for GlyphEditor {
         }
 
         self.mouse = new_state;
+    }
+
+    fn key(&mut self, event: &KeyEvent, ctx: &mut HandlerCtx) -> bool {
+        //println!("keydown {:?}", event);
+        let nudge_keys: &[char] = &[LEFT_ARROW, RIGHT_ARROW, UP_ARROW, DOWN_ARROW];
+        if let KeyEvent { key: KeyVariant::Char(c), .. } = event {
+            if nudge_keys.contains(c) {
+                self.nudge_selection(*c, 5.);
+                ctx.invalidate();
+                return true;
+            }
+        }
+        false
     }
 
     fn layout(
