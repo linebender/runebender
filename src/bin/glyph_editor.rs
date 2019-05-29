@@ -24,6 +24,7 @@ mod editor;
 
 fn build_ui(ui: &mut UiState, glyph: Glyph) {
     let root_id = editor::GlyphEditor::new(glyph).ui(ui);
+    ui.set_focus(Some(root_id));
     ui.set_root(root_id);
 }
 
