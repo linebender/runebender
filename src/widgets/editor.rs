@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use kurbo::{Affine, BezPath, Circle, Line, Rect, Shape, Vec2};
 use norad::glyph::{Glyph, PointType};
@@ -36,7 +36,7 @@ pub struct GlyphEditor {
     path: BezPath,
     height: f32,
     controls: Vec<(Circle, PointId)>,
-    selected: HashSet<PointId>,
+    selected: HashMap<PointId, Vec2>,
     mouse: MouseState,
     /// for mapping a point in the widget to a point in the glyph
     // TODO: how do I get the inverse of an affine?
@@ -67,7 +67,7 @@ impl GlyphEditor {
             height,
             path,
             controls: Vec::new(),
-            selected: HashSet::new(),
+            selected: HashMap::new(),
             mouse: MouseState::Normal,
             translate_fn: Box::new(|pt| pt),
         }
@@ -85,7 +85,7 @@ impl GlyphEditor {
     }
 
     fn nudge_selection(&mut self, key: char, count: f32) {
-        let sels: Vec<_> = self.selected.iter().cloned().collect();
+        let sels: Vec<_> = self.selected.keys().cloned().collect();
         for point in sels.iter() {
             if let Some(p) = self.glyph.outline.as_mut().iter_mut().flat_map(|o| o.contours.iter_mut()).flat_map(|c| c.points.iter_mut()).nth(*point) {
                 match key {
@@ -97,6 +97,36 @@ impl GlyphEditor {
                 }
             }
         }
+        self.path = glyph_widget::path_for_glyph(&self.glyph);
+    }
+
+    /// sets all selected points to a single x or y position. The axis used is
+    /// that with the smallest max distance between points. The position is the smallest
+    /// position of an exiting selected point on that axis.
+    ///
+    /// These choices (especially the latter) are arbitrary.
+    fn align_points(&mut self) {
+         //are these points closer horizontally or vertically?
+        if self.selected.len() < 2 { return; }
+
+        let mut sels = self.selected.clone();
+        let minx = sels.values().fold(std::f64::MAX, |acc, p|  p.x.min(acc));
+        let maxx = sels.values().fold(std::f64::MIN, |acc, p|  p.x.max(acc));
+        let miny = sels.values().fold(std::f64::MAX, |acc, p|  p.y.min(acc));
+        let maxy = sels.values().fold(std::f64::MIN, |acc, p|  p.y.max(acc));
+        println!("{} {} {} {}", minx, maxx, miny, maxy);
+
+        for point in sels.keys() {
+            if let Some(p) = self.glyph.outline.as_mut().iter_mut().flat_map(|o| o.contours.iter_mut()).flat_map(|c| c.points.iter_mut()).nth(*point) {
+                let glyph_point = ( self.translate_fn )((minx, miny).into());
+                if maxx - minx < maxy - miny {
+                    p.x = glyph_point.x as f32;
+                } else {
+                    p.y = glyph_point.y as f32;
+                }
+            }
+        }
+
         self.path = glyph_widget::path_for_glyph(&self.glyph);
     }
 
@@ -173,7 +203,7 @@ impl Widget for GlyphEditor {
 
                 ctx.render_ctx.fill(circ, color, FillRule::NonZero);
 
-                if self.selected.contains(&id) {
+                if self.selected.contains_key(&id) {
                     let bbox = circ.bounding_box();
                     let bbox = inset_rect(bbox, 2.0, 2.0);
                     ctx.render_ctx.stroke(bbox, &outline_clr, 0.5, None);
@@ -200,7 +230,7 @@ impl Widget for GlyphEditor {
             MouseState::Normal | MouseState::Hover(_) if event.which == MouseButton::Left && event.count == 1 => {
                 self.selected.clear();
                 if let Some((circ, point)) =  clicked_control.as_ref() {
-                    self.selected.insert(*point);
+                    self.selected.insert(*point, circ.center);
                     eprintln!("dragging point {}", point);
                     MouseState::Drag { point: *point, start: circ.center, current: v2 }
                 } else {
@@ -239,7 +269,7 @@ impl Widget for GlyphEditor {
                 let new_rect = Rect::from_points(start, v2).abs();
                 self.selected = self.controls.iter()
                     .filter(|(c, _)| is_inside_rect(new_rect, c.center))
-                    .map(|(_, id)| *id)
+                    .map(|(c, id)| (*id, c.center))
                     .collect();
 
                 MouseState::RectSelect { start, current: v2 }
@@ -258,11 +288,16 @@ impl Widget for GlyphEditor {
     }
 
     fn key(&mut self, event: &KeyEvent, ctx: &mut HandlerCtx) -> bool {
-        //println!("keydown {:?}", event);
+        println!("keydown {:?}", event);
         let nudge_keys: &[char] = &[LEFT_ARROW, RIGHT_ARROW, UP_ARROW, DOWN_ARROW];
         if let KeyEvent { key: KeyVariant::Char(c), .. } = event {
             if nudge_keys.contains(c) {
                 self.nudge_selection(*c, 5.);
+                ctx.invalidate();
+                return true;
+            } else if c == &'i' {
+                eprintln!("align points?");
+                self.align_points();
                 ctx.invalidate();
                 return true;
             }
