@@ -288,7 +288,6 @@ impl Widget for GlyphEditor {
     }
 
     fn key(&mut self, event: &KeyEvent, ctx: &mut HandlerCtx) -> bool {
-        println!("keydown {:?}", event);
         let nudge_keys: &[char] = &[LEFT_ARROW, RIGHT_ARROW, UP_ARROW, DOWN_ARROW];
         if let KeyEvent { key: KeyVariant::Char(c), .. } = event {
             if nudge_keys.contains(c) {
@@ -296,9 +295,11 @@ impl Widget for GlyphEditor {
                 ctx.invalidate();
                 return true;
             } else if c == &'i' {
-                eprintln!("align points?");
                 self.align_points();
                 ctx.invalidate();
+                return true;
+            } else if c == &'\u{1b}' {
+                ctx.send_event(true);
                 return true;
             }
         }
