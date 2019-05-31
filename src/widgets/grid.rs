@@ -1,8 +1,7 @@
-use kurbo::Rect;
-use piet::{FillRule, RenderContext};
+//! A collection of children laid out in a grid.
 
 use druid::widget::Widget;
-use druid::{BoxConstraints, Geometry, LayoutResult, HandlerCtx, Id, LayoutCtx, MouseEvent, PaintCtx, Ui};
+use druid::{BoxConstraints, LayoutResult, Id, LayoutCtx, Ui};
 
 //TODO: this should be part of the main lib
 #[derive(Debug, Default)]
@@ -81,80 +80,5 @@ impl Widget for Grid {
         self.layout.next_orig.x += padding + item_w;
         self.layout.row_count += 1;
         LayoutResult::RequestChild(next_child, BoxConstraints::tight((self.item_size.width, self.item_size.height)))
-    }
-}
-
-pub struct Clickable {}
-
-impl Clickable {
-    pub fn new() -> Self {
-        Clickable {}
-    }
-
-    /// Add to UI with children.
-    pub fn ui<ID: Into<Option<Id>>>(self, child: ID, ctx: &mut Ui) -> Id {
-        if let Some(child) = child.into() {
-            ctx.add(self, &[child])
-        } else {
-            ctx.add(self, &[])
-        }
-    }
-}
-
-impl Widget for Clickable {
-    fn mouse(&mut self, event: &MouseEvent, ctx: &mut HandlerCtx) -> bool {
-        //eprintln!("event {:?} node: {}", &event, ctx.id);
-        if event.count > 0 {
-            ctx.set_active(true);
-        } else {
-            ctx.set_active(false);
-            if ctx.is_hot() {
-                ctx.send_event(true);
-            }
-        }
-        ctx.invalidate();
-        true
-    }
-
-    fn layout(
-        &mut self,
-        bc: &BoxConstraints,
-        children: &[Id],
-        size: Option<(f32, f32)>,
-        ctx: &mut LayoutCtx,
-    ) -> LayoutResult {
-        if let Some(size) = size {
-            // Maybe this is not necessary, rely on default value.
-            ctx.position_child(children[0], (0.0, 0.0));
-            LayoutResult::Size(size)
-        } else if children.is_empty() {
-            LayoutResult::Size((bc.max_width, bc.max_height))
-        } else {
-            LayoutResult::RequestChild(children[0], *bc)
-        }
-    }
-
-    fn paint(&mut self, paint_ctx: &mut PaintCtx, geom: &Geometry) {
-        let is_active = paint_ctx.is_active();
-        let is_hot = paint_ctx.is_hot();
-        let bg_color = match (is_active, is_hot) {
-            (true, true) => 0x60f068ff,
-            (false, true) => 0x5050f8ff,
-            _ => 0x000048ff,
-        };
-        let brush = paint_ctx.render_ctx.solid_brush(bg_color).unwrap();
-        let (x, y) = geom.pos;
-        let (width, height) = geom.size;
-        let rect = Rect::new(
-            x as f64,
-            y as f64,
-            x as f64 + width as f64,
-            y as f64 + height as f64,
-            );
-        paint_ctx.render_ctx.fill(rect, &brush, FillRule::NonZero);
-    }
-
-    fn on_hot_changed(&mut self, _hot: bool, ctx: &mut HandlerCtx) {
-        ctx.invalidate();
     }
 }

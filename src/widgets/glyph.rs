@@ -12,6 +12,7 @@ const GLYPH_COLOR: u32 =  0x6a_6a_6a_ff;
 const HIGHLIGHT_COLOR: u32 =  0xfa_fa_fa_ff;
 const ON_CLICK_COLOR: u32 =  0x_24_24_84_ff;
 
+#[allow(dead_code)]
 pub struct GlyphWidget {
     glyph: Glyph,
     path: BezPath,
@@ -75,9 +76,9 @@ impl Widget for GlyphWidget {
     fn layout(
         &mut self,
         bc: &BoxConstraints,
-        children: &[Id],
-        size: Option<(f32, f32)>,
-        ctx: &mut LayoutCtx,
+        _children: &[Id],
+        _size: Option<(f32, f32)>,
+        _ctx: &mut LayoutCtx,
     ) -> LayoutResult {
         LayoutResult::Size((bc.max_width, bc.max_height))
     }
