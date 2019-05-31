@@ -1,26 +1,15 @@
 // Copyright 2019 the Runebender authors.
 
 //! Load a layer from a UFO file and display all glyphs
-
-use std::any::Any;
 use norad::{Ufo, Glyph};
 
 use druid_shell::platform::WindowBuilder;
 use druid_shell::win_main;
 
 use druid::widget::EventForwarder;
-use druid::{
-    BoxConstraints, HandlerCtx, Id, LayoutCtx, LayoutResult, Ui, UiMain, UiState, Widget,
-};
+use druid::{Id, UiMain, UiState};
 
-#[path="../widgets/grid.rs"]
-mod grid;
-
-#[path="../widgets/glyph.rs"]
-mod glyph_widget;
-
-#[path="../widgets/editor.rs"]
-mod editor;
+use runebender::widgets::{GlyphEditor, GlyphWidget, Grid};
 
 #[derive(Debug, Clone)]
 pub enum Action {
@@ -63,12 +52,12 @@ fn main() {
     let mut builder = WindowBuilder::new();
     let mut state = UiState::new();
 
-    let grid = grid::Grid::new((100.0, 100.0));
+    let grid = Grid::new((100.0, 100.0));
 
     let glyph_widgets = glyphs.into_iter()
         .map(|g| {
             let mut action = Action::Edit(g.clone());
-            let widget = glyph_widget::GlyphWidget::new(g).ui(&mut state);
+            let widget = GlyphWidget::new(g).ui(&mut state);
             state.add_listener(widget, move |_: &mut bool, mut ctx| {
                 ctx.poke_up(&mut action);
             });
@@ -86,7 +75,7 @@ fn main() {
         forwarder,
         move |action: &mut Action, mut ctx| match action {
             Action::Edit(glyph) => {
-                let edit_widget = editor::GlyphEditor::new(glyph.clone()).ui(&mut ctx);
+                let edit_widget = GlyphEditor::new(glyph.clone()).ui(&mut ctx);
                 ctx.add_listener(edit_widget, move |_: &mut bool, mut ctx| {
                     ctx.poke_up(&mut Action::EndEdit);
                 });

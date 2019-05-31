@@ -11,8 +11,7 @@ use druid::{
 
 use druid::widget::MouseButton;
 
-#[path="./glyph.rs"]
-mod glyph_widget;
+use super::glyph::path_for_glyph;
 
 //HACK: currently we just use the point's "overall index" as an id.
 type PointId = usize;
@@ -61,7 +60,7 @@ impl GlyphEditor {
                  .any(|h| h > 1000.))
             .unwrap_or(false) { 4000. } else { 1000. };
 
-        let path = glyph_widget::path_for_glyph(&glyph);
+        let path = path_for_glyph(&glyph);
         GlyphEditor {
             glyph,
             height,
@@ -81,7 +80,7 @@ impl GlyphEditor {
             p.y = glyph_point.y as f32;
         }
 
-        self.path = glyph_widget::path_for_glyph(&self.glyph);
+        self.path = path_for_glyph(&self.glyph);
     }
 
     fn nudge_selection(&mut self, key: char, count: f32) {
@@ -97,7 +96,7 @@ impl GlyphEditor {
                 }
             }
         }
-        self.path = glyph_widget::path_for_glyph(&self.glyph);
+        self.path = path_for_glyph(&self.glyph);
     }
 
     /// sets all selected points to a single x or y position. The axis used is
@@ -109,12 +108,11 @@ impl GlyphEditor {
          //are these points closer horizontally or vertically?
         if self.selected.len() < 2 { return; }
 
-        let mut sels = self.selected.clone();
+        let sels = self.selected.clone();
         let minx = sels.values().fold(std::f64::MAX, |acc, p|  p.x.min(acc));
         let maxx = sels.values().fold(std::f64::MIN, |acc, p|  p.x.max(acc));
         let miny = sels.values().fold(std::f64::MAX, |acc, p|  p.y.min(acc));
         let maxy = sels.values().fold(std::f64::MIN, |acc, p|  p.y.max(acc));
-        println!("{} {} {} {}", minx, maxx, miny, maxy);
 
         for point in sels.keys() {
             if let Some(p) = self.glyph.outline.as_mut().iter_mut().flat_map(|o| o.contours.iter_mut()).flat_map(|c| c.points.iter_mut()).nth(*point) {
@@ -127,7 +125,7 @@ impl GlyphEditor {
             }
         }
 
-        self.path = glyph_widget::path_for_glyph(&self.glyph);
+        self.path = path_for_glyph(&self.glyph);
     }
 
 

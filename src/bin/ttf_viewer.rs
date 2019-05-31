@@ -12,9 +12,7 @@ use druid::{
     UiMain, UiState,
 };
 
-mod font;
-
-use font::Font;
+use runebender::font::Font;
 
 struct GlyphList {
     font: Font,
