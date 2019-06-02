@@ -60,7 +60,7 @@ impl Widget for GlyphWidget {
                                  0.0,
                                  -scale as f64,
                                  x as f64 + l_pad,
-                                 (height +  y) as f64 - baseline, // + bb.height() * scale
+                                 (height +  y) as f64 - baseline,
         ]);
         let fill_color = if is_active { HIGHLIGHT_COLOR } else { GLYPH_COLOR };
         let fill = ctx.render_ctx.solid_brush(fill_color).unwrap();
@@ -80,7 +80,7 @@ impl Widget for GlyphWidget {
         _size: Option<(f32, f32)>,
         _ctx: &mut LayoutCtx,
     ) -> LayoutResult {
-        LayoutResult::Size((bc.max_width, bc.max_height))
+        LayoutResult::Size(bc.max())
     }
 
     fn on_hot_changed(&mut self, _hot: bool, ctx: &mut HandlerCtx) {

@@ -2,6 +2,21 @@
 
 A font editor written in Rust, currently in very early stages.
 
+This repo currently contains a crate that itself contains a number of different
+experimental binaries. These are in `src/bin`.
+
+To run the toy editor:
+
+```rust
+cargo run --bin=ufo_editor path/to/some/unifedfontobject.ufo
+```
+
+To run the ttf viewer:
+
+```rust
+cargo run --bin=ttf_viewer path/to/my_font.tff
+```
+
 ## Contributions
 
 Contributions are welcome. The [Rust Code of Conduct] applies. Please feel free to add your name to the [AUTHORS] file in any substantive pull request.

@@ -33,7 +33,7 @@ fn main() {
 
     println!("loading {}", glyph_path);
     let mut ufo = Ufo::load(&glyph_path).expect("failed to load ufo");
-    let layer = ufo.find_layer(|l| l.name == "foreground").expect("failed to find foreground layer");
+    let layer = ufo.get_default_layer().expect("failed to find foreground layer");
     let glyph_names = layer.iter_contents().map(|(n, _)| n.clone()).collect::<Vec<_>>();
 
     let glyphs = glyph_names.iter().flat_map(|n| {

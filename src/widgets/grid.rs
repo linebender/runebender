@@ -51,14 +51,15 @@ impl Widget for Grid {
         if size.is_none() {
             self.layout = LayoutState::default();
             if children.is_empty() {
-                return LayoutResult::Size((bc.min_width, bc.min_height));
+                return LayoutResult::Size(bc.min());
             }
         }
 
         let item_w = self.item_size.width;
         let item_h = self.item_size.height;
-        let items_per_row = (bc.max_width / (self.item_size.width + self.padding)).floor();
-        let padding = (bc.max_width - ((self.item_size.width + self.padding) * items_per_row)) / items_per_row;
+        let max_width = bc.max().0;
+        let items_per_row = (max_width / (self.item_size.width + self.padding)).floor();
+        let padding = (max_width - ((self.item_size.width + self.padding) * items_per_row)) / items_per_row;
         let padding = padding.max(self.padding);
 
         if self.layout.ix >= children.len() {
@@ -68,8 +69,7 @@ impl Widget for Grid {
         let next_child = children[self.layout.ix];
         self.layout.ix += 1;
 
-        //for child in _children {
-        if self.layout.row_count > 0 && self.layout.next_orig.x + item_w + self.padding > bc.max_width {
+        if self.layout.row_count > 0 && self.layout.next_orig.x + item_w + self.padding > max_width {
             self.layout.row_count = 0;
             self.layout.next_orig.x = 0.;
             self.layout.next_orig.y += self.padding + item_h;
