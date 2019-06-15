@@ -90,7 +90,7 @@ impl Widget for GlyphWidget {
         let pos = (xpos, ypos);
 
         //draw a semi-translucent background
-        let text_bg_rect = Rect::from_origin_size((pos.0 as f64, (pos.1 - font_size * 0.75) as f64).into(), (text.width(), font_size as f64).into());
+        let text_bg_rect = Rect::from_origin_size((pos.0 as f64, (pos.1 - font_size * 0.75) as f64).into(), (text.width() as f64, font_size as f64).into());
         let text_bg_color = ctx.render_ctx.solid_brush(TEXT_BG_COLOR).unwrap();
         ctx.render_ctx.fill(text_bg_rect, &text_bg_color, FillRule::NonZero);
 
