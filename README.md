@@ -5,6 +5,20 @@ A font editor written in Rust, currently in very early stages.
 This repo currently contains a crate that itself contains a number of different
 experimental binaries. These are in `src/bin`.
 
+## Building
+
+You need to have `libcairo` installed.
+
+### Mac
+
+There is currently an [issue](https://github.com/gtk-rs/cairo/issues/263) when `libcairo` is installed via `homebrew`.
+
+Until this is fixed please compile using
+
+    PKG_CONFIG_PATH="/usr/local/opt/libffi/lib/pkgconfig" cargo build
+
+## Running
+
 To run the toy editor:
 
 ```rust
