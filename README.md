@@ -7,7 +7,7 @@ experimental binaries. These are in `src/bin`.
 
 ## Building
 
-You need to have `libcairo` installed.
+On macOS, you need to have `libcairo` installed.
 
 ### Mac
 
