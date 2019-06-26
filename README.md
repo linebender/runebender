@@ -7,10 +7,13 @@ experimental binaries. These are in `src/bin`.
 
 ## Building
 
-On macOS, you need to have `libcairo` installed.
+### Linux
 
-### Mac
+Linux is currently not supported, since window management is missing.
 
+### macOS
+
+You need to have `libcairo` installed.
 There is currently an [issue](https://github.com/gtk-rs/cairo/issues/263) when `libcairo` is installed via `homebrew`.
 
 Until this is fixed please compile using
