@@ -7,10 +7,6 @@ experimental binaries. These are in `src/bin`.
 
 ## Building
 
-### Linux
-
-Linux is currently not supported, since window management is missing.
-
 ### macOS
 
 You need to have `libcairo` installed.
