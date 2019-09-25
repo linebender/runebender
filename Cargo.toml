@@ -1,19 +1,10 @@
 [package]
 name = "runebender"
-version = "0.1.0"
-authors = ["Raph Levien <raph.levien@gmail.com>"]
+version = "0.2.0"
+authors = ["Raph Levien <raph.levien@gmail.com>, Colin Rofls <colin.rofls@gmail.com>"]
 license = "Apache-2.0"
 edition = "2018"
 
 [dependencies]
-druid = { git="https://github.com/xi-editor/druid/", rev="1c9da82f871a04b4f4ca680f105ab82925235883" }
-druid-shell = { git="https://github.com/xi-editor/druid/", rev="1c9da82f871a04b4f4ca680f105ab82925235883" }
-norad = { git="https://github.com/linebender/norad", rev="49eec403e69158be535d4ef0735ea38d8237d9ea" }
-kurbo = "0.2.1"
-piet = "0.0.2"
-piet-common = "0.0.2"
-
-[dependencies.font-rs]
-git = "https://github.com/raphlinus/font-rs"
-rev = "788e8b523956b5c7addedb7fb524f22c53fe07dd"
-features = ["kurbo"]
+druid = { git="https://github.com/xi-editor/druid/", rev="922613f" }
+norad = "0.0.1"
