@@ -1,11 +1,14 @@
 //! A font editor.
 
+mod data;
 mod menus;
+mod widgets;
 
-use druid::widget::{Align, Label, Padding};
+use druid::widget::{Align, DynLabel, Padding};
 use druid::{AppLauncher, LocalizedString, Widget, WindowDesc};
 
-type AppState = u32;
+use data::AppState;
+use widgets::Controller;
 
 fn main() {
     let main_window = WindowDesc::new(make_ui)
@@ -14,12 +17,16 @@ fn main() {
 
     AppLauncher::with_window(main_window)
         .use_simple_logger()
-        .launch(0)
+        .launch(AppState::default())
         .expect("launch failed");
 }
 
 fn make_ui() -> impl Widget<AppState> {
-    let text = LocalizedString::new("Fontville!");
-    let label = Label::new(text);
-    Align::centered(Padding::uniform(5.0, label))
+    let label = DynLabel::new(|data: &AppState, _| {
+        format!(
+            "{:?}",
+            data.file.as_ref().map(|obj| format!("{:?}", &obj.path))
+        )
+    });
+    Controller::new(Align::centered(Padding::uniform(5.0, label)))
 }
