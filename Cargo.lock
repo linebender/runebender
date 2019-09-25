@@ -701,6 +701,7 @@ name = "runebender"
 version = "0.2.0"
 dependencies = [
  "druid 0.3.0 (git+https://github.com/xi-editor/druid/?rev=3cb5700)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "norad 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
