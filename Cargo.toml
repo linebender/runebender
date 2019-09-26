@@ -7,5 +7,5 @@ edition = "2018"
 
 [dependencies]
 druid = { git="https://github.com/xi-editor/druid/", rev="3cb5700" }
-norad = "0.0.1"
-log = "*"
+norad = "0.0.2"
+log = "0.4.8"
