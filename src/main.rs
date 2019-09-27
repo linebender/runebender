@@ -1,6 +1,7 @@
 //! A font editor.
 
 mod data;
+mod lens2;
 mod menus;
 mod widgets;
 
@@ -33,7 +34,7 @@ fn make_ui() -> impl Widget<AppState> {
         None => "New Font".to_string(),
     });
     col.add_child(
-        SizedBox::new(Align::centered(Padding::uniform(5.0, label))).height(80.),
+        SizedBox::new(Align::centered(Padding::uniform(5.0, label))).height(60.),
         0.,
     );
     col.add_child(Scroll::new(GlyphGrid::new()).vertical(), 1.);
