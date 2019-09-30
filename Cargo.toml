@@ -6,8 +6,7 @@ license = "Apache-2.0"
 edition = "2018"
 
 [dependencies]
-druid = { git="https://github.com/xi-editor/druid/", rev="3cb5700" }
+druid = { git="https://github.com/xi-editor/druid/", rev="028021" }
+norad = { git="https://github.com/linebender/norad", branch="runebender", features=["druid_data"] }
 #norad = "0.0.2"
-#norad = { git="https://github.com/linebender/norad", branch="rc-glyph" }
-norad = { path = "../norad" }
 log = "0.4.8"
