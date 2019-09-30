@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use druid::kurbo::{Affine, BezPath, Point, Rect, Shape, Size};
+use druid::kurbo::{Affine, BezPath, Line, Point, Rect, Shape, Size};
 use druid::piet::{
     Color, FontBuilder, PietText, PietTextLayout, RenderContext, Text, TextLayout,
     TextLayoutBuilder,
@@ -28,8 +28,25 @@ const GLYPH_COLOR: Color = Color::rgb8(0x6a, 0x6a, 0x6a);
 const HIGHLIGHT_COLOR: Color = Color::rgb8(0x04, 0x3b, 0xaf);
 
 impl Widget<Rc<Ufo>> for GlyphGrid {
-    fn paint(&mut self, ctx: &mut PaintCtx, _state: &BaseState, data: &Rc<Ufo>, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &Rc<Ufo>, env: &Env) {
         ctx.render_ctx.clear(Color::WHITE);
+        let row_len = 1.0_f64.max(state.size().width / GLYPH_SIZE).floor() as usize;
+        let row_count = if self.children.is_empty() {
+            0
+        } else {
+            self.children.len() / row_len + 1
+        };
+        let units_per_em = data
+            .font_info
+            .as_ref()
+            .and_then(|info| info.units_per_em.clone())
+            .unwrap_or(1000.);
+
+        for row in 0..row_count {
+            let baseline = row as f64 * GLYPH_SIZE + GLYPH_SIZE * (1.0 - 0.16);
+            let line = Line::new((0., baseline), (state.size().width + GLYPH_SIZE, baseline));
+            ctx.render_ctx.stroke(&line, &GLYPH_COLOR, 0.5);
+        }
         for child in &mut self.children {
             child.paint_with_offset(ctx, data, env);
         }
