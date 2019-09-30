@@ -3,28 +3,32 @@
 use std::rc::Rc;
 
 use druid::kurbo::{Affine, BezPath, Point, Rect, Shape, Size};
-use druid::piet::{Color, RenderContext};
+use druid::piet::{
+    Color, FontBuilder, PietText, PietTextLayout, RenderContext, Text, TextLayout,
+    TextLayoutBuilder,
+};
 use druid::{
-    BaseState, BoxConstraints, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget,
-    WidgetPod,
+    theme, BaseState, BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx,
+    Widget, WidgetPod,
 };
 
-//use norad::Ufo;
 use norad::glyph::{Contour, ContourPoint, Glyph, PointType};
+use norad::Ufo;
 
-use crate::data::{lenses, AppState};
+use crate::data::lenses;
+use crate::lens2::Lens2Wrap;
 
 pub struct GlyphGrid {
-    children: Vec<WidgetPod<AppState, GridItem>>,
+    children: Vec<WidgetPod<Rc<Ufo>, Lens2Wrap<Rc<Glyph>, lenses::app_state::Glyph, GridInner>>>,
 }
 
-//const TOTAL_HEIGHT: f64 = 2000.;
 const GLYPH_SIZE: f64 = 100.;
+const TEXT_BG_COLOR: Color = Color::rgba8(0xd7, 0xd8, 0xd2, 0xad);
 const GLYPH_COLOR: Color = Color::rgb8(0x6a, 0x6a, 0x6a);
-const HIGHLIGHT_COLOR: Color = Color::rgb8(0xfa, 0xfa, 0xfa);
+const HIGHLIGHT_COLOR: Color = Color::rgb8(0x04, 0x3b, 0xaf);
 
-impl Widget<AppState> for GlyphGrid {
-    fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &AppState, env: &Env) {
+impl Widget<Rc<Ufo>> for GlyphGrid {
+    fn paint(&mut self, ctx: &mut PaintCtx, _state: &BaseState, data: &Rc<Ufo>, env: &Env) {
         ctx.render_ctx.clear(Color::WHITE);
         for child in &mut self.children {
             child.paint_with_offset(ctx, data, env);
@@ -35,11 +39,10 @@ impl Widget<AppState> for GlyphGrid {
         &mut self,
         ctx: &mut LayoutCtx,
         bc: &BoxConstraints,
-        data: &AppState,
+        data: &Rc<Ufo>,
         env: &Env,
     ) -> Size {
         let width = (bc.max().width / GLYPH_SIZE).floor() * GLYPH_SIZE;
-        eprintln!("width {}", width);
         let mut x: f64 = 0.;
         let mut y: f64 = 0.;
 
@@ -57,18 +60,29 @@ impl Widget<AppState> for GlyphGrid {
         Size::new(width, y + GLYPH_SIZE)
     }
 
-    fn event(&mut self, _event: &Event, _ctx: &mut EventCtx, _data: &mut AppState, _env: &Env) {}
-
-    fn update(&mut self, ctx: &mut UpdateCtx, _old: Option<&AppState>, new: &AppState, _env: &Env) {
-        if let Some(layer) = new.file.as_ref().and_then(|f| f.object.get_default_layer()) {
-            if layer.inner.borrow().contents.len() != self.children.len() {
-                self.children.clear();
-                for key in layer.inner.borrow().contents.keys() {
-                    self.children.push(WidgetPod::new(GridItem::new(key)));
-                }
-            }
-            ctx.invalidate();
+    fn event(&mut self, event: &Event, ctx: &mut EventCtx, data: &mut Rc<Ufo>, env: &Env) {
+        for child in &mut self.children {
+            child.event(event, ctx, data, env)
         }
+    }
+
+    fn update(&mut self, ctx: &mut UpdateCtx, _old: Option<&Rc<Ufo>>, new: &Rc<Ufo>, _env: &Env) {
+        if new.glyph_count() != self.children.len() {
+            let units_per_em = new
+                .font_info
+                .as_ref()
+                .and_then(|info| info.units_per_em.clone())
+                .unwrap_or(1000.);
+            let widget = GridInner { units_per_em };
+            self.children.clear();
+            for key in new.iter_names() {
+                self.children.push(WidgetPod::new(Lens2Wrap::new(
+                    widget,
+                    lenses::app_state::Glyph(key),
+                )));
+            }
+        }
+        ctx.invalidate();
     }
 }
 
@@ -80,66 +94,17 @@ impl GlyphGrid {
     }
 }
 
-struct GridItem {
-    name: String,
-    inner: GridInner,
-}
-
-struct GridInner;
-
-impl GridItem {
-    fn new(name: impl Into<String>) -> Self {
-        GridItem {
-            name: name.into(),
-            inner: GridInner,
-        }
-    }
-
-    fn get_glyph(&self, data: &AppState) -> Option<Rc<Glyph>> {
-        data.file
-            .as_ref()?
-            .object
-            .get_default_layer()?
-            .get_glyph(&self.name)
-            .ok()
-    }
-}
-
-impl Widget<AppState> for GridItem {
-    fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, d: &AppState, env: &Env) {
-        let glyph = self.get_glyph(d).expect("missing glyph");
-        self.inner.paint(ctx, state, &glyph, env)
-    }
-
-    fn layout(
-        &mut self,
-        ctx: &mut LayoutCtx,
-        bc: &BoxConstraints,
-        d: &AppState,
-        env: &Env,
-    ) -> Size {
-        let glyph = self.get_glyph(d).expect("missing glyph");
-        self.inner.layout(ctx, bc, &glyph, env)
-    }
-
-    fn event(&mut self, event: &Event, ctx: &mut EventCtx, data: &mut AppState, env: &Env) {
-        let mut glyph = self.get_glyph(data).expect("missing glyph");
-        self.inner.event(event, ctx, &mut glyph, env)
-    }
-
-    fn update(&mut self, ctx: &mut UpdateCtx, old: Option<&AppState>, new: &AppState, env: &Env) {
-        let old = old.map(|old| self.get_glyph(old).expect("missing glyph"));
-        let new = self.get_glyph(new).expect("missing glyph");
-        self.inner.update(ctx, old.as_ref(), &new, env)
-    }
+#[derive(Debug, Clone, Copy)]
+struct GridInner {
+    units_per_em: f64,
 }
 
 impl Widget<Rc<Glyph>> for GridInner {
-    fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &Rc<Glyph>, _env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &Rc<Glyph>, env: &Env) {
         let path = path_for_glyph(data);
         let bb = path.bounding_box();
         let geom = Rect::ZERO.with_size(state.size());
-        let scale = geom.height() as f64 / 1000.;
+        let scale = geom.height() as f64 / self.units_per_em;
         let scale = scale * 0.85; // some margins around glyphs
         let scaled_width = bb.width() * scale as f64;
         let l_pad = ((geom.width() as f64 - scaled_width) / 2.).round();
@@ -158,8 +123,33 @@ impl Widget<Rc<Glyph>> for GridInner {
         } else {
             GLYPH_COLOR
         };
-        //let fill = ctx.render_ctx.solid_brush(glyph_body_color).unwrap();
         ctx.render_ctx.fill(affine * &path, &glyph_body_color);
+
+        if state.is_hot() {
+            ctx.render_ctx.stroke(affine * &path, &HIGHLIGHT_COLOR, 1.0);
+            ctx.render_ctx.stroke(geom, &HIGHLIGHT_COLOR, 1.0);
+        }
+
+        let font_size = env.get(theme::TEXT_SIZE_NORMAL);
+        let name_color = if state.is_hot() {
+            HIGHLIGHT_COLOR
+        } else {
+            GLYPH_COLOR
+        };
+        let text = get_text_layout(&mut ctx.text(), data.name.as_str(), env);
+        let xpos = geom.x0 + (geom.width() - text.width()) * 0.5;
+        let ypos = geom.y0 + geom.height() - font_size * 0.25;
+        let pos = (xpos, ypos);
+
+        //draw a semi-translucent background
+        let text_bg_rect = Rect::from_origin_size(
+            (pos.0 as f64, (pos.1 - font_size * 0.75) as f64),
+            (text.width() as f64, font_size as f64),
+        );
+
+        ctx.render_ctx.fill(&text_bg_rect, &TEXT_BG_COLOR);
+        // draw the text
+        ctx.render_ctx.draw_text(&text, pos, &name_color)
     }
 
     fn layout(
@@ -172,17 +162,55 @@ impl Widget<Rc<Glyph>> for GridInner {
         bc.max()
     }
 
-    fn event(&mut self, _event: &Event, _ctx: &mut EventCtx, _data: &mut Rc<Glyph>, _env: &Env) {}
+    fn event(&mut self, event: &Event, ctx: &mut EventCtx, _data: &mut Rc<Glyph>, _env: &Env) {
+        match event {
+            Event::MouseDown(_) => {
+                ctx.set_active(true);
+                ctx.invalidate();
+            }
+            Event::MouseUp(_) => {
+                if ctx.is_active() {
+                    ctx.set_active(false);
+                    ctx.invalidate();
+                    if ctx.is_hot() {
+                        log::info!("grid item mouse up");
+                    }
+                }
+            }
+            Event::HotChanged(_) => {
+                ctx.invalidate();
+            }
+            _ => (),
+        }
+    }
 
     fn update(
         &mut self,
         ctx: &mut UpdateCtx,
-        _old: Option<&Rc<Glyph>>,
-        _new: &Rc<Glyph>,
+        old: Option<&Rc<Glyph>>,
+        new: &Rc<Glyph>,
         _env: &Env,
     ) {
-        ctx.invalidate();
+        if old.map(|old| !old.same(new)).unwrap_or(true) {
+            ctx.invalidate();
+        }
     }
+}
+
+fn get_text_layout(text_ctx: &mut PietText, text: &str, env: &Env) -> PietTextLayout {
+    let font_name = env.get(theme::FONT_NAME);
+    let font_size = env.get(theme::TEXT_SIZE_NORMAL);
+    // TODO: caching of both the format and the layout
+    let font = text_ctx
+        .new_font_by_name(font_name, font_size)
+        .unwrap()
+        .build()
+        .unwrap();
+    text_ctx
+        .new_text_layout(&font, text)
+        .unwrap()
+        .build()
+        .unwrap()
 }
 
 pub fn path_for_glyph(glyph: &Glyph) -> BezPath {
