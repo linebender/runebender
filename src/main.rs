@@ -1,4 +1,4 @@
-//! A font editor.
+//! A font editor!
 
 mod data;
 mod lens2;

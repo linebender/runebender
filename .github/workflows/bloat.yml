@@ -28,7 +28,19 @@ jobs:
         run: git fetch origin ${{ steps.get_revs.outputs.fetch }}
         if: steps.get_revs.outputs.fetch != ''
 
+      - name: check for meaningful changes
+        run: |
+            git checkout ${{ steps.get_revs.outputs.base }}
+            md5 */*.rs */*/*.rs Cargo.* | sort > bloat-base-checksums.txt
+            git checkout ${{ steps.get_revs.outputs.head }}
+            md5 */*.rs */*/*.rs Cargo.* | sort > bloat-head-checksums.txt
+            echo "$(md5 -q bloat-base-checksums.txt) and $(md5 -q bloat-head-checksums.txt)"
+            if [[ $(md5 -q bloat-base-checksums.txt) == $(md5 -q bloat-head-checksums.txt) ]]; then exit 1; fi
+        # above is a hack; we exit 1 (failure) if we want to continue; we then check
+        # for failure and continue below, and if on success we exit early without reporting this as a failure.
+
       - name: checkout base
+        if: failure()
         uses: actions/checkout@v1
         with:
           ref: ${{ steps.get_revs.outputs.base }}
