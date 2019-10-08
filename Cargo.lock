@@ -420,7 +420,7 @@ dependencies = [
 [[package]]
 name = "norad"
 version = "0.0.3"
-source = "git+https://github.com/linebender/norad?branch=runebender#129c51d9e3f82c5664932addeaea77cd8c89c97d"
+source = "git+https://github.com/linebender/norad?rev=b82522a7#b82522a7e34f07fb83da70142cfb8f51599afc8a"
 dependencies = [
  "druid 0.3.0 (git+https://github.com/xi-editor/druid/?rev=22dfeae)",
  "plist 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -710,7 +710,7 @@ version = "0.2.0"
 dependencies = [
  "druid 0.3.0 (git+https://github.com/xi-editor/druid/?rev=22dfeae)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "norad 0.0.3 (git+https://github.com/linebender/norad?branch=runebender)",
+ "norad 0.0.3 (git+https://github.com/linebender/norad?rev=b82522a7)",
 ]
 
 [[package]]
@@ -1032,7 +1032,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum memchr 2.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "88579771288728879b57485cc7d6b07d648c9f0141eb955f8ab7f9d45394468e"
 "checksum nodrop 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)" = "2f9667ddcc6cc8a43afc9b7917599d7216aa09c463919ea32c59ed6cac8bc945"
 "checksum nom 4.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "2ad2a91a8e869eeb30b9cb3119ae87773a8f4ae617f41b1eb9c154b2905f7bd6"
-"checksum norad 0.0.3 (git+https://github.com/linebender/norad?branch=runebender)" = "<none>"
+"checksum norad 0.0.3 (git+https://github.com/linebender/norad?rev=b82522a7)" = "<none>"
 "checksum num 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)" = "4703ad64153382334aa8db57c637364c322d3372e097840c72000dabdcf6156e"
 "checksum num-bigint 0.1.44 (registry+https://github.com/rust-lang/crates.io-index)" = "e63899ad0da84ce718c14936262a41cee2c79c981fc0a0e7c7beb47d5a07e8c1"
 "checksum num-complex 0.1.43 (registry+https://github.com/rust-lang/crates.io-index)" = "b288631d7878aaf59442cffd36910ea604ecd7745c36054328595114001c9656"
