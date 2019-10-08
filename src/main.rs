@@ -39,7 +39,11 @@ fn make_ui() -> impl Widget<AppState> {
         0.,
     );
     col.add_child(
-        Scroll::new(Lens2Wrap::new(GlyphGrid::new(), lenses::app_state::Ufo)).vertical(),
+        Scroll::new(Lens2Wrap::new(
+            GlyphGrid::new(),
+            lenses::app_state::GlyphSet,
+        ))
+        .vertical(),
         1.,
     );
     Controller::new(col)
