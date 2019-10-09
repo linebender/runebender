@@ -6,15 +6,16 @@ use druid::piet::{
     TextLayoutBuilder,
 };
 use druid::{
-    theme, BaseState, BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx,
-    Widget, WidgetPod,
+    theme, BaseState, BoxConstraints, Command, Data, Env, Event, EventCtx, LayoutCtx, PaintCtx,
+    UpdateCtx, Widget, WidgetPod,
 };
 
+use crate::app_delegate::EDIT_GLYPH;
 use crate::data::{lenses, GlyphPlus, GlyphSet};
 use crate::lens2::Lens2Wrap;
 
 pub struct GlyphGrid {
-    children: Vec<WidgetPod<GlyphSet, Lens2Wrap<GlyphPlus, lenses::app_state::Glyph, GridInner>>>,
+    children: Vec<WidgetPod<GlyphSet, Lens2Wrap<GlyphPlus, lenses::glyph_set::Glyph, GridInner>>>,
 }
 
 const GLYPH_SIZE: f64 = 100.;
@@ -86,7 +87,7 @@ impl Widget<GlyphSet> for GlyphGrid {
             for key in new.object.iter_names() {
                 self.children.push(WidgetPod::new(Lens2Wrap::new(
                     widget,
-                    lenses::app_state::Glyph(key),
+                    lenses::glyph_set::Glyph(key),
                 )));
             }
         }
@@ -103,8 +104,8 @@ impl GlyphGrid {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct GridInner {
-    units_per_em: f64,
+pub struct GridInner {
+    pub units_per_em: f64,
 }
 
 impl Widget<GlyphPlus> for GridInner {
@@ -172,7 +173,7 @@ impl Widget<GlyphPlus> for GridInner {
         bc.max()
     }
 
-    fn event(&mut self, event: &Event, ctx: &mut EventCtx, _data: &mut GlyphPlus, _env: &Env) {
+    fn event(&mut self, event: &Event, ctx: &mut EventCtx, data: &mut GlyphPlus, _env: &Env) {
         match event {
             Event::MouseDown(_) => {
                 ctx.set_active(true);
@@ -183,7 +184,7 @@ impl Widget<GlyphPlus> for GridInner {
                     ctx.set_active(false);
                     ctx.invalidate();
                     if ctx.is_hot() {
-                        log::info!("grid item mouse up");
+                        ctx.submit_command(Command::new(EDIT_GLYPH, data.glyph.name.clone()), None);
                     }
                 }
             }
