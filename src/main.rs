@@ -1,9 +1,10 @@
 //! A font editor.
 
+mod app_delegate;
 mod data;
 mod lens2;
 mod menus;
-mod widgets;
+pub mod widgets;
 
 use druid::widget::{Align, Column, DynLabel, Padding, Scroll, SizedBox};
 use druid::{AppLauncher, LocalizedString, Widget, WindowDesc};
@@ -21,6 +22,7 @@ fn main() {
     let state = get_initial_state();
 
     AppLauncher::with_window(main_window)
+        .delegate(app_delegate::make_delegate())
         .use_simple_logger()
         .launch(state)
         .expect("launch failed");

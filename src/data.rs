@@ -41,6 +41,13 @@ pub struct GlyphPlus {
     resolved: BezCache,
 }
 
+/// The state for an editor view.
+#[derive(Clone, Data)]
+pub struct EditorState {
+    pub glyph: Arc<Glyph>,
+    pub ufo: Arc<Ufo>,
+}
+
 impl AppState {
     pub fn set_file(&mut self, object: Ufo, path: impl Into<Option<PathBuf>>) {
         let obj = FontObject {
@@ -140,13 +147,20 @@ pub mod lenses {
     pub mod app_state {
         use std::sync::Arc;
 
-        use super::super::{AppState, GlyphPlus, GlyphSet as GlyphSet_};
+        use super::super::{
+            AppState, EditorState as EditorState_, GlyphPlus, GlyphSet as GlyphSet_,
+        };
         use crate::lens2::Lens2;
         use norad::GlyphName;
 
+        /// AppState -> GlyphSet_
         pub struct GlyphSet;
 
+        /// AppState -> GlyphPlus
         pub struct Glyph(pub GlyphName);
+
+        /// AppState -> EditorState
+        pub struct EditorState(pub GlyphName);
 
         impl Lens2<AppState, GlyphSet_> for GlyphSet {
             fn get<V, F: FnOnce(&GlyphSet_) -> V>(&self, data: &AppState, f: F) -> V {
@@ -164,6 +178,85 @@ pub mod lenses {
                 f(&mut glyphs)
             }
         }
+
+        impl Lens2<AppState, EditorState_> for EditorState {
+            fn get<V, F: FnOnce(&EditorState_) -> V>(&self, data: &AppState, f: F) -> V {
+                let glyph = data
+                    .file
+                    .object
+                    .get_glyph(&self.0)
+                    .expect("missing glyph in lens2");
+                let glyph = EditorState_ {
+                    glyph: Arc::clone(glyph),
+                    ufo: Arc::clone(&data.file.object),
+                };
+                f(&glyph)
+            }
+
+            fn with_mut<V, F: FnOnce(&mut EditorState_) -> V>(
+                &self,
+                data: &mut AppState,
+                f: F,
+            ) -> V {
+                //FIXME: this is creating a new copy and then throwing it away
+                //this is just so that the signatures work for now, we aren't actually doing any
+                //mutating
+                let glyph = data
+                    .file
+                    .object
+                    .get_glyph(&self.0)
+                    .expect("missing glyph in lens2");
+                let mut glyph = EditorState_ {
+                    glyph: Arc::clone(glyph),
+                    ufo: Arc::clone(&data.file.object),
+                };
+                f(&mut glyph)
+            }
+        }
+
+        impl Lens2<AppState, GlyphPlus> for Glyph {
+            fn get<V, F: FnOnce(&GlyphPlus) -> V>(&self, data: &AppState, f: F) -> V {
+                let glyph = data
+                    .file
+                    .object
+                    .get_glyph(&self.0)
+                    .expect("missing glyph in lens2");
+                let glyph = GlyphPlus {
+                    glyph: Arc::clone(glyph),
+                    ufo: Arc::clone(&data.file.object),
+                    resolved: Arc::clone(&data.file.resolved),
+                };
+                f(&glyph)
+            }
+
+            fn with_mut<V, F: FnOnce(&mut GlyphPlus) -> V>(&self, data: &mut AppState, f: F) -> V {
+                //FIXME: this is creating a new copy and then throwing it away
+                //this is just so that the signatures work for now, we aren't actually doing any
+                //mutating
+                let glyph = data
+                    .file
+                    .object
+                    .get_glyph(&self.0)
+                    .expect("missing glyph in lens2");
+                let mut glyph = GlyphPlus {
+                    glyph: Arc::clone(glyph),
+                    ufo: Arc::clone(&data.file.object),
+                    resolved: Arc::clone(&data.file.resolved),
+                };
+                f(&mut glyph)
+            }
+        }
+    }
+
+    pub mod glyph_set {
+        use norad::GlyphName;
+        use std::sync::Arc;
+
+        use super::super::{GlyphPlus, GlyphSet as GlyphSet_};
+        use crate::lens2::Lens2;
+
+        /// GlyphSet_ -> GlyphPlus
+        pub struct Glyph(pub GlyphName);
 
         impl Lens2<GlyphSet_, GlyphPlus> for Glyph {
             fn get<V, F: FnOnce(&GlyphPlus) -> V>(&self, data: &GlyphSet_, f: F) -> V {
