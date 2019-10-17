@@ -104,8 +104,8 @@ impl GlyphGrid {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct GridInner {
-    pub units_per_em: f64,
+struct GridInner {
+    units_per_em: f64,
 }
 
 impl Widget<GlyphPlus> for GridInner {
