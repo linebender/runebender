@@ -7,8 +7,11 @@ use std::sync::Arc;
 
 use druid::kurbo::{Affine, BezPath, Point};
 use druid::Data;
-use norad::glyph::{AffineTransform, Contour, ContourPoint, Glyph, PointType};
+use norad::glyph::{Contour, ContourPoint, Glyph, PointType};
 use norad::{FontInfo, FormatVersion, MetaInfo, Ufo};
+
+/// This is by convention.
+const DEFAULT_UNITS_PER_EM: f64 = 1000.;
 
 #[derive(Clone, Default)]
 pub struct AppState {
@@ -41,10 +44,22 @@ pub struct GlyphPlus {
     resolved: BezCache,
 }
 
+/// Things in `FontInfo` that are relevant while editing or drawing.
+#[derive(Clone, Data)]
+pub struct FontMetrics {
+    pub units_per_em: f64,
+    pub descender: Option<f64>,
+    pub x_height: Option<f64>,
+    pub cap_height: Option<f64>,
+    pub ascender: Option<f64>,
+    pub italic_angle: Option<f64>,
+}
+
 /// The state for an editor view.
 #[derive(Clone, Data)]
 pub struct EditorState {
     pub glyph: Arc<Glyph>,
+    pub metrics: FontMetrics,
     pub ufo: Arc<Ufo>,
 }
 
@@ -62,12 +77,14 @@ impl AppState {
 impl GlyphPlus {
     /// Get the fully resolved (including components) bezier path for this glyph.
     pub fn get_bezier(&self) -> Option<Arc<BezPath>> {
-        get_bezier(&self.glyph.name, &self.ufo, &self.resolved)
+        get_bezier(&self.glyph.name, &self.ufo, Some(&self.resolved))
     }
 }
 
-pub fn get_bezier(name: &str, ufo: &Arc<Ufo>, resolved: &BezCache) -> Option<Arc<BezPath>> {
-    if let Some(resolved) = resolved.borrow().get(name).map(Arc::clone) {
+/// Given a glyph name, a `Ufo`, and an optional cache, returns the fully resolved
+/// (including all sub components) `BezPath` for this glyph.
+pub fn get_bezier(name: &str, ufo: &Arc<Ufo>, resolved: Option<&BezCache>) -> Option<Arc<BezPath>> {
+    if let Some(resolved) = resolved.and_then(|r| r.borrow().get(name).map(Arc::clone)) {
         return Some(resolved);
     }
 
@@ -81,7 +98,7 @@ pub fn get_bezier(name: &str, ufo: &Arc<Ufo>, resolved: &BezCache) -> Option<Arc
     {
         match get_bezier(&comp.base, ufo, resolved) {
             Some(comp_path) => {
-                let affine = convert_affine(&comp.transform);
+                let affine: Affine = comp.transform.clone().into();
                 for comp_elem in (affine * &*comp_path).elements() {
                     path.push(*comp_elem);
                 }
@@ -91,19 +108,10 @@ pub fn get_bezier(name: &str, ufo: &Arc<Ufo>, resolved: &BezCache) -> Option<Arc
     }
 
     let path = Arc::new(path);
-    resolved.borrow_mut().insert(name.to_string(), path.clone());
+    if let Some(resolved) = resolved {
+        resolved.borrow_mut().insert(name.to_string(), path.clone());
+    }
     Some(path)
-}
-
-fn convert_affine(affine: &AffineTransform) -> Affine {
-    Affine::new([
-        affine.x_scale as f64,
-        affine.xy_scale as f64,
-        affine.yx_scale as f64,
-        affine.y_scale as f64,
-        affine.x_offset as f64,
-        affine.y_offset as f64,
-    ])
 }
 
 impl Data for FontObject {
@@ -143,21 +151,42 @@ impl std::default::Default for FontObject {
     }
 }
 
+impl<'a> From<&'a FontInfo> for FontMetrics {
+    fn from(src: &'a FontInfo) -> FontMetrics {
+        FontMetrics {
+            units_per_em: src.units_per_em.unwrap_or(DEFAULT_UNITS_PER_EM),
+            descender: src.descender,
+            x_height: src.x_height,
+            cap_height: src.cap_height,
+            ascender: src.ascender,
+            italic_angle: src.italic_angle,
+        }
+    }
+}
+
+impl std::default::Default for FontMetrics {
+    fn default() -> Self {
+        FontMetrics {
+            units_per_em: DEFAULT_UNITS_PER_EM,
+            descender: None,
+            x_height: None,
+            cap_height: None,
+            ascender: None,
+            italic_angle: None,
+        }
+    }
+}
+
 pub mod lenses {
     pub mod app_state {
         use std::sync::Arc;
 
-        use super::super::{
-            AppState, EditorState as EditorState_, GlyphPlus, GlyphSet as GlyphSet_,
-        };
+        use super::super::{AppState, EditorState as EditorState_, GlyphSet as GlyphSet_};
         use crate::lens2::Lens2;
         use norad::GlyphName;
 
         /// AppState -> GlyphSet_
         pub struct GlyphSet;
-
-        /// AppState -> GlyphPlus
-        pub struct Glyph(pub GlyphName);
 
         /// AppState -> EditorState
         pub struct EditorState(pub GlyphName);
@@ -186,9 +215,17 @@ pub mod lenses {
                     .object
                     .get_glyph(&self.0)
                     .expect("missing glyph in lens2");
+                let metrics = data
+                    .file
+                    .object
+                    .font_info
+                    .as_ref()
+                    .map(Into::into)
+                    .unwrap_or_default();
                 let glyph = EditorState_ {
                     glyph: Arc::clone(glyph),
                     ufo: Arc::clone(&data.file.object),
+                    metrics,
                 };
                 f(&glyph)
             }
@@ -206,42 +243,17 @@ pub mod lenses {
                     .object
                     .get_glyph(&self.0)
                     .expect("missing glyph in lens2");
+                let metrics = data
+                    .file
+                    .object
+                    .font_info
+                    .as_ref()
+                    .map(Into::into)
+                    .unwrap_or_default();
                 let mut glyph = EditorState_ {
                     glyph: Arc::clone(glyph),
                     ufo: Arc::clone(&data.file.object),
-                };
-                f(&mut glyph)
-            }
-        }
-
-        impl Lens2<AppState, GlyphPlus> for Glyph {
-            fn get<V, F: FnOnce(&GlyphPlus) -> V>(&self, data: &AppState, f: F) -> V {
-                let glyph = data
-                    .file
-                    .object
-                    .get_glyph(&self.0)
-                    .expect("missing glyph in lens2");
-                let glyph = GlyphPlus {
-                    glyph: Arc::clone(glyph),
-                    ufo: Arc::clone(&data.file.object),
-                    resolved: Arc::clone(&data.file.resolved),
-                };
-                f(&glyph)
-            }
-
-            fn with_mut<V, F: FnOnce(&mut GlyphPlus) -> V>(&self, data: &mut AppState, f: F) -> V {
-                //FIXME: this is creating a new copy and then throwing it away
-                //this is just so that the signatures work for now, we aren't actually doing any
-                //mutating
-                let glyph = data
-                    .file
-                    .object
-                    .get_glyph(&self.0)
-                    .expect("missing glyph in lens2");
-                let mut glyph = GlyphPlus {
-                    glyph: Arc::clone(glyph),
-                    ufo: Arc::clone(&data.file.object),
-                    resolved: Arc::clone(&data.file.resolved),
+                    metrics,
                 };
                 f(&mut glyph)
             }
