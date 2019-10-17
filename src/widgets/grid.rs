@@ -146,7 +146,7 @@ impl Widget<GlyphPlus> for GridInner {
         } else {
             GLYPH_COLOR
         };
-        let text = get_text_layout(&mut ctx.text(), data.glyph.name.as_str(), env);
+        let text = get_text_layout(&mut ctx.text(), &data.glyph.name, env);
         let xpos = geom.x0 + (geom.width() - text.width()) * 0.5;
         let ypos = geom.y0 + geom.height() - font_size * 0.25;
         let pos = (xpos, ypos);

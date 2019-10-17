@@ -3,7 +3,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use druid::kurbo::{Affine, BezPath, Point};
 use druid::Data;
@@ -16,19 +16,19 @@ pub struct AppState {
 }
 
 /// A shared map from glyph names to resolved `BezPath`s.
-type BezCache = Rc<RefCell<HashMap<String, Rc<BezPath>>>>;
+type BezCache = Arc<RefCell<HashMap<String, Arc<BezPath>>>>;
 
 #[derive(Clone)]
 pub struct FontObject {
     pub path: Option<PathBuf>,
-    pub object: Rc<Ufo>,
+    pub object: Arc<Ufo>,
     resolved: BezCache,
 }
 
 /// The main data type for the grid view.
 #[derive(Clone, Data)]
 pub struct GlyphSet {
-    pub object: Rc<Ufo>,
+    pub object: Arc<Ufo>,
     resolved: BezCache,
 }
 
@@ -36,8 +36,8 @@ pub struct GlyphSet {
 /// glyph.
 #[derive(Clone, Data)]
 pub struct GlyphPlus {
-    pub glyph: Rc<Glyph>,
-    pub ufo: Rc<Ufo>,
+    pub glyph: Arc<Glyph>,
+    pub ufo: Arc<Ufo>,
     resolved: BezCache,
 }
 
@@ -45,8 +45,8 @@ impl AppState {
     pub fn set_file(&mut self, object: Ufo, path: impl Into<Option<PathBuf>>) {
         let obj = FontObject {
             path: path.into(),
-            object: Rc::new(object),
-            resolved: Rc::new(Default::default()),
+            object: Arc::new(object),
+            resolved: Arc::new(Default::default()),
         };
         self.file = obj;
     }
@@ -54,13 +54,13 @@ impl AppState {
 
 impl GlyphPlus {
     /// Get the fully resolved (including components) bezier path for this glyph.
-    pub fn get_bezier(&self) -> Option<Rc<BezPath>> {
-        get_bezier(self.glyph.name.as_str(), &self.ufo, &self.resolved)
+    pub fn get_bezier(&self) -> Option<Arc<BezPath>> {
+        get_bezier(&self.glyph.name, &self.ufo, &self.resolved)
     }
 }
 
-pub fn get_bezier(name: &str, ufo: &Rc<Ufo>, resolved: &BezCache) -> Option<Rc<BezPath>> {
-    if let Some(resolved) = resolved.borrow().get(name).map(Rc::clone) {
+pub fn get_bezier(name: &str, ufo: &Arc<Ufo>, resolved: &BezCache) -> Option<Arc<BezPath>> {
+    if let Some(resolved) = resolved.borrow().get(name).map(Arc::clone) {
         return Some(resolved);
     }
 
@@ -83,7 +83,7 @@ pub fn get_bezier(name: &str, ufo: &Rc<Ufo>, resolved: &BezCache) -> Option<Rc<B
         }
     }
 
-    let path = Rc::new(path);
+    let path = Arc::new(path);
     resolved.borrow_mut().insert(name.to_string(), path.clone());
     Some(path)
 }
@@ -130,15 +130,15 @@ impl std::default::Default for FontObject {
 
         FontObject {
             path: None,
-            object: Rc::new(ufo),
-            resolved: Rc::new(Default::default()),
+            object: Arc::new(ufo),
+            resolved: Arc::new(Default::default()),
         }
     }
 }
 
 pub mod lenses {
     pub mod app_state {
-        use std::rc::Rc;
+        use std::sync::Arc;
 
         use super::super::{AppState, GlyphPlus, GlyphSet as GlyphSet_};
         use crate::lens2::Lens2;
@@ -151,15 +151,15 @@ pub mod lenses {
         impl Lens2<AppState, GlyphSet_> for GlyphSet {
             fn get<V, F: FnOnce(&GlyphSet_) -> V>(&self, data: &AppState, f: F) -> V {
                 let glyphs = GlyphSet_ {
-                    object: Rc::clone(&data.file.object),
-                    resolved: Rc::clone(&data.file.resolved),
+                    object: Arc::clone(&data.file.object),
+                    resolved: Arc::clone(&data.file.resolved),
                 };
                 f(&glyphs)
             }
             fn with_mut<V, F: FnOnce(&mut GlyphSet_) -> V>(&self, data: &mut AppState, f: F) -> V {
                 let mut glyphs = GlyphSet_ {
-                    object: Rc::clone(&data.file.object),
-                    resolved: Rc::clone(&data.file.resolved),
+                    object: Arc::clone(&data.file.object),
+                    resolved: Arc::clone(&data.file.resolved),
                 };
                 f(&mut glyphs)
             }
@@ -172,9 +172,9 @@ pub mod lenses {
                     .get_glyph(&self.0)
                     .expect("missing glyph in lens2");
                 let glyph = GlyphPlus {
-                    glyph: Rc::clone(glyph),
-                    ufo: Rc::clone(&data.object),
-                    resolved: Rc::clone(&data.resolved),
+                    glyph: Arc::clone(glyph),
+                    ufo: Arc::clone(&data.object),
+                    resolved: Arc::clone(&data.resolved),
                 };
                 f(&glyph)
             }
@@ -188,9 +188,9 @@ pub mod lenses {
                     .get_glyph(&self.0)
                     .expect("missing glyph in lens2");
                 let mut glyph = GlyphPlus {
-                    glyph: Rc::clone(glyph),
-                    ufo: Rc::clone(&data.object),
-                    resolved: Rc::clone(&data.resolved),
+                    glyph: Arc::clone(glyph),
+                    ufo: Arc::clone(&data.object),
+                    resolved: Arc::clone(&data.resolved),
                 };
                 f(&mut glyph)
             }
