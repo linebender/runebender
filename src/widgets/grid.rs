@@ -2,8 +2,7 @@
 
 use druid::kurbo::{Affine, Line, Rect, Shape, Size};
 use druid::piet::{
-    Color, FontBuilder, PietText, PietTextLayout, RenderContext, Text, TextLayout,
-    TextLayoutBuilder,
+    FontBuilder, PietText, PietTextLayout, RenderContext, Text, TextLayout, TextLayoutBuilder,
 };
 use druid::{
     theme, BaseState, BoxConstraints, Command, Data, Env, Event, EventCtx, LayoutCtx, PaintCtx,
@@ -19,13 +18,10 @@ pub struct GlyphGrid {
 }
 
 const GLYPH_SIZE: f64 = 100.;
-const TEXT_BG_COLOR: Color = Color::rgba8(0xd7, 0xd8, 0xd2, 0xad);
-const GLYPH_COLOR: Color = Color::rgb8(0x6a, 0x6a, 0x6a);
-const HIGHLIGHT_COLOR: Color = Color::rgb8(0x04, 0x3b, 0xaf);
 
 impl Widget<GlyphSet> for GlyphGrid {
     fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &GlyphSet, env: &Env) {
-        ctx.render_ctx.clear(Color::WHITE);
+        ctx.render_ctx.clear(env.get(theme::BACKGROUND_LIGHT));
         let row_len = 1.0_f64.max(state.size().width / GLYPH_SIZE).floor() as usize;
         let row_count = if self.children.is_empty() {
             0
@@ -36,7 +32,8 @@ impl Widget<GlyphSet> for GlyphGrid {
         for row in 0..row_count {
             let baseline = row as f64 * GLYPH_SIZE + GLYPH_SIZE * (1.0 - 0.16);
             let line = Line::new((0., baseline), (state.size().width + GLYPH_SIZE, baseline));
-            ctx.render_ctx.stroke(&line, &GLYPH_COLOR, 0.5);
+            ctx.render_ctx
+                .stroke(&line, &env.get(theme::FOREGROUND_DARK), 0.5);
         }
         for child in &mut self.children {
             child.paint_with_offset(ctx, data, env);
@@ -128,24 +125,25 @@ impl Widget<GlyphPlus> for GridInner {
             geom.height() - baseline,
         ]);
 
+        let hl_color = env.get(theme::SELECTION_COLOR);
+        let glyph_color = env.get(theme::FOREGROUND_DARK);
         let glyph_body_color = if state.is_active() {
-            HIGHLIGHT_COLOR
+            &hl_color
         } else {
-            GLYPH_COLOR
+            &glyph_color
         };
-        ctx.render_ctx.fill(affine * &*path, &glyph_body_color);
+        ctx.render_ctx.fill(affine * &*path, glyph_body_color);
 
         if state.is_hot() {
-            ctx.render_ctx
-                .stroke(affine * &*path, &HIGHLIGHT_COLOR, 1.0);
-            ctx.render_ctx.stroke(geom, &HIGHLIGHT_COLOR, 1.0);
+            ctx.render_ctx.stroke(affine * &*path, &hl_color, 1.0);
+            ctx.render_ctx.stroke(geom, &hl_color, 1.0);
         }
 
         let font_size = env.get(theme::TEXT_SIZE_NORMAL);
         let name_color = if state.is_hot() {
-            HIGHLIGHT_COLOR
+            hl_color
         } else {
-            GLYPH_COLOR
+            glyph_color
         };
         let text = get_text_layout(&mut ctx.text(), &data.glyph.name, env);
         let xpos = geom.x0 + (geom.width() - text.width()) * 0.5;
@@ -158,7 +156,10 @@ impl Widget<GlyphPlus> for GridInner {
             (text.width() as f64, font_size as f64),
         );
 
-        ctx.render_ctx.fill(&text_bg_rect, &TEXT_BG_COLOR);
+        ctx.render_ctx.fill(
+            &text_bg_rect,
+            &env.get(theme::BACKGROUND_DARK).with_alpha(0.5),
+        );
         // draw the text
         ctx.render_ctx.draw_text(&text, pos, &name_color)
     }

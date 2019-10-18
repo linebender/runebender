@@ -1,18 +1,16 @@
 //! the main editor widget.
 
 use druid::kurbo::{Affine, Rect, Shape, Size};
-use druid::piet::{Color, RenderContext};
+use druid::piet::RenderContext;
 use druid::{
-    BaseState, BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget,
+    theme, BaseState, BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx,
+    Widget,
 };
 
 use norad::GlyphName;
 
 use crate::data::{lenses, AppState, EditorState};
 use crate::lens2::Lens2Wrap;
-
-const GLYPH_COLOR: Color = Color::rgb8(0x6a, 0x6a, 0x6a);
-const HIGHLIGHT_COLOR: Color = Color::rgb8(0x04, 0x3b, 0xaf);
 
 /// The root widget of the glyph editor window.
 pub struct Editor;
@@ -24,10 +22,9 @@ impl Editor {
 }
 
 impl Widget<EditorState> for Editor {
-    fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &EditorState, _env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &EditorState, env: &Env) {
         //TODO: replacement for missing glyphs
         let path = crate::data::get_bezier(&data.glyph.name, &data.ufo, None).unwrap_or_default();
-        //let path = data.get_bezier().unwrap_or_default();
         let bb = path.bounding_box();
         let geom = Rect::ZERO.with_size(state.size());
         let scale = geom.height() as f64 / data.metrics.units_per_em;
@@ -44,18 +41,8 @@ impl Widget<EditorState> for Editor {
             geom.height() - baseline,
         ]);
 
-        let glyph_body_color = if state.is_active() {
-            HIGHLIGHT_COLOR
-        } else {
-            GLYPH_COLOR
-        };
-        ctx.render_ctx.fill(affine * &*path, &glyph_body_color);
-
-        if state.is_hot() {
-            ctx.render_ctx
-                .stroke(affine * &*path, &HIGHLIGHT_COLOR, 1.0);
-            ctx.render_ctx.stroke(geom, &HIGHLIGHT_COLOR, 1.0);
-        }
+        ctx.render_ctx
+            .fill(affine * &*path, &env.get(theme::FOREGROUND_DARK));
     }
 
     fn layout(
