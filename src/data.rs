@@ -6,16 +6,26 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use druid::kurbo::{Affine, BezPath, Point};
-use druid::Data;
-use norad::glyph::{Contour, ContourPoint, Glyph, PointType};
+use druid::{Data, WindowId};
+use norad::glyph::{Contour, ContourPoint, Glyph, GlyphName, PointType};
 use norad::{FontInfo, FormatVersion, MetaInfo, Ufo};
 
 /// This is by convention.
 const DEFAULT_UNITS_PER_EM: f64 = 1000.;
 
+/// A glyph that has been opened is either waiting for a window to connect,
+/// or is in a window.
+#[derive(Debug, Clone)]
+pub enum OpenGlyph {
+    Pending,
+    Window(WindowId),
+}
+
 #[derive(Clone, Default)]
 pub struct AppState {
     pub file: FontObject,
+    /// glyphs that are already open in an editor window
+    pub open_glyphs: Arc<HashMap<GlyphName, OpenGlyph>>,
 }
 
 /// A shared map from glyph names to resolved `BezPath`s.
