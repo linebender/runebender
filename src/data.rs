@@ -10,6 +10,8 @@ use druid::{Data, WindowId};
 use norad::glyph::{Contour, ContourPoint, Glyph, GlyphName, PointType};
 use norad::{FontInfo, FormatVersion, MetaInfo, Ufo};
 
+use crate::edit_session::EditSession;
+
 /// This is by convention.
 const DEFAULT_UNITS_PER_EM: f64 = 1000.;
 
@@ -26,6 +28,7 @@ pub struct AppState {
     pub file: FontObject,
     /// glyphs that are already open in an editor window
     pub open_glyphs: Arc<HashMap<GlyphName, OpenGlyph>>,
+    pub sessions: Arc<HashMap<GlyphName, EditSession>>,
 }
 
 /// A shared map from glyph names to resolved `BezPath`s.
@@ -71,6 +74,7 @@ pub struct EditorState {
     pub glyph: Arc<Glyph>,
     pub metrics: FontMetrics,
     pub ufo: Arc<Ufo>,
+    //pub session: EditSession,
 }
 
 impl AppState {
