@@ -1,9 +1,14 @@
 //! A font editor.
 
 mod app_delegate;
+mod component;
 mod data;
+mod design_space;
+mod edit_session;
+mod guides;
 mod lens2;
 mod menus;
+mod path;
 pub mod widgets;
 
 use druid::widget::{Align, Column, DynLabel, Padding, Scroll, SizedBox};
