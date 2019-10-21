@@ -44,7 +44,12 @@ impl DPoint {
     /// Should only be used with inputs already in design space, such as when
     /// loaded from file.
     pub(crate) fn new(x: f64, y: f64) -> DPoint {
-        assert!(x.is_finite() && y.is_finite() && x.fract() == 0. && y.fract() == 0., "({}, {})", x, y);
+        assert!(
+            x.is_finite() && y.is_finite() && x.fract() == 0. && y.fract() == 0.,
+            "({}, {})",
+            x,
+            y
+        );
         DPoint { x, y }
     }
 
