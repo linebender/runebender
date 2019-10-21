@@ -1,5 +1,5 @@
-use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use super::design_space::{DPoint, DVec2, ViewPort};
 use druid::kurbo::{BezPath, Point, Vec2};
@@ -38,20 +38,14 @@ pub struct Path {
     points: std::sync::Arc<Vec<PathPoint>>,
     trailing: Option<DPoint>,
     closed: bool,
-    bezier: RefCell<BezPath>,
-    bezier_stale: Cell<bool>,
 }
 
 impl EntityId {
-    pub(crate) fn for_guide() -> Self {
+    pub(crate) fn new_with_parent(parent: usize) -> Self {
         EntityId {
-            parent: 0,
+            parent,
             point: next_id(),
         }
-    }
-
-    pub(crate) fn is_guide(self) -> bool {
-        self.parent == 0
     }
 }
 
@@ -127,8 +121,57 @@ impl Path {
             points: std::sync::Arc::new(vec![start]),
             closed: false,
             trailing: None,
-            bezier: RefCell::new(BezPath::new()),
-            bezier_stale: Cell::new(false),
+        }
+    }
+
+    pub fn from_norad(src: &norad::glyph::Contour) -> Path {
+        use norad::glyph::PointType as NoradPType;
+        assert!(
+            !src.points.is_empty(),
+            "non empty points list should already be checked"
+        );
+        let closed = if let NoradPType::Move = src.points[0].typ {
+            false
+        } else {
+            true
+        };
+
+        let path_id = next_id();
+
+        let mut points: Vec<PathPoint> = src
+            .points
+            .iter()
+            .map(|src_point| {
+                //eprintln!("({}, {}): {:?}{}", src_point.x, src_point.y, src_point.typ, if src_point.smooth { " smooth" } else { "" });
+                let point = DPoint::new(src_point.x.round() as f64, src_point.y.round() as f64);
+                let typ = match &src_point.typ {
+                    NoradPType::OffCurve => PointType::OffCurve,
+                    NoradPType::QCurve => panic!(
+                        "quadratics unsupported, we should have \
+                         validated input before now"
+                    ),
+                    NoradPType::Move | NoradPType::Line | NoradPType::Curve if src_point.smooth => {
+                        PointType::OnCurveSmooth
+                    }
+                    _other => PointType::OnCurve,
+                };
+                let id = EntityId {
+                    parent: path_id,
+                    point: next_id(),
+                };
+                PathPoint { id, point, typ }
+            })
+            .collect();
+
+        if closed {
+            points.rotate_left(1);
+        }
+
+        Path {
+            id: path_id,
+            points: Arc::new(points),
+            trailing: None,
+            closed,
         }
     }
 
@@ -141,7 +184,6 @@ impl Path {
     }
 
     fn points_mut(&mut self) -> &mut Vec<PathPoint> {
-        self.bezier_stale.set(true);
         std::sync::Arc::make_mut(&mut self.points)
     }
 
@@ -169,14 +211,7 @@ impl Path {
         }
     }
 
-    pub fn bezier(&self) -> std::cell::Ref<BezPath> {
-        if self.bezier_stale.replace(false) {
-            *self.bezier.borrow_mut() = self.make_bezier();
-        }
-        self.bezier.borrow()
-    }
-
-    fn make_bezier(&self) -> BezPath {
+    fn bezier(&self) -> BezPath {
         let mut bez = BezPath::new();
         bez.move_to(self.start_point().point.to_raw());
         let mut i = if self.closed { 0 } else { 1 };
@@ -202,10 +237,9 @@ impl Path {
     }
 
     pub fn screen_dist(&self, vport: ViewPort, point: Point) -> f64 {
-        use std::ops::Deref;
-        let screen_bez = vport.transform() * self.bezier().deref();
+        let screen_bez = vport.transform() * self.bezier();
         let (_, x, y) = screen_bez.nearest(point, 0.1);
-        dbg!(Vec2::new(x, y).hypot())
+        Vec2::new(x, y).hypot()
     }
 
     /// Appends a point. Called when the user clicks. This point is always a corner;
@@ -459,7 +493,7 @@ impl Path {
     }
 
     // in an open path, the first point is essentially a `move_to` command.
-    // 'closing' the path means moving this path to the end of the list.
+    // 'closing' the path means moving this point to the end of the list.
     fn close(&mut self) -> EntityId {
         assert!(!self.closed);
         self.points_mut().rotate_left(1);
