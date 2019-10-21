@@ -211,7 +211,7 @@ impl Path {
         }
     }
 
-    fn bezier(&self) -> BezPath {
+    pub fn bezier(&self) -> BezPath {
         let mut bez = BezPath::new();
         bez.move_to(self.start_point().point.to_raw());
         let mut i = if self.closed { 0 } else { 1 };

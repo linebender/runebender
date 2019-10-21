@@ -4,6 +4,7 @@ mod app_delegate;
 mod component;
 mod data;
 mod design_space;
+mod draw;
 mod edit_session;
 mod guides;
 mod lens2;
