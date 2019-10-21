@@ -3,15 +3,19 @@
 use std::collections::BTreeSet;
 
 use crate::data::FontMetrics;
-use crate::guides::{Guide, GuideLine};
-use crate::path::{Path, EntityId, PointType};
 use crate::design_space::ViewPort;
+use crate::edit_session::EditSession;
+use crate::guides::{Guide, GuideLine};
+use crate::path::{EntityId, Path, PointType};
 //use super::{Tool, ViewPort};
 use druid::kurbo::{Affine, BezPath, Circle, CubicBez, Line, PathSeg, Point, Rect, Size, Vec2};
 use druid::piet::{Color, Piet, RenderContext};
 use druid::PaintCtx;
 
+use norad::Glyph;
+
 const PATH_COLOR: Color = Color::rgb8(0x00, 0x00, 0x00);
+const METRICS_COLOR: Color = Color::rgb8(0xA0, 0xA0, 0xA0);
 const GUIDE_COLOR: Color = Color::rgb8(0xFC, 0x54, 0x93);
 const SELECTED_GUIDE_COLOR: Color = Color::rgb8(0xFE, 0xED, 0xED);
 const SELECTION_RECT_BG_COLOR: Color = Color::rgba8(0xDD, 0xDD, 0xDD, 0x55);
@@ -50,6 +54,22 @@ impl<'a, 'b> std::ops::DerefMut for DrawCtx<'a, 'b> {
 impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
     fn new(ctx: &'a mut Piet<'b>, space: ViewPort) -> Self {
         DrawCtx { ctx, space }
+    }
+
+    fn draw_metrics(&mut self, glyph: &Glyph, metrics: &FontMetrics) {
+        let upm = metrics.units_per_em;
+        //let cap_height = metrics.cap_height.unwrap_or((upm * 0.7).round());
+        let ascender = metrics.ascender.unwrap_or((upm * 0.8).round());
+        let descender = metrics.descender.unwrap_or(-(upm * 0.2).round());
+        let hadvance = glyph
+            .advance
+            .as_ref()
+            .map(|a| a.width as f64)
+            .unwrap_or((upm * 0.5).round());
+        let bounds = Rect::from_points((0., descender), (hadvance, ascender));
+        self.stroke(bounds, &METRICS_COLOR, 1.0);
+        let baseline = Line::new((0.0, 0.0), (hadvance, 0.0));
+        self.stroke(baseline, &METRICS_COLOR, 1.0);
     }
 
     fn draw_grid(&mut self) {
@@ -126,7 +146,6 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
                 let p1 = p2 - vec * 5000.; // an arbitrary number
                 let p2 = p2 + vec * 5000.;
                 Line::new(p1, p2)
-
             } //Line::new(Point::ZERO, Point::ZERO),
         }
     }
@@ -289,7 +308,12 @@ struct PointIter<'a> {
 }
 
 impl<'a> PointIter<'a> {
-    fn new(path: &'a Path, vport: ViewPort, bez: &'a BezPath, sels: &'a BTreeSet<EntityId>) -> Self {
+    fn new(
+        path: &'a Path,
+        vport: ViewPort,
+        bez: &'a BezPath,
+        sels: &'a BTreeSet<EntityId>,
+    ) -> Self {
         PointIter {
             idx: 0,
             vport,
@@ -346,46 +370,37 @@ impl<'a> std::iter::Iterator for PointIter<'a> {
     }
 }
 
-pub(crate) fn draw_paths(
-    metrics: &FontMetrics,
-    paths: &[Path],
-    sels: &BTreeSet<EntityId>,
-    guides: &[Guide],
-    //tool: &dyn Tool,
+pub(crate) fn draw_session(
+    ctx: &mut PaintCtx,
     space: ViewPort,
     canvas_size: Size,
-    ctx: &mut PaintCtx,
-    _mouse: Point,
+    metrics: &FontMetrics,
+    session: &EditSession,
 ) {
     ctx.clear(Color::WHITE);
-    //if tool.name() == "preview" {
-        //draw_ctx.draw_filled_paths(paths);
-        //return;
-    //}
-
     let affine = Affine::new([
-        1.0,
+        0.8,
         0.0,
         0.0,
-        -1.0,
-        0.0,
+        -0.8,
+        canvas_size.width * 0.25,
         canvas_size.height * 0.75,
     ]);
-    ctx.save();
+    if let Err(e) = ctx.save() {
+        log::warn!("failed to save context {:?}", e);
+    }
+
     ctx.transform(affine);
-
     let mut draw_ctx = DrawCtx::new(&mut ctx.render_ctx, space);
+    draw_ctx.draw_metrics(&session.glyph, metrics);
 
-    draw_ctx.draw_grid();
-    draw_ctx.draw_guides(guides, sels);
-    for path in paths {
-        //let bez = affine * (space.transform() * path.bezier().clone());
+    for path in session.paths.iter() {
         let bez = (space.transform() * path.bezier().clone());
         draw_ctx.draw_path(&bez);
         draw_ctx.draw_control_point_lines(path);
         draw_ctx.draw_direction_indicator(&bez);
 
-        for point in PointIter::new(path, space, &bez, sels) {
+        for point in PointIter::new(path, space, &bez, &session.selection) {
             draw_ctx.draw_point(point)
         }
 
@@ -398,11 +413,65 @@ pub(crate) fn draw_paths(
     if let Err(e) = ctx.restore() {
         log::warn!("failed to restore context {:?}", e);
     }
-
-    //if let Some(rect) = tool.selection_rect() {
-        //draw_ctx.draw_selection_rect(rect);
-    //}
 }
+
+//pub(crate) fn draw_paths(
+//metrics: &FontMetrics,
+//paths: &[Path],
+//sels: &BTreeSet<EntityId>,
+//guides: &[Guide],
+////tool: &dyn Tool,
+//space: ViewPort,
+//canvas_size: Size,
+//ctx: &mut PaintCtx,
+//_mouse: Point,
+//) {
+//ctx.clear(Color::WHITE);
+////if tool.name() == "preview" {
+////draw_ctx.draw_filled_paths(paths);
+////return;
+////}
+
+//let affine = Affine::new([
+//0.8,
+//0.0,
+//0.0,
+//-0.8,
+//canvas_size.width * 0.75,
+//canvas_size.height * 0.75,
+//]);
+//ctx.save();
+//ctx.transform(affine);
+
+//let mut draw_ctx = DrawCtx::new(&mut ctx.render_ctx, space);
+
+//draw_ctx.draw_grid();
+//draw_ctx.draw_guides(guides, sels);
+//for path in paths {
+////let bez = affine * (space.transform() * path.bezier().clone());
+//let bez = (space.transform() * path.bezier().clone());
+//draw_ctx.draw_path(&bez);
+//draw_ctx.draw_control_point_lines(path);
+//draw_ctx.draw_direction_indicator(&bez);
+
+//for point in PointIter::new(path, space, &bez, sels) {
+//draw_ctx.draw_point(point)
+//}
+
+//if let Some(pt) = path.trailing() {
+//if path.should_draw_trailing() {
+//draw_ctx.draw_off_curve_point(pt.to_screen(space), true);
+//}
+//}
+//}
+//if let Err(e) = ctx.restore() {
+//log::warn!("failed to restore context {:?}", e);
+//}
+
+////if let Some(rect) = tool.selection_rect() {
+////draw_ctx.draw_selection_rect(rect);
+////}
+//}
 
 /// Return the tangent of the cubic bezier `cb`, at time `t`, as a vector
 /// relative to the path's start point.

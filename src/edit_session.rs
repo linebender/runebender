@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use druid::Data;
-use norad::{GlyphName, Ufo};
+use norad::{Glyph, GlyphName, Ufo};
 
 use crate::component::Component;
 use crate::guides::Guide;
@@ -14,6 +14,7 @@ type UndoStack = ();
 #[derive(Debug, Clone, Data)]
 pub struct EditSession {
     pub name: GlyphName,
+    pub glyph: Arc<Glyph>,
     pub paths: Arc<Vec<Path>>,
     pub selection: Arc<BTreeSet<EntityId>>,
     pub components: Arc<Vec<Component>>,
@@ -24,7 +25,7 @@ pub struct EditSession {
 impl EditSession {
     pub fn new(name: &GlyphName, ufo: &Ufo) -> Self {
         let name = name.to_owned();
-        let glyph = ufo.get_glyph(&name).unwrap();
+        let glyph = ufo.get_glyph(&name).unwrap().to_owned();
         let paths = glyph
             .outline
             .as_ref()
@@ -43,6 +44,7 @@ impl EditSession {
 
         EditSession {
             name,
+            glyph,
             paths: Arc::new(paths),
             selection: Arc::default(),
             components: Arc::new(components),

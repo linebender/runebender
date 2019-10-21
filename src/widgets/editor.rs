@@ -10,8 +10,9 @@ use druid::{
 use norad::GlyphName;
 
 use crate::data::{lenses, AppState, EditorState};
-use crate::lens2::Lens2Wrap;
 use crate::design_space::ViewPort;
+use crate::draw;
+use crate::lens2::Lens2Wrap;
 
 /// The root widget of the glyph editor window.
 pub struct Editor;
@@ -25,7 +26,13 @@ impl Editor {
 impl Widget<EditorState> for Editor {
     fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &EditorState, env: &Env) {
         //TODO: replacement for missing glyphs
-        crate::draw::draw_paths(&data.metrics, &data.session.paths, &data.session.selection, &data.session.guides, ViewPort::default(), state.size(), ctx, druid::kurbo::Point::ZERO);
+        draw::draw_session(
+            ctx,
+            ViewPort::default(),
+            state.size(),
+            &data.metrics,
+            &data.session,
+        );
         //let path = crate::data::get_bezier(&data.session.name, &data.ufo, None).unwrap_or_default();
         //let bb = path.bounding_box();
         //let geom = Rect::ZERO.with_size(state.size());
@@ -35,16 +42,16 @@ impl Widget<EditorState> for Editor {
         //let l_pad = ((geom.width() as f64 - scaled_width) / 2.).round();
         //let baseline = (geom.height() * 0.16) as f64;
         //let affine = Affine::new([
-            //scale as f64,
-            //0.0,
-            //0.0,
-            //-scale as f64,
-            //l_pad,
-            //geom.height() - baseline,
+        //scale as f64,
+        //0.0,
+        //0.0,
+        //-scale as f64,
+        //l_pad,
+        //geom.height() - baseline,
         //]);
 
         //ctx.render_ctx
-            //.fill(affine * &*path, &env.get(theme::FOREGROUND_DARK));
+        //.fill(affine * &*path, &env.get(theme::FOREGROUND_DARK));
     }
 
     fn layout(
