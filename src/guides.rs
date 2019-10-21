@@ -20,7 +20,7 @@ pub enum GuideLine {
 
 impl Guide {
     fn new(guide: GuideLine) -> Self {
-        let id = EntityId::for_guide();
+        let id = EntityId::new_with_parent(0);
         Guide { id, guide }
     }
 
@@ -84,5 +84,23 @@ impl Guide {
                 p2.y += nudge.y;
             }
         }
+    }
+
+    pub fn from_norad(src: &norad::glyph::Guideline) -> Self {
+        use norad::glyph::Line;
+
+        let guide = match src.line {
+            Line::Vertical(x) => GuideLine::Vertical(DPoint::new(x as f64, 0.)),
+            Line::Horizontal(y) => GuideLine::Horiz(DPoint::new(0., y as f64)),
+            Line::Angle { x, y, degrees } => {
+                let p1 = DPoint::new(x as f64, y as f64);
+                let p2 = p1.to_raw() + Vec2::from_angle(degrees as f64);
+                let p2 = DPoint::new(p2.x, p2.y);
+                GuideLine::Angle { p1, p2 }
+            }
+        };
+
+        let id = EntityId::new_with_parent(0);
+        Guide { guide, id }
     }
 }

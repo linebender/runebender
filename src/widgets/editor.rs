@@ -24,7 +24,7 @@ impl Editor {
 impl Widget<EditorState> for Editor {
     fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &EditorState, env: &Env) {
         //TODO: replacement for missing glyphs
-        let path = crate::data::get_bezier(&data.glyph.name, &data.ufo, None).unwrap_or_default();
+        let path = crate::data::get_bezier(&data.session.name, &data.ufo, None).unwrap_or_default();
         let bb = path.bounding_box();
         let geom = Rect::ZERO.with_size(state.size());
         let scale = geom.height() as f64 / data.metrics.units_per_em;

@@ -71,10 +71,9 @@ pub struct FontMetrics {
 /// The state for an editor view.
 #[derive(Clone, Data)]
 pub struct EditorState {
-    pub glyph: Arc<Glyph>,
     pub metrics: FontMetrics,
     pub ufo: Arc<Ufo>,
-    //pub session: EditSession,
+    pub session: EditSession,
 }
 
 impl AppState {
@@ -195,9 +194,10 @@ pub mod lenses {
     pub mod app_state {
         use std::sync::Arc;
 
+        use norad::GlyphName;
+
         use super::super::{AppState, EditorState as EditorState_, GlyphSet as GlyphSet_};
         use crate::lens2::Lens2;
-        use norad::GlyphName;
 
         /// AppState -> GlyphSet_
         pub struct GlyphSet;
@@ -224,11 +224,6 @@ pub mod lenses {
 
         impl Lens2<AppState, EditorState_> for EditorState {
             fn get<V, F: FnOnce(&EditorState_) -> V>(&self, data: &AppState, f: F) -> V {
-                let glyph = data
-                    .file
-                    .object
-                    .get_glyph(&self.0)
-                    .expect("missing glyph in lens2");
                 let metrics = data
                     .file
                     .object
@@ -236,10 +231,11 @@ pub mod lenses {
                     .as_ref()
                     .map(Into::into)
                     .unwrap_or_default();
+                let session = data.sessions.get(&self.0).unwrap().to_owned();
                 let glyph = EditorState_ {
-                    glyph: Arc::clone(glyph),
                     ufo: Arc::clone(&data.file.object),
                     metrics,
+                    session,
                 };
                 f(&glyph)
             }
@@ -251,12 +247,6 @@ pub mod lenses {
             ) -> V {
                 //FIXME: this is creating a new copy and then throwing it away
                 //this is just so that the signatures work for now, we aren't actually doing any
-                //mutating
-                let glyph = data
-                    .file
-                    .object
-                    .get_glyph(&self.0)
-                    .expect("missing glyph in lens2");
                 let metrics = data
                     .file
                     .object
@@ -264,10 +254,11 @@ pub mod lenses {
                     .as_ref()
                     .map(Into::into)
                     .unwrap_or_default();
+                let session = data.sessions.get(&self.0).unwrap().to_owned();
                 let mut glyph = EditorState_ {
-                    glyph: Arc::clone(glyph),
                     ufo: Arc::clone(&data.file.object),
                     metrics,
+                    session,
                 };
                 f(&mut glyph)
             }

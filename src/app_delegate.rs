@@ -6,6 +6,7 @@ use druid::{AppDelegate, Command, Event, LocalizedString, Selector, WindowDesc};
 use norad::GlyphName;
 
 use crate::data::{AppState, OpenGlyph};
+use crate::edit_session::EditSession;
 use crate::widgets::Editor;
 
 pub const EDIT_GLYPH: Selector = Selector::new("runebender.open-editor-with-glyph");
@@ -33,6 +34,8 @@ pub fn make_delegate() -> AppDelegate<AppState> {
                     ctx.submit_command(command, None);
                     Arc::make_mut(&mut data.open_glyphs)
                         .insert(payload.clone(), OpenGlyph::Pending);
+                    let session = EditSession::new(&payload, &data.file.object);
+                    Arc::make_mut(&mut data.sessions).insert(payload.clone(), session);
                 }
             }
             None
