@@ -11,6 +11,7 @@ use norad::GlyphName;
 
 use crate::data::{lenses, AppState, EditorState};
 use crate::lens2::Lens2Wrap;
+use crate::design_space::ViewPort;
 
 /// The root widget of the glyph editor window.
 pub struct Editor;
@@ -24,25 +25,26 @@ impl Editor {
 impl Widget<EditorState> for Editor {
     fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &EditorState, env: &Env) {
         //TODO: replacement for missing glyphs
-        let path = crate::data::get_bezier(&data.session.name, &data.ufo, None).unwrap_or_default();
-        let bb = path.bounding_box();
-        let geom = Rect::ZERO.with_size(state.size());
-        let scale = geom.height() as f64 / data.metrics.units_per_em;
-        let scale = scale * 0.85; // some margins around glyphs
-        let scaled_width = bb.width() * scale as f64;
-        let l_pad = ((geom.width() as f64 - scaled_width) / 2.).round();
-        let baseline = (geom.height() * 0.16) as f64;
-        let affine = Affine::new([
-            scale as f64,
-            0.0,
-            0.0,
-            -scale as f64,
-            l_pad,
-            geom.height() - baseline,
-        ]);
+        crate::draw::draw_paths(&data.metrics, &data.session.paths, &data.session.selection, &data.session.guides, ViewPort::default(), state.size(), ctx, druid::kurbo::Point::ZERO);
+        //let path = crate::data::get_bezier(&data.session.name, &data.ufo, None).unwrap_or_default();
+        //let bb = path.bounding_box();
+        //let geom = Rect::ZERO.with_size(state.size());
+        //let scale = geom.height() as f64 / data.metrics.units_per_em;
+        //let scale = scale * 0.85; // some margins around glyphs
+        //let scaled_width = bb.width() * scale as f64;
+        //let l_pad = ((geom.width() as f64 - scaled_width) / 2.).round();
+        //let baseline = (geom.height() * 0.16) as f64;
+        //let affine = Affine::new([
+            //scale as f64,
+            //0.0,
+            //0.0,
+            //-scale as f64,
+            //l_pad,
+            //geom.height() - baseline,
+        //]);
 
-        ctx.render_ctx
-            .fill(affine * &*path, &env.get(theme::FOREGROUND_DARK));
+        //ctx.render_ctx
+            //.fill(affine * &*path, &env.get(theme::FOREGROUND_DARK));
     }
 
     fn layout(

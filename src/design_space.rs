@@ -19,8 +19,8 @@ const MAX_SCROLL: f64 = 5000.;
 /// The position of the view, relative to the design space.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ViewPort {
-    offset: Vec2,
-    zoom: f64,
+    pub offset: Vec2,
+    pub zoom: f64,
 }
 
 /// A point in design space.
@@ -44,7 +44,7 @@ impl DPoint {
     /// Should only be used with inputs already in design space, such as when
     /// loaded from file.
     pub(crate) fn new(x: f64, y: f64) -> DPoint {
-        assert!(x.is_finite() && y.is_finite() && x.fract() == 0. && y.fract() == 0.);
+        assert!(x.is_finite() && y.is_finite() && x.fract() == 0. && y.fract() == 0., "({}, {})", x, y);
         DPoint { x, y }
     }
 
