@@ -32,6 +32,7 @@ impl Widget<EditorState> for Editor {
             state.size(),
             &data.metrics,
             &data.session,
+            &data.ufo,
         );
         //let path = crate::data::get_bezier(&data.session.name, &data.ufo, None).unwrap_or_default();
         //let bb = path.bounding_box();

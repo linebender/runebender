@@ -1,7 +1,9 @@
 //! Drawing algorithms and helpers
 
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
+use crate::component::Component;
 use crate::data::FontMetrics;
 use crate::design_space::ViewPort;
 use crate::edit_session::EditSession;
@@ -12,7 +14,7 @@ use druid::kurbo::{Affine, BezPath, Circle, CubicBez, Line, PathSeg, Point, Rect
 use druid::piet::{Color, Piet, RenderContext};
 use druid::PaintCtx;
 
-use norad::Glyph;
+use norad::{Glyph, Ufo};
 
 const PATH_COLOR: Color = Color::rgb8(0x00, 0x00, 0x00);
 const METRICS_COLOR: Color = Color::rgb8(0xA0, 0xA0, 0xA0);
@@ -25,6 +27,7 @@ const CORNER_POINT_COLOR: Color = Color::rgb8(0x0b, 0x2b, 0xdb);
 const OFF_CURVE_POINT_COLOR: Color = Color::rgb8(0xbb, 0xbb, 0xbb);
 const OFF_CURVE_HANDLE_COLOR: Color = Color::rgb8(0xbb, 0xbb, 0xbb);
 const DIRECTION_ARROW_COLOR: Color = Color::rgba8(0x00, 0x00, 0x00, 0x44);
+const COMPONENT_FILL_COLOR: Color = Color::rgba8(0, 0, 0, 0x44);
 
 const SMOOTH_RADIUS: f64 = 3.5;
 const SMOOTH_SELECTED_RADIUS: f64 = 4.;
@@ -282,6 +285,15 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         arrow.apply_affine(translate);
         self.fill(arrow, &DIRECTION_ARROW_COLOR);
     }
+
+    fn draw_component(&mut self, component: &Component, ufo: &Ufo) {
+        if let Some(bez) = crate::data::get_bezier(&component.base, ufo, None) {
+            self.fill(
+                component.transform * Arc::try_unwrap(bez).unwrap(),
+                &COMPONENT_FILL_COLOR,
+            );
+        }
+    }
 }
 
 struct PointStyle {
@@ -376,8 +388,11 @@ pub(crate) fn draw_session(
     canvas_size: Size,
     metrics: &FontMetrics,
     session: &EditSession,
+    ufo: &Ufo,
 ) {
     ctx.clear(Color::WHITE);
+    // kind of a hack? the glyph coordinate space has (0, 0) at the baseline with y up;
+    // the piet coordinate space has (0, 0) in the top left, with y down.
     let affine = Affine::new([
         0.8,
         0.0,
@@ -393,9 +408,10 @@ pub(crate) fn draw_session(
     ctx.transform(affine);
     let mut draw_ctx = DrawCtx::new(&mut ctx.render_ctx, space);
     draw_ctx.draw_metrics(&session.glyph, metrics);
+    draw_ctx.draw_guides(&session.guides, &session.selection);
 
     for path in session.paths.iter() {
-        let bez = (space.transform() * path.bezier().clone());
+        let bez = space.transform() * path.bezier().clone();
         draw_ctx.draw_path(&bez);
         draw_ctx.draw_control_point_lines(path);
         draw_ctx.draw_direction_indicator(&bez);
@@ -409,6 +425,10 @@ pub(crate) fn draw_session(
                 draw_ctx.draw_off_curve_point(pt.to_screen(space), true);
             }
         }
+    }
+
+    for component in session.components.iter() {
+        draw_ctx.draw_component(component, ufo);
     }
     if let Err(e) = ctx.restore() {
         log::warn!("failed to restore context {:?}", e);

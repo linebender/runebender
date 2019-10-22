@@ -33,7 +33,7 @@ impl Widget<GlyphSet> for GlyphGrid {
             let baseline = row as f64 * GLYPH_SIZE + GLYPH_SIZE * (1.0 - 0.16);
             let line = Line::new((0., baseline), (state.size().width + GLYPH_SIZE, baseline));
             ctx.render_ctx
-                .stroke(&line, &env.get(theme::FOREGROUND_DARK), 0.5);
+                .stroke(&line, &env.get(theme::FOREGROUND_DARK), 1.0);
         }
         for child in &mut self.children {
             child.paint_with_offset(ctx, data, env);

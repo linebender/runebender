@@ -96,7 +96,7 @@ impl GlyphPlus {
 
 /// Given a glyph name, a `Ufo`, and an optional cache, returns the fully resolved
 /// (including all sub components) `BezPath` for this glyph.
-pub fn get_bezier(name: &str, ufo: &Arc<Ufo>, resolved: Option<&BezCache>) -> Option<Arc<BezPath>> {
+pub fn get_bezier(name: &str, ufo: &Ufo, resolved: Option<&BezCache>) -> Option<Arc<BezPath>> {
     if let Some(resolved) = resolved.and_then(|r| r.borrow().get(name).map(Arc::clone)) {
         return Some(resolved);
     }
