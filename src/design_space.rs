@@ -115,7 +115,7 @@ impl DVec2 {
 }
 
 impl ViewPort {
-    fn scroll(&mut self, event: &WheelEvent) {
+    pub fn scroll(&mut self, event: &WheelEvent) {
         let mut delta = event.delta;
         if event.mods.shift {
             if delta.x > delta.y {
@@ -127,13 +127,13 @@ impl ViewPort {
         let x = (self.offset.x - event.delta.x)
             .min(MAX_SCROLL)
             .max(MIN_SCROLL);
-        let y = (self.offset.y - event.delta.y)
+        let y = (self.offset.y + event.delta.y)
             .min(MAX_SCROLL)
             .max(MIN_SCROLL);
         self.offset = Vec2::new(x.round(), y.round());
     }
 
-    fn zoom(&mut self, event: &WheelEvent, mouse: Point) {
+    pub fn zoom(&mut self, event: &WheelEvent, mouse: Point) {
         let delta = if event.delta.x.abs() > event.delta.y.abs() {
             event.delta.x
         } else {

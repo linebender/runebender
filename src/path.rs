@@ -215,7 +215,7 @@ impl Path {
         let mut bez = BezPath::new();
         bez.move_to(self.start_point().point.to_raw());
         let mut i = if self.closed { 0 } else { 1 };
-        self.debug_print_points();
+        //self.debug_print_points();
 
         while i < self.points.len() {
             if self.points[i].is_on_curve() {

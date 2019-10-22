@@ -194,6 +194,7 @@ pub mod lenses {
     pub mod app_state {
         use std::sync::Arc;
 
+        use druid::Data;
         use norad::GlyphName;
 
         use super::super::{AppState, EditorState as EditorState_, GlyphSet as GlyphSet_};
@@ -260,7 +261,16 @@ pub mod lenses {
                     metrics,
                     session,
                 };
-                f(&mut glyph)
+                let v = f(&mut glyph);
+                if !data
+                    .sessions
+                    .get(&self.0)
+                    .map(|s| s.same(&glyph.session))
+                    .unwrap_or(true)
+                {
+                    Arc::make_mut(&mut data.sessions).insert(self.0.clone(), glyph.session);
+                }
+                v
             }
         }
     }
