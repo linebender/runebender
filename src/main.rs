@@ -18,9 +18,11 @@ fn main() {
         .title(LocalizedString::new("Runebender"))
         .menu(menus::make_menu());
 
+    let state = get_initial_state();
+
     AppLauncher::with_window(main_window)
         .use_simple_logger()
-        .launch(AppState::default())
+        .launch(state)
         .expect("launch failed");
 }
 
@@ -47,4 +49,20 @@ fn make_ui() -> impl Widget<AppState> {
         1.,
     );
     Controller::new(col)
+}
+
+/// If there was an argument passed at the command line, try to open it as a .ufo
+/// file, otherwise return blank state.
+fn get_initial_state() -> AppState {
+    let mut state = AppState::default();
+    if let Some(arg) = std::env::args().skip(1).next() {
+        match norad::Ufo::load(&arg) {
+            Ok(ufo) => state.set_file(ufo, std::path::PathBuf::from(arg)),
+            Err(e) => {
+                eprintln!("Failed to load first arg '{}' as ufo file.\nError:'{}'", arg, e);
+                std::process::exit(1);
+            }
+        }
+    }
+    state
 }
