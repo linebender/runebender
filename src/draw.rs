@@ -38,6 +38,8 @@ const OFF_CURVE_SELECTED_RADIUS: f64 = 2.5;
 struct DrawCtx<'a, 'b: 'a> {
     ctx: &'a mut Piet<'b>,
     space: ViewPort,
+    /// the size of the drawing area
+    size: Size,
 }
 
 impl<'a, 'b> std::ops::Deref for DrawCtx<'a, 'b> {
@@ -55,8 +57,8 @@ impl<'a, 'b> std::ops::DerefMut for DrawCtx<'a, 'b> {
 }
 
 impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
-    fn new(ctx: &'a mut Piet<'b>, space: ViewPort) -> Self {
-        DrawCtx { ctx, space }
+    fn new(ctx: &'a mut Piet<'b>, space: ViewPort, size: Size) -> Self {
+        DrawCtx { ctx, space, size }
     }
 
     fn draw_metrics(&mut self, glyph: &Glyph, metrics: &FontMetrics) {
@@ -70,9 +72,10 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
             .map(|a| a.width as f64)
             .unwrap_or((upm * 0.5).round());
         let bounds = Rect::from_points((0., descender), (hadvance, ascender));
-        self.stroke(bounds, &METRICS_COLOR, 1.0);
+        let transform = self.space.transform();
+        self.stroke(transform * bounds, &METRICS_COLOR, 1.0);
         let baseline = Line::new((0.0, 0.0), (hadvance, 0.0));
-        self.stroke(baseline, &METRICS_COLOR, 1.0);
+        self.stroke(transform * baseline, &METRICS_COLOR, 1.0);
     }
 
     fn draw_grid(&mut self) {
@@ -86,7 +89,8 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
             // TODO: use view size
             // TODO: more efficient maybe to just save the grid as a bezier,
             // then just transform and draw?
-            let visible_pixels = 2000 / self.space.zoom as usize;
+            let visible_pixels =
+                self.size.width.max(self.size.height).ceil() as usize / self.space.zoom as usize;
             let view_origin = self.space.transform().inverse() * Point::new(0., 0.);
             let Point { x, y } = view_origin.round();
             let x1 = x - 1.;
@@ -155,7 +159,8 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
 
     fn draw_path(&mut self, bez: &BezPath) {
         let path_brush = self.solid_brush(PATH_COLOR);
-        self.stroke(bez, &path_brush, 1.0);
+        let transform = self.space.transform();
+        self.stroke(transform * bez, &path_brush, 1.0);
     }
 
     fn draw_filled_paths(&mut self, paths: &[Path]) {
@@ -254,18 +259,15 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         } else {
             OFF_CURVE_RADIUS
         };
-        let brush = self.solid_brush(OFF_CURVE_POINT_COLOR);
         let circ = Circle::new(p, radius);
         if selected {
             self.fill(circ, &OFF_CURVE_POINT_COLOR);
         } else {
-            self.stroke(circ, &brush, 1.0);
+            self.stroke(circ, &OFF_CURVE_POINT_COLOR, 1.0);
         }
     }
 
     fn draw_selection_rect(&mut self, rect: Rect) {
-        let bg_brush = self.solid_brush(SELECTION_RECT_BG_COLOR);
-        let stroke_brush = self.solid_brush(SELECTION_RECT_STROKE_COLOR);
         self.fill(rect, &SELECTION_RECT_BG_COLOR);
         self.stroke(rect, &SELECTION_RECT_STROKE_COLOR, 1.0);
     }
@@ -283,7 +285,8 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         let mut arrow = make_arrow();
         arrow.apply_affine(rotate);
         arrow.apply_affine(translate);
-        self.fill(arrow, &DIRECTION_ARROW_COLOR);
+        let transform = self.space.transform();
+        self.fill(transform * arrow, &DIRECTION_ARROW_COLOR);
     }
 
     fn draw_component(&mut self, component: &Component, ufo: &Ufo) {
@@ -393,14 +396,7 @@ pub(crate) fn draw_session(
     ctx.clear(Color::WHITE);
     // kind of a hack? the glyph coordinate space has (0, 0) at the baseline with y up;
     // the piet coordinate space has (0, 0) in the top left, with y down.
-    let affine = Affine::new([
-        0.8,
-        0.0,
-        0.0,
-        -0.8,
-        canvas_size.width * 0.25,
-        canvas_size.height * 0.75,
-    ]);
+    let affine = Affine::new([1.0, 0.0, 0.0, -1., 0.0, 0.0]);
     if let Err(e) = ctx.save() {
         log::warn!("failed to save context {:?}", e);
     }
@@ -411,12 +407,15 @@ pub(crate) fn draw_session(
     //}
 
     ctx.transform(affine);
-    let mut draw_ctx = DrawCtx::new(&mut ctx.render_ctx, space);
+
+    let mut draw_ctx = DrawCtx::new(&mut ctx.render_ctx, space, canvas_size);
+    draw_ctx.draw_grid();
     draw_ctx.draw_metrics(&session.glyph, metrics);
     draw_ctx.draw_guides(&session.guides, &session.selection);
 
     for path in session.paths.iter() {
-        let bez = space.transform() * path.bezier().clone();
+        let bez = path.bezier();
+        //let bez = space.transform() * path.bezier().clone();
         draw_ctx.draw_path(&bez);
         draw_ctx.draw_control_point_lines(path);
         draw_ctx.draw_direction_indicator(&bez);
