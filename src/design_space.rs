@@ -258,6 +258,14 @@ impl fmt::Display for DPoint {
     }
 }
 
+impl Data for ViewPort {
+    fn same(&self, other: &ViewPort) -> bool {
+        self.offset.x.same(&other.offset.x)
+            && self.offset.y.same(&other.offset.y)
+            && self.zoom.same(&other.zoom)
+    }
+}
+
 impl std::default::Default for ViewPort {
     fn default() -> Self {
         ViewPort {

@@ -405,6 +405,11 @@ pub(crate) fn draw_session(
         log::warn!("failed to save context {:?}", e);
     }
 
+    //if tool.name() == "preview" {
+    //draw_ctx.draw_filled_paths(paths);
+    //return;
+    //}
+
     ctx.transform(affine);
     let mut draw_ctx = DrawCtx::new(&mut ctx.render_ctx, space);
     draw_ctx.draw_metrics(&session.glyph, metrics);
@@ -430,68 +435,15 @@ pub(crate) fn draw_session(
     for component in session.components.iter() {
         draw_ctx.draw_component(component, ufo);
     }
+
+    //if let Some(rect) = tool.selection_rect() {
+    //draw_ctx.draw_selection_rect(rect);
+    //}
+
     if let Err(e) = ctx.restore() {
         log::warn!("failed to restore context {:?}", e);
     }
 }
-
-//pub(crate) fn draw_paths(
-//metrics: &FontMetrics,
-//paths: &[Path],
-//sels: &BTreeSet<EntityId>,
-//guides: &[Guide],
-////tool: &dyn Tool,
-//space: ViewPort,
-//canvas_size: Size,
-//ctx: &mut PaintCtx,
-//_mouse: Point,
-//) {
-//ctx.clear(Color::WHITE);
-////if tool.name() == "preview" {
-////draw_ctx.draw_filled_paths(paths);
-////return;
-////}
-
-//let affine = Affine::new([
-//0.8,
-//0.0,
-//0.0,
-//-0.8,
-//canvas_size.width * 0.75,
-//canvas_size.height * 0.75,
-//]);
-//ctx.save();
-//ctx.transform(affine);
-
-//let mut draw_ctx = DrawCtx::new(&mut ctx.render_ctx, space);
-
-//draw_ctx.draw_grid();
-//draw_ctx.draw_guides(guides, sels);
-//for path in paths {
-////let bez = affine * (space.transform() * path.bezier().clone());
-//let bez = (space.transform() * path.bezier().clone());
-//draw_ctx.draw_path(&bez);
-//draw_ctx.draw_control_point_lines(path);
-//draw_ctx.draw_direction_indicator(&bez);
-
-//for point in PointIter::new(path, space, &bez, sels) {
-//draw_ctx.draw_point(point)
-//}
-
-//if let Some(pt) = path.trailing() {
-//if path.should_draw_trailing() {
-//draw_ctx.draw_off_curve_point(pt.to_screen(space), true);
-//}
-//}
-//}
-//if let Err(e) = ctx.restore() {
-//log::warn!("failed to restore context {:?}", e);
-//}
-
-////if let Some(rect) = tool.selection_rect() {
-////draw_ctx.draw_selection_rect(rect);
-////}
-//}
 
 /// Return the tangent of the cubic bezier `cb`, at time `t`, as a vector
 /// relative to the path's start point.

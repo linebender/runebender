@@ -5,6 +5,7 @@ use druid::Data;
 use norad::{Glyph, GlyphName, Ufo};
 
 use crate::component::Component;
+use crate::design_space::ViewPort;
 use crate::guides::Guide;
 use crate::path::{EntityId, Path};
 
@@ -20,6 +21,7 @@ pub struct EditSession {
     pub components: Arc<Vec<Component>>,
     pub guides: Arc<Vec<Guide>>,
     pub undo_stack: UndoStack,
+    pub viewport: ViewPort,
 }
 
 impl EditSession {
@@ -50,6 +52,7 @@ impl EditSession {
             components: Arc::new(components),
             guides: Arc::new(guides),
             undo_stack: (),
+            viewport: ViewPort::default(),
         }
     }
 }
