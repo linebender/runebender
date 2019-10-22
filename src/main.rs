@@ -67,7 +67,10 @@ fn get_initial_state() -> AppState {
         match norad::Ufo::load(&arg) {
             Ok(ufo) => state.set_file(ufo, std::path::PathBuf::from(arg)),
             Err(e) => {
-                eprintln!("Failed to load first arg '{}' as ufo file.\nError:'{}'", arg, e);
+                eprintln!(
+                    "Failed to load first arg '{}' as ufo file.\nError:'{}'",
+                    arg, e
+                );
                 std::process::exit(1);
             }
         }
