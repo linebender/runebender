@@ -237,7 +237,7 @@ impl Path {
     }
 
     pub fn screen_dist(&self, vport: ViewPort, point: Point) -> f64 {
-        let screen_bez = vport.transform() * self.bezier();
+        let screen_bez = vport.affine() * self.bezier();
         let (_, x, y) = screen_bez.nearest(point, 0.1);
         Vec2::new(x, y).hypot()
     }
