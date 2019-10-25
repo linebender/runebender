@@ -72,10 +72,12 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
             .map(|a| a.width as f64)
             .unwrap_or((upm * 0.5).round());
         let bounds = Rect::from_points((0., descender), (hadvance, ascender));
-        let transform = self.space.transform();
-        self.stroke(transform * bounds, &METRICS_COLOR, 1.0);
+        let bounds = self.space.rect_to_screen(bounds);
+
+        self.stroke(bounds, &METRICS_COLOR, 1.0);
         let baseline = Line::new((0.0, 0.0), (hadvance, 0.0));
-        self.stroke(transform * baseline, &METRICS_COLOR, 1.0);
+        let baseline = self.space.affine() * baseline;
+        self.stroke(baseline, &METRICS_COLOR, 1.0);
     }
 
     fn draw_grid(&mut self) {
@@ -91,7 +93,7 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
             // then just transform and draw?
             let visible_pixels =
                 self.size.width.max(self.size.height).ceil() as usize / self.space.zoom as usize;
-            let view_origin = self.space.transform().inverse() * Point::new(0., 0.);
+            let view_origin = self.space.inverse_affine() * Point::new(0., 0.);
             let Point { x, y } = view_origin.round();
             let x1 = x - 1.;
             let y1 = y - 1.;
@@ -132,7 +134,7 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
     }
 
     fn line_for_guide(&self, guide: &Guide) -> Line {
-        let view_origin = self.space.transform().inverse() * Point::new(0., 0.);
+        let view_origin = self.space.inverse_affine() * Point::new(0., 0.);
         let Point { x, y } = view_origin.round();
         let visible_pixels = 2000. / self.space.zoom;
         match guide.guide {
@@ -159,13 +161,13 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
 
     fn draw_path(&mut self, bez: &BezPath) {
         let path_brush = self.solid_brush(PATH_COLOR);
-        let transform = self.space.transform();
+        let transform = self.space.affine();
         self.stroke(transform * bez, &path_brush, 1.0);
     }
 
     fn draw_filled_paths(&mut self, paths: &[Path]) {
         for p in paths {
-            let bez = self.space.transform() * p.bezier().clone();
+            let bez = self.space.affine() * p.bezier().clone();
             self.fill(bez, &Color::BLACK);
         }
     }
@@ -285,7 +287,7 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         let mut arrow = make_arrow();
         arrow.apply_affine(rotate);
         arrow.apply_affine(translate);
-        let transform = self.space.transform();
+        let transform = self.space.affine();
         self.fill(transform * arrow, &DIRECTION_ARROW_COLOR);
     }
 
@@ -393,20 +395,12 @@ pub(crate) fn draw_session(
     session: &EditSession,
     ufo: &Ufo,
 ) {
-    ctx.clear(Color::WHITE);
-    // kind of a hack? the glyph coordinate space has (0, 0) at the baseline with y up;
-    // the piet coordinate space has (0, 0) in the top left, with y down.
-    let affine = Affine::new([1.0, 0.0, 0.0, -1., 0.0, 0.0]);
-    if let Err(e) = ctx.save() {
-        log::warn!("failed to save context {:?}", e);
-    }
+    //ctx.clear(Color::WHITE);
 
     //if tool.name() == "preview" {
     //draw_ctx.draw_filled_paths(paths);
     //return;
     //}
-
-    ctx.transform(affine);
 
     let mut draw_ctx = DrawCtx::new(&mut ctx.render_ctx, space, canvas_size);
     draw_ctx.draw_grid();
@@ -438,10 +432,6 @@ pub(crate) fn draw_session(
     //if let Some(rect) = tool.selection_rect() {
     //draw_ctx.draw_selection_rect(rect);
     //}
-
-    if let Err(e) = ctx.restore() {
-        log::warn!("failed to restore context {:?}", e);
-    }
 }
 
 /// Return the tangent of the cubic bezier `cb`, at time `t`, as a vector

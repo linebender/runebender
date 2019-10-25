@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use druid::kurbo::{Affine, BezPath, Point};
+use druid::kurbo::{Affine, BezPath, Point, Rect, Size};
 use druid::{Data, WindowId};
 use norad::glyph::{Contour, ContourPoint, Glyph, GlyphName, PointType};
 use norad::{FontInfo, FormatVersion, MetaInfo, Ufo};
@@ -380,4 +380,22 @@ pub fn path_for_glyph(glyph: &Glyph) -> BezPath {
             .for_each(|c| add_contour(&mut path, c));
     }
     path
+}
+
+/// Calculate the size of a glyph's layout rect
+pub fn glyph_rect(data: &EditorState) -> Rect {
+    let upm = data.metrics.units_per_em;
+    let ascender = data.metrics.ascender.unwrap_or(upm * 0.8);
+    let descender = data.metrics.descender.unwrap_or(upm * -0.2);
+    let width = data
+        .session
+        .glyph
+        .advance
+        .as_ref()
+        .map(|a| a.width as f64)
+        .unwrap_or(upm * 0.5);
+
+    let work_size = Size::new(width, ascender + descender.abs());
+    let work_origin = Point::new(0., -ascender);
+    Rect::from_origin_size(work_origin, work_size)
 }

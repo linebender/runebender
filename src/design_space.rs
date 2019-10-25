@@ -8,19 +8,21 @@
 use std::fmt;
 use std::ops::{Add, Mul, Sub};
 
-use druid::kurbo::{Point, TranslateScale, Vec2};
-use druid::{Data, WheelEvent};
-
-const MIN_ZOOM: f64 = 0.2;
-const MAX_ZOOM: f64 = 50.;
-const MIN_SCROLL: f64 = -5000.;
-const MAX_SCROLL: f64 = 5000.;
+use druid::kurbo::{Affine, Point, Rect, Vec2};
+use druid::Data;
 
 /// The position of the view, relative to the design space.
 #[derive(Debug, Clone, Copy, PartialEq)]
+//TODO: rename to DesignSpace
 pub struct ViewPort {
-    pub offset: Vec2,
+    /// The offset from (0, 0) in view space (the top left corner) and (0, 0) in
+    /// design space, which is the intersection of the baseline and the left sidebearing.
+    pub(crate) offset: Vec2,
     pub zoom: f64,
+    /// Whether or not the y axis is inverted between view and design space.
+    ///
+    /// This is always `true`. It exists to make this code more readable.
+    pub flipped_y: bool,
 }
 
 /// A point in design space.
@@ -54,12 +56,11 @@ impl DPoint {
     }
 
     pub fn from_screen(point: Point, vport: ViewPort) -> DPoint {
-        let point = vport.transform().inverse() * point;
-        DPoint::new(point.x.round(), point.y.round())
+        vport.from_screen(point)
     }
 
     pub fn to_screen(self, vport: ViewPort) -> Point {
-        vport.transform() * self.to_raw()
+        vport.to_screen(self)
     }
 
     /// Create a new `DPoint` from a `Point` in design space. This should only
@@ -115,68 +116,48 @@ impl DVec2 {
 }
 
 impl ViewPort {
-    pub fn scroll(&mut self, event: &WheelEvent) {
-        let mut delta = event.delta;
-        if event.mods.shift {
-            if delta.x > delta.y {
-                delta.y = 0.;
-            } else {
-                delta.x = 0.;
-            }
-        }
-        let x = (self.offset.x - event.delta.x)
-            .min(MAX_SCROLL)
-            .max(MIN_SCROLL);
-        let y = (self.offset.y + event.delta.y)
-            .min(MAX_SCROLL)
-            .max(MIN_SCROLL);
-        self.offset = Vec2::new(x.round(), y.round());
-    }
-
-    pub fn zoom(&mut self, event: &WheelEvent, mouse: Point) {
-        let delta = if event.delta.x.abs() > event.delta.y.abs() {
-            event.delta.x
+    pub fn affine(&self) -> Affine {
+        let y_scale = if self.flipped_y {
+            -self.zoom
         } else {
-            event.delta.y
+            self.zoom
         };
-        // the deltas we get are big, and make zooming jumpy
-        let delta = delta.round() * 0.02;
-        if delta == 0. {
-            return;
-        }
-
-        // We want the mouse to stay fixed in design space _and_ in screen space.
-        // 1. get the pre-zoom design space location of the mouse
-        let pre_mouse = self.transform().inverse() * mouse;
-        let next_zoom = (self.zoom + delta).max(MIN_ZOOM).min(MAX_ZOOM);
-        if (next_zoom - self.zoom).abs() < 0.001 {
-            // don't jump around near our boundaries.
-            return;
-        }
-        self.zoom = next_zoom;
-        // 2. get the post-zoom screen-space location of pre_mouse
-        let post_mouse = self.transform() * pre_mouse;
-        let mouse_delta = mouse - post_mouse;
-
-        //eprintln!("{:.4}: ({:.2}, {:.2}), ({:.2}, {:.2}), ({:.2}, {:.2})", self.zoom, pre_mouse.x, pre_mouse.y, post_mouse.x, post_mouse.y, mouse_delta.x, mouse_delta.y);
-        self.offset += mouse_delta;
+        Affine::new([self.zoom, 0.0, 0.0, y_scale, self.offset.x, self.offset.y])
     }
 
-    pub fn pan(&mut self, delta: Vec2) {
-        self.offset += delta
+    pub fn inverse_affine(&self) -> Affine {
+        inverse_affine(self.affine())
     }
 
-    pub fn transform(&self) -> TranslateScale {
-        TranslateScale::new(self.offset, self.zoom)
+    fn from_screen(&self, point: impl Into<Point>) -> DPoint {
+        let point = self.inverse_affine() * point.into();
+        DPoint::new(point.x.round(), point.y.round())
     }
 
-    fn design_point(&self, point: impl Into<Point>) -> DPoint {
-        DPoint::from_screen(point.into(), *self)
+    pub fn to_screen(&self, point: impl Into<DPoint>) -> Point {
+        self.affine() * point.into().to_raw()
     }
 
-    pub fn to_screen(&self, point: impl Into<Point>) -> Point {
-        DPoint::from_raw(point.into()).to_screen(*self)
+    // rects get special treatment because they can't be transformed with an affine
+    pub fn rect_to_screen(&self, rect: Rect) -> Rect {
+        let p0 = self.to_screen(DPoint::from_raw(rect.origin()));
+        let p1 = self.to_screen(DPoint::from_raw((rect.x1, rect.y1)));
+        Rect::from_points(p0, p1)
     }
+}
+
+// TODO: delete me when Affine::inverse lands in kurbo
+fn inverse_affine(t: Affine) -> Affine {
+    let coeffs = t.as_coeffs();
+    let inv_det = coeffs[0] * coeffs[3] - coeffs[1] * coeffs[2];
+    Affine::new([
+        inv_det * coeffs[3],
+        -inv_det * coeffs[1],
+        -inv_det * coeffs[2],
+        inv_det * coeffs[0],
+        inv_det * (coeffs[2] * coeffs[5] - coeffs[3] * coeffs[4]),
+        inv_det * (coeffs[1] * coeffs[4] - coeffs[0] * coeffs[5]),
+    ])
 }
 
 impl Add<DVec2> for DPoint {
@@ -242,6 +223,12 @@ impl Mul<f64> for DVec2 {
     }
 }
 
+impl From<(f64, f64)> for DPoint {
+    fn from(src: (f64, f64)) -> DPoint {
+        DPoint::new(src.0, src.1)
+    }
+}
+
 impl fmt::Debug for DPoint {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "D({:?}, {:?})", self.x, self.y)
@@ -271,6 +258,7 @@ impl std::default::Default for ViewPort {
         ViewPort {
             offset: Vec2::ZERO,
             zoom: 1.0,
+            flipped_y: true,
         }
     }
 }

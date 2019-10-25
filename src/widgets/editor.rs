@@ -1,35 +1,47 @@
 //! the main editor widget.
 
-use druid::kurbo::{Point, Size};
+use druid::kurbo::{Rect, Size, Vec2};
 use druid::{
     BaseState, BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget,
 };
 
-use norad::GlyphName;
-
-use crate::data::{lenses, AppState, EditorState};
+use crate::data::{glyph_rect, EditorState};
 use crate::design_space::ViewPort;
 use crate::draw;
-use crate::lens2::Lens2Wrap;
 
 /// The root widget of the glyph editor window.
-pub struct Editor(Point /* mouse pos; hacky, just to get zoom working */);
+pub struct Editor {
+    work_offset: Vec2,
+}
+
+pub const CANVAS_SIZE: Size = Size::new(10000., 10000.);
 
 impl Editor {
-    pub fn new(glyph_name: GlyphName) -> impl Widget<AppState> {
-        Lens2Wrap::new(
-            Editor(Point::ZERO),
-            lenses::app_state::EditorState(glyph_name),
-        )
+    pub fn new() -> Editor {
+        Editor {
+            work_offset: Vec2::ZERO,
+        }
     }
 }
 
 impl Widget<EditorState> for Editor {
     fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &EditorState, _env: &Env) {
-        //TODO: replacement for missing glyphs
+        use druid::piet::{Color, RenderContext};
+        //paint_checkerboard(ctx, data.session.viewport.zoom);
+        let rect =
+            Rect::ZERO.with_size((CANVAS_SIZE.to_vec2() * data.session.viewport.zoom).to_size());
+        ctx.fill(rect, &Color::WHITE);
+
+        //FIXME HACK: we were stashing work_offset in the editor struct while playing
+        //around, it should be removed and only live in ViewPort or equivalent
+        let viewport = ViewPort {
+            zoom: data.session.viewport.zoom,
+            flipped_y: true,
+            offset: self.work_offset,
+        };
         draw::draw_session(
             ctx,
-            data.session.viewport,
+            viewport,
             state.size(),
             &data.metrics,
             &data.session,
@@ -40,28 +52,22 @@ impl Widget<EditorState> for Editor {
     fn layout(
         &mut self,
         _ctx: &mut LayoutCtx,
-        bc: &BoxConstraints,
-        _d: &EditorState,
+        _bc: &BoxConstraints,
+        data: &EditorState,
         _env: &Env,
     ) -> Size {
-        bc.max()
+        // FIXME: use all items on canvas when computing size
+        let work_rect = glyph_rect(data);
+        let canvas_rect = Rect::ZERO.with_size(CANVAS_SIZE);
+        let work_offset = canvas_rect.center() - work_rect.center();
+
+        self.work_offset = work_offset * data.session.viewport.zoom;
+        // we want to center the frame of the glyph on the canvas
+
+        (CANVAS_SIZE.to_vec2() * data.session.viewport.zoom).to_size()
     }
 
-    fn event(&mut self, event: &Event, ctx: &mut EventCtx, data: &mut EditorState, _env: &Env) {
-        match event {
-            Event::MouseMoved(event) => self.0 = event.pos,
-            Event::Wheel(wheel) => {
-                if wheel.mods.meta {
-                    data.session.viewport.zoom(wheel, self.0);
-                } else {
-                    data.session.viewport.scroll(wheel);
-                }
-                ctx.set_handled();
-                ctx.invalidate();
-            }
-            _ => (),
-        }
-    }
+    fn event(&mut self, _event: &Event, _ctx: &mut EventCtx, _data: &mut EditorState, _env: &Env) {}
 
     fn update(
         &mut self,
