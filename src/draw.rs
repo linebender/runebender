@@ -293,10 +293,10 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
 
     fn draw_component(&mut self, component: &Component, ufo: &Ufo) {
         if let Some(bez) = crate::data::get_bezier(&component.base, ufo, None) {
-            self.fill(
-                component.transform * Arc::try_unwrap(bez).unwrap(),
-                &COMPONENT_FILL_COLOR,
-            );
+            let mut bez = Arc::try_unwrap(bez).expect("just created, guaranteed unique");
+            bez.apply_affine(component.transform);
+            bez.apply_affine(self.space.affine());
+            self.fill(bez, &COMPONENT_FILL_COLOR);
         }
     }
 }
