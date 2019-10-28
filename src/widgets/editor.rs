@@ -5,7 +5,7 @@ use druid::{
     BaseState, BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget,
 };
 
-use crate::data::{glyph_rect, EditorState};
+use crate::data::EditorState;
 use crate::design_space::ViewPort;
 use crate::draw;
 
@@ -14,7 +14,7 @@ pub struct Editor {
     work_offset: Vec2,
 }
 
-pub const CANVAS_SIZE: Size = Size::new(10000., 10000.);
+pub const CANVAS_SIZE: Size = Size::new(5000., 5000.);
 
 impl Editor {
     pub fn new() -> Editor {
@@ -56,13 +56,12 @@ impl Widget<EditorState> for Editor {
         data: &EditorState,
         _env: &Env,
     ) -> Size {
-        // FIXME: use all items on canvas when computing size
-        let work_rect = glyph_rect(data);
+        let work_rect = data.content_region();
         let canvas_rect = Rect::ZERO.with_size(CANVAS_SIZE);
         let work_offset = canvas_rect.center() - work_rect.center();
 
-        self.work_offset = work_offset * data.session.viewport.zoom;
         // we want to center the frame of the glyph on the canvas
+        self.work_offset = work_offset * data.session.viewport.zoom;
 
         (CANVAS_SIZE.to_vec2() * data.session.viewport.zoom).to_size()
     }
