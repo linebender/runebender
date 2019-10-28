@@ -4,12 +4,14 @@ use druid::{
     BaseState, BoxConstraints, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget,
 };
 
-use crate::data::{glyph_rect, EditorState};
+use crate::data::EditorState;
 
 use super::CANVAS_SIZE;
 
 const MIN_ZOOM: f64 = 0.02;
 const MAX_ZOOM: f64 = 50.;
+/// mouse wheel deltas are big, so we scale them down
+const ZOOM_SCALE: f64 = 0.001;
 
 /// A widget that wraps a scroll widget, adding zoom.
 pub struct ScrollZoom<T: Widget<EditorState>> {
@@ -29,8 +31,7 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
 
     fn zoom(&mut self, data: &mut EditorState, delta: Vec2, size: Size) {
         let delta = most_significant_axis(delta);
-        // deltas are big, so we scale them down
-        let delta = delta.round() * 0.001;
+        let delta = delta.round() * ZOOM_SCALE;
         if delta == 0. {
             return;
         }
@@ -55,7 +56,7 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
     /// center the glyph on the canvas
     fn set_initial_scroll(&mut self, data: &EditorState, view_size: Size) {
         // set scroll offsets so that the work is centered on load
-        let work_rect = glyph_rect(data);
+        let work_rect = data.content_region();
         let canvas_size = CANVAS_SIZE * data.session.viewport.zoom;
         let work_size = work_rect.size() * data.session.viewport.zoom;
 
@@ -73,7 +74,7 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
     }
 
     fn set_initial_zoom(&mut self, data: &mut EditorState, view_size: Size) {
-        let work_size = glyph_rect(data).size();
+        let work_size = data.content_region().size();
         let fit_ratio =
             (work_size.width / view_size.width).max(work_size.height / view_size.height);
         if fit_ratio > 1.0 {

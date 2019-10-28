@@ -94,6 +94,40 @@ impl GlyphPlus {
     }
 }
 
+impl EditorState {
+    /// Returns a rect representing the metric bounds of this glyph; that is,
+    /// taking into account the font metrics (ascender, descender) as well as the
+    /// glyph's width.
+    ///
+    /// This rect is in the same coordinate space as the glyph; the origin
+    /// is at the intersection of the baseline and the left sidebearing,
+    /// and y is up.
+    fn layout_bounds(&self) -> Rect {
+        let upm = self.metrics.units_per_em;
+        let ascender = self.metrics.ascender.unwrap_or(upm * 0.8);
+        let descender = self.metrics.descender.unwrap_or(upm * -0.2);
+        let width = self
+            .session
+            .glyph
+            .advance
+            .as_ref()
+            .map(|a| a.width as f64)
+            .unwrap_or(upm * 0.5);
+
+        let work_size = Size::new(width, ascender + descender.abs());
+        let work_origin = Point::new(0., descender);
+        Rect::from_origin_size(work_origin, work_size)
+    }
+
+    /// Returns a `Rect` representing, in the coordinate space of the canvas,
+    /// the total region occupied by outlines, components, anchors, and the metric
+    /// bounds.
+    pub fn content_region(&self) -> Rect {
+        let result = self.layout_bounds().union(self.session.work_bounds());
+        Rect::from_points((result.x0, -result.y0), (result.x1, -result.y1))
+    }
+}
+
 /// Given a glyph name, a `Ufo`, and an optional cache, returns the fully resolved
 /// (including all sub components) `BezPath` for this glyph.
 pub fn get_bezier(name: &str, ufo: &Ufo, resolved: Option<&BezCache>) -> Option<Arc<BezPath>> {
@@ -380,22 +414,4 @@ pub fn path_for_glyph(glyph: &Glyph) -> BezPath {
             .for_each(|c| add_contour(&mut path, c));
     }
     path
-}
-
-/// Calculate the size of a glyph's layout rect
-pub fn glyph_rect(data: &EditorState) -> Rect {
-    let upm = data.metrics.units_per_em;
-    let ascender = data.metrics.ascender.unwrap_or(upm * 0.8);
-    let descender = data.metrics.descender.unwrap_or(upm * -0.2);
-    let width = data
-        .session
-        .glyph
-        .advance
-        .as_ref()
-        .map(|a| a.width as f64)
-        .unwrap_or(upm * 0.5);
-
-    let work_size = Size::new(width, ascender + descender.abs());
-    let work_origin = Point::new(0., -ascender);
-    Rect::from_origin_size(work_origin, work_size)
 }
