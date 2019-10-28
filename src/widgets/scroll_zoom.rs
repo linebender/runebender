@@ -1,4 +1,4 @@
-use druid::kurbo::{Point, Size, Vec2};
+use druid::kurbo::{Point, Rect, Size, Vec2};
 use druid::widget::Scroll;
 use druid::{
     BaseState, BoxConstraints, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget,
@@ -73,14 +73,23 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
         self.child.scroll(delta_off, view_size);
     }
 
-    fn set_initial_zoom(&mut self, data: &mut EditorState, view_size: Size) {
+    /// set the initial zoom and offset, so that the work is positioned in the center
+    /// of the canvas.
+    fn set_initial_viewport(&mut self, data: &mut EditorState, view_size: Size) {
+        let content_region = data.content_region();
         let work_size = data.content_region().size();
         let fit_ratio =
             (work_size.width / view_size.width).max(work_size.height / view_size.height);
-        if fit_ratio > 1.0 {
-            let new_zoom = 0.9 / fit_ratio;
-            data.session.viewport.zoom = new_zoom;
-        }
+        let new_zoom = if fit_ratio > 1.0 {
+            0.9 / fit_ratio
+        } else {
+            1.0
+        };
+
+        let canvas_rect = Rect::ZERO.with_size(CANVAS_SIZE);
+        let work_offset = canvas_rect.center() - content_region.center();
+        data.session.viewport.set_offset(work_offset);
+        data.session.viewport.zoom = new_zoom;
     }
 }
 
@@ -110,7 +119,7 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
     fn event(&mut self, event: &Event, ctx: &mut EventCtx, data: &mut EditorState, env: &Env) {
         match event {
             Event::Size(size) if !self.is_setup => {
-                self.set_initial_zoom(data, *size);
+                self.set_initial_viewport(data, *size);
                 ctx.request_focus();
             }
             Event::MouseMoved(mouse) => {
