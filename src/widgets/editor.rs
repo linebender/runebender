@@ -1,26 +1,21 @@
 //! the main editor widget.
 
-use druid::kurbo::{Rect, Size, Vec2};
+use druid::kurbo::{Rect, Size};
 use druid::{
     BaseState, BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget,
 };
 
 use crate::data::EditorState;
-use crate::design_space::ViewPort;
 use crate::draw;
 
 /// The root widget of the glyph editor window.
-pub struct Editor {
-    work_offset: Vec2,
-}
+pub struct Editor {}
 
 pub const CANVAS_SIZE: Size = Size::new(5000., 5000.);
 
 impl Editor {
     pub fn new() -> Editor {
-        Editor {
-            work_offset: Vec2::ZERO,
-        }
+        Editor {}
     }
 }
 
@@ -32,16 +27,9 @@ impl Widget<EditorState> for Editor {
             Rect::ZERO.with_size((CANVAS_SIZE.to_vec2() * data.session.viewport.zoom).to_size());
         ctx.fill(rect, &Color::WHITE);
 
-        //FIXME HACK: we were stashing work_offset in the editor struct while playing
-        //around, it should be removed and only live in ViewPort or equivalent
-        let viewport = ViewPort {
-            zoom: data.session.viewport.zoom,
-            flipped_y: true,
-            offset: self.work_offset,
-        };
         draw::draw_session(
             ctx,
-            viewport,
+            data.session.viewport,
             state.size(),
             &data.metrics,
             &data.session,
@@ -56,13 +44,6 @@ impl Widget<EditorState> for Editor {
         data: &EditorState,
         _env: &Env,
     ) -> Size {
-        let work_rect = data.content_region();
-        let canvas_rect = Rect::ZERO.with_size(CANVAS_SIZE);
-        let work_offset = canvas_rect.center() - work_rect.center();
-
-        // we want to center the frame of the glyph on the canvas
-        self.work_offset = work_offset * data.session.viewport.zoom;
-
         (CANVAS_SIZE.to_vec2() * data.session.viewport.zoom).to_size()
     }
 

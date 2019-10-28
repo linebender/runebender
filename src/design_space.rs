@@ -17,7 +17,12 @@ use druid::Data;
 pub struct ViewPort {
     /// The offset from (0, 0) in view space (the top left corner) and (0, 0) in
     /// design space, which is the intersection of the baseline and the left sidebearing.
-    pub(crate) offset: Vec2,
+    ///
+    /// # Note:
+    ///
+    /// This does not account for zoom. Zoom must be applied when using this to
+    /// derive a screen point.
+    offset: Vec2,
     pub zoom: f64,
     /// Whether or not the y axis is inverted between view and design space.
     ///
@@ -116,17 +121,22 @@ impl DVec2 {
 }
 
 impl ViewPort {
+    pub fn set_offset(&mut self, offset: Vec2) {
+        self.offset = offset;
+    }
+
     pub fn affine(&self) -> Affine {
         let y_scale = if self.flipped_y {
             -self.zoom
         } else {
             self.zoom
         };
-        Affine::new([self.zoom, 0.0, 0.0, y_scale, self.offset.x, self.offset.y])
+        let offset = self.offset * self.zoom;
+        Affine::new([self.zoom, 0.0, 0.0, y_scale, offset.x, offset.y])
     }
 
     pub fn inverse_affine(&self) -> Affine {
-        inverse_affine(self.affine())
+        self.affine().inverse()
     }
 
     fn from_screen(&self, point: impl Into<Point>) -> DPoint {
@@ -144,20 +154,6 @@ impl ViewPort {
         let p1 = self.to_screen(DPoint::from_raw((rect.x1, rect.y1)));
         Rect::from_points(p0, p1)
     }
-}
-
-// TODO: delete me when Affine::inverse lands in kurbo
-fn inverse_affine(t: Affine) -> Affine {
-    let coeffs = t.as_coeffs();
-    let inv_det = coeffs[0] * coeffs[3] - coeffs[1] * coeffs[2];
-    Affine::new([
-        inv_det * coeffs[3],
-        -inv_det * coeffs[1],
-        -inv_det * coeffs[2],
-        inv_det * coeffs[0],
-        inv_det * (coeffs[2] * coeffs[5] - coeffs[3] * coeffs[4]),
-        inv_det * (coeffs[1] * coeffs[4] - coeffs[0] * coeffs[5]),
-    ])
 }
 
 impl Add<DVec2> for DPoint {
