@@ -45,7 +45,7 @@ fn make_ui() -> impl Widget<AppState> {
             .unwrap_or_else(|| "Untitled".to_string())
     });
     col.add_child(
-        SizedBox::new(Align::centered(Padding::uniform(5.0, label))).height(40.),
+        SizedBox::new(Align::centered(Padding::new(5.0, label))).height(40.),
         0.,
     );
     col.add_child(

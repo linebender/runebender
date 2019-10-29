@@ -20,9 +20,8 @@ impl Editor {
 }
 
 impl Widget<EditorState> for Editor {
-    fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &EditorState, _env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, _: &BaseState, data: &EditorState, _env: &Env) {
         use druid::piet::{Color, RenderContext};
-        //paint_checkerboard(ctx, data.session.viewport.zoom);
         let rect =
             Rect::ZERO.with_size((CANVAS_SIZE.to_vec2() * data.session.viewport.zoom).to_size());
         ctx.fill(rect, &Color::WHITE);
@@ -30,7 +29,7 @@ impl Widget<EditorState> for Editor {
         draw::draw_session(
             ctx,
             data.session.viewport,
-            state.size(),
+            ctx.region().to_rect(),
             &data.metrics,
             &data.session,
             &data.ufo,

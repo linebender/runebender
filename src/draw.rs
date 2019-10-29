@@ -9,8 +9,7 @@ use crate::design_space::ViewPort;
 use crate::edit_session::EditSession;
 use crate::guides::{Guide, GuideLine};
 use crate::path::{EntityId, Path, PointType};
-//use super::{Tool, ViewPort};
-use druid::kurbo::{Affine, BezPath, Circle, CubicBez, Line, PathSeg, Point, Rect, Size, Vec2};
+use druid::kurbo::{Affine, BezPath, Circle, CubicBez, Line, PathSeg, Point, Rect, Vec2};
 use druid::piet::{Color, Piet, RenderContext};
 use druid::PaintCtx;
 
@@ -39,7 +38,7 @@ struct DrawCtx<'a, 'b: 'a> {
     ctx: &'a mut Piet<'b>,
     space: ViewPort,
     /// the size of the drawing area
-    size: Size,
+    visible_rect: Rect,
 }
 
 impl<'a, 'b> std::ops::Deref for DrawCtx<'a, 'b> {
@@ -57,8 +56,12 @@ impl<'a, 'b> std::ops::DerefMut for DrawCtx<'a, 'b> {
 }
 
 impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
-    fn new(ctx: &'a mut Piet<'b>, space: ViewPort, size: Size) -> Self {
-        DrawCtx { ctx, space, size }
+    fn new(ctx: &'a mut Piet<'b>, space: ViewPort, visible_rect: Rect) -> Self {
+        DrawCtx {
+            ctx,
+            space,
+            visible_rect,
+        }
     }
 
     fn draw_metrics(&mut self, glyph: &Glyph, metrics: &FontMetrics) {
@@ -81,29 +84,37 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
     }
 
     fn draw_grid(&mut self) {
-        if self.space.zoom >= 8.0 {
-            let grid_fade = ((self.space.zoom - 8.) / 10.).min(1.0).max(0.01);
+        const MIN_SCALE_FOR_GRID: f64 = 4.0;
+
+        if self.space.zoom >= MIN_SCALE_FOR_GRID {
+            // we draw the grid very lightly at low zoom levels.
+            let grid_fade = ((self.space.zoom - MIN_SCALE_FOR_GRID) / 10.)
+                .min(1.0)
+                .max(0.05);
             let gray_val = 0xFF - (0x44 as f64 * grid_fade) as u8;
-            //let gray = gray_val << 16 | gray_val << 8 | gray_val;
-            //let brush = self.solid_brush(Color::rgb24(gray));
             let brush = Color::rgb8(gray_val, gray_val, gray_val);
 
-            // TODO: use view size
-            // TODO: more efficient maybe to just save the grid as a bezier,
-            // then just transform and draw?
             let visible_pixels =
-                self.size.width.max(self.size.height).ceil() as usize / self.space.zoom as usize;
-            let view_origin = self.space.inverse_affine() * Point::new(0., 0.);
+                self.visible_rect.width().max(self.visible_rect.height()) / self.space.zoom;
+            let visible_pixels = visible_pixels.ceil() as usize;
+
+            let view_origin = self.space.inverse_affine() * self.visible_rect.origin();
             let Point { x, y } = view_origin.round();
+
+            //NOTE: we are drawing in glyph space; y is up.
+
+            // draw one line past what is visible.
             let x1 = x - 1.;
-            let y1 = y - 1.;
+            let y1 = y + 1.;
+            let len = 2.0 + visible_pixels as f64;
             for i in 0..=visible_pixels {
                 let off = i as f64;
-                let len = visible_pixels as f64;
                 let xmin = self.space.to_screen((x1 + off, y1));
-                let xmax = self.space.to_screen((x1 + off, y1 + len));
-                let ymin = self.space.to_screen((x1, y1 + off));
-                let ymax = self.space.to_screen((x1 + len, y1 + off));
+                let xmax = self.space.to_screen((x1 + off, y1 - len));
+                //TODO: this might mean that we draw lines at different pixel
+                //intervals, based on how the rounding goes? is it better to floor()?
+                let ymin = self.space.to_screen((x1, y1 - off)).round();
+                let ymax = self.space.to_screen((x1 + len, y1 - off)).round();
                 self.stroke(Line::new(xmin, xmax), &brush, 1.0);
                 self.stroke(Line::new(ymin, ymax), &brush, 1.0);
             }
@@ -390,7 +401,7 @@ impl<'a> std::iter::Iterator for PointIter<'a> {
 pub(crate) fn draw_session(
     ctx: &mut PaintCtx,
     space: ViewPort,
-    canvas_size: Size,
+    visible_rect: Rect,
     metrics: &FontMetrics,
     session: &EditSession,
     ufo: &Ufo,
@@ -402,7 +413,7 @@ pub(crate) fn draw_session(
     //return;
     //}
 
-    let mut draw_ctx = DrawCtx::new(&mut ctx.render_ctx, space, canvas_size);
+    let mut draw_ctx = DrawCtx::new(&mut ctx.render_ctx, space, visible_rect);
     draw_ctx.draw_grid();
     draw_ctx.draw_metrics(&session.glyph, metrics);
     draw_ctx.draw_guides(&session.guides, &session.selection);
