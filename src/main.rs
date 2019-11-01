@@ -2,6 +2,7 @@
 
 mod app_delegate;
 mod component;
+mod consts;
 mod data;
 mod design_space;
 mod draw;
@@ -9,7 +10,9 @@ mod edit_session;
 mod guides;
 mod lens2;
 mod menus;
+mod mouse;
 mod path;
+mod tools;
 pub mod widgets;
 
 use druid::widget::{Align, Column, DynLabel, Padding, Scroll, SizedBox};

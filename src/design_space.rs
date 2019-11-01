@@ -95,7 +95,7 @@ impl DVec2 {
         DVec2 { x, y }
     }
 
-    fn from_raw(vec2: impl Into<Vec2>) -> DVec2 {
+    pub fn from_raw(vec2: impl Into<Vec2>) -> DVec2 {
         let vec2 = vec2.into();
         DVec2::new(vec2.x.round(), vec2.y.round())
     }
@@ -139,7 +139,7 @@ impl ViewPort {
         self.affine().inverse()
     }
 
-    fn from_screen(&self, point: impl Into<Point>) -> DPoint {
+    pub fn from_screen(&self, point: impl Into<Point>) -> DPoint {
         let point = self.inverse_affine() * point.into();
         DPoint::new(point.x.round(), point.y.round())
     }
@@ -221,7 +221,7 @@ impl Mul<f64> for DVec2 {
 
 impl From<(f64, f64)> for DPoint {
     fn from(src: (f64, f64)) -> DPoint {
-        DPoint::new(src.0, src.1)
+        DPoint::new(src.0.round(), src.1.round())
     }
 }
 

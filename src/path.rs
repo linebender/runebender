@@ -5,10 +5,13 @@ use super::design_space::{DPoint, DVec2, ViewPort};
 use druid::kurbo::{BezPath, Point, Vec2};
 use druid::Data;
 
+const RESERVED_ID_COUNT: usize = 5;
+const GUIDE_TYPE_ID: usize = 1;
+
 /// We give paths & points unique integer identifiers.
 fn next_id() -> usize {
     use std::sync::atomic::{AtomicUsize, Ordering};
-    static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
+    static NEXT_ID: AtomicUsize = AtomicUsize::new(RESERVED_ID_COUNT);
     NEXT_ID.fetch_add(1, Ordering::Relaxed)
 }
 
@@ -41,11 +44,20 @@ pub struct Path {
 }
 
 impl EntityId {
-    pub(crate) fn new_with_parent(parent: usize) -> Self {
+    pub fn new_with_parent(parent: usize) -> Self {
         EntityId {
             parent,
             point: next_id(),
         }
+    }
+
+    #[inline]
+    pub fn new_for_guide() -> Self {
+        EntityId::new_with_parent(GUIDE_TYPE_ID)
+    }
+
+    pub fn is_guide(self) -> bool {
+        self.parent == GUIDE_TYPE_ID
     }
 }
 

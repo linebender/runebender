@@ -19,8 +19,6 @@ const PATH_COLOR: Color = Color::rgb8(0x00, 0x00, 0x00);
 const METRICS_COLOR: Color = Color::rgb8(0xA0, 0xA0, 0xA0);
 const GUIDE_COLOR: Color = Color::rgb8(0xFC, 0x54, 0x93);
 const SELECTED_GUIDE_COLOR: Color = Color::rgb8(0xFE, 0xED, 0xED);
-const SELECTION_RECT_BG_COLOR: Color = Color::rgba8(0xDD, 0xDD, 0xDD, 0x55);
-const SELECTION_RECT_STROKE_COLOR: Color = Color::rgb8(0x53, 0x8B, 0xBB);
 const SMOOTH_POINT_COLOR: Color = Color::rgb8(0x_41, 0x8E, 0x22);
 const CORNER_POINT_COLOR: Color = Color::rgb8(0x0b, 0x2b, 0xdb);
 const OFF_CURVE_POINT_COLOR: Color = Color::rgb8(0xbb, 0xbb, 0xbb);
@@ -145,9 +143,10 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
     }
 
     fn line_for_guide(&self, guide: &Guide) -> Line {
-        let view_origin = self.space.inverse_affine() * Point::new(0., 0.);
+        let view_origin = self.space.inverse_affine() * self.visible_rect.origin();
         let Point { x, y } = view_origin.round();
-        let visible_pixels = 2000. / self.space.zoom;
+        let vis_size = self.visible_rect.size();
+        let visible_pixels = ((vis_size.width.max(vis_size.height)) / self.space.zoom).ceil();
         match guide.guide {
             GuideLine::Horiz(p) => {
                 let p1 = self.space.to_screen((x, p.y));
@@ -156,7 +155,7 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
             }
             GuideLine::Vertical(p) => {
                 let p1 = self.space.to_screen((p.x, y));
-                let p2 = self.space.to_screen((p.x, y + visible_pixels));
+                let p2 = self.space.to_screen((p.x, y - visible_pixels));
                 Line::new(p1, p2)
             }
             GuideLine::Angle { p1, p2 } => {
@@ -166,7 +165,7 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
                 let p1 = p2 - vec * 5000.; // an arbitrary number
                 let p2 = p2 + vec * 5000.;
                 Line::new(p1, p2)
-            } //Line::new(Point::ZERO, Point::ZERO),
+            }
         }
     }
 
@@ -280,11 +279,6 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         }
     }
 
-    fn draw_selection_rect(&mut self, rect: Rect) {
-        self.fill(rect, &SELECTION_RECT_BG_COLOR);
-        self.stroke(rect, &SELECTION_RECT_STROKE_COLOR, 1.0);
-    }
-
     fn draw_direction_indicator(&mut self, path: &BezPath) {
         let first_seg = match path.segments().next().as_ref().map(PathSeg::to_cubic) {
             None => return,
@@ -298,8 +292,9 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         let mut arrow = make_arrow();
         arrow.apply_affine(rotate);
         arrow.apply_affine(translate);
-        let transform = self.space.affine();
-        self.fill(transform * arrow, &DIRECTION_ARROW_COLOR);
+        // FIXME: this scales with zoom, we want a minimum scale probably?
+        arrow.apply_affine(self.space.affine());
+        self.fill(arrow, &DIRECTION_ARROW_COLOR);
     }
 
     fn draw_component(&mut self, component: &Component, ufo: &Ufo) {
