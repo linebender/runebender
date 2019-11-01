@@ -24,7 +24,7 @@ impl Data for Component {
 impl Component {
     pub fn from_norad(src: &norad::glyph::Component) -> Self {
         let base = src.base.as_str().into();
-        let transform = src.transform.clone().into();
+        let transform = src.transform.into();
         let id = EntityId::new_with_parent(0);
         Component {
             base,

@@ -12,9 +12,6 @@ use crate::path::{EntityId, Path};
 
 type UndoStack = ();
 
-#[derive(Debug, Clone)]
-struct DataRect(Rect);
-
 /// The editing state of a particular glyph.
 #[derive(Debug, Clone, Data)]
 pub struct EditSession {
@@ -26,7 +23,8 @@ pub struct EditSession {
     pub guides: Arc<Vec<Guide>>,
     pub undo_stack: UndoStack,
     pub viewport: ViewPort,
-    work_bounds: DataRect,
+    #[druid(same_fn = "rect_same")]
+    work_bounds: Rect,
 }
 
 impl EditSession {
@@ -62,22 +60,20 @@ impl EditSession {
             guides: Arc::new(guides),
             undo_stack: (),
             viewport: ViewPort::default(),
-            work_bounds: DataRect(work_bounds),
+            work_bounds: work_bounds,
         }
     }
 
     /// Returns the current layout bounds of the 'work', that is, all the things
     /// that are 'part of the glyph'.
     pub fn work_bounds(&self) -> Rect {
-        self.work_bounds.0
+        self.work_bounds
     }
 }
 
-impl Data for DataRect {
-    fn same(&self, other: &DataRect) -> bool {
-        self.0.x0.same(&other.0.x0)
-            && self.0.x1.same(&other.0.x1)
-            && self.0.y0.same(&other.0.y0)
-            && self.0.y1.same(&other.0.y1)
-    }
+fn rect_same(one: &Rect, two: &Rect) -> bool {
+    one.x0.same(&two.x0)
+        && one.x1.same(&two.x1)
+        && one.y0.same(&two.y0)
+        && one.y1.same(&two.y1)
 }
