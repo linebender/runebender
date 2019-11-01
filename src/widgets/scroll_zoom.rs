@@ -4,9 +4,8 @@ use druid::{
     BaseState, BoxConstraints, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget,
 };
 
+use crate::consts::{CANVAS_SIZE, REQUEST_FOCUS};
 use crate::data::EditorState;
-
-use super::CANVAS_SIZE;
 
 const MIN_ZOOM: f64 = 0.02;
 const MAX_ZOOM: f64 = 50.;
@@ -120,7 +119,9 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
         match event {
             Event::Size(size) if !self.is_setup => {
                 self.set_initial_viewport(data, *size);
-                ctx.request_focus();
+                //HACK: because of how WidgetPod works this event isn't propogated,
+                //so we need to use a command to tell the Editor struct to request focus
+                ctx.submit_command(REQUEST_FOCUS.into(), None);
             }
             Event::MouseMoved(mouse) => {
                 self.mouse = mouse.pos;
@@ -131,17 +132,6 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
                 ctx.set_handled();
                 ctx.invalidate();
                 return;
-            }
-            // for debugging zoom:
-            Event::KeyUp(key) if key.unmod_text() == Some("j") => {
-                self.zoom(data, Vec2::new(50., 0.), ctx.size());
-                self.child.reset_scrollbar_fade(ctx);
-                ctx.invalidate();
-            }
-            Event::KeyUp(key) if key.unmod_text() == Some("k") => {
-                self.zoom(data, Vec2::new(-50., 0.), ctx.size());
-                self.child.reset_scrollbar_fade(ctx);
-                ctx.invalidate();
             }
             _ => (),
         }

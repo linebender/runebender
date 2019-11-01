@@ -20,7 +20,7 @@ pub enum GuideLine {
 
 impl Guide {
     fn new(guide: GuideLine) -> Self {
-        let id = EntityId::new_with_parent(0);
+        let id = EntityId::new_for_guide();
         Guide { id, guide }
     }
 
