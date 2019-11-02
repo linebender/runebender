@@ -215,12 +215,10 @@ fn get_text_layout(text_ctx: &mut PietText, text: &str, env: &Env) -> PietTextLa
     // TODO: caching of both the format and the layout
     let font = text_ctx
         .new_font_by_name(font_name, font_size)
-        .unwrap()
         .build()
         .unwrap();
     text_ctx
         .new_text_layout(&font, text)
-        .unwrap()
         .build()
         .unwrap()
 }
