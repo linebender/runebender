@@ -6,7 +6,11 @@ pub const CANVAS_SIZE: Size = Size::new(5000., 5000.);
 
 /// Commands and Selectors
 pub mod cmd {
+    use druid::kurbo::Point;
     use druid::Selector;
+
+    use crate::path::EntityId;
+
     /// Hack. Sent at launch to the editor widget, so it knows to request keyboard focus.
     pub const REQUEST_FOCUS: Selector = Selector::new("runebender.request-focus");
 
@@ -36,4 +40,20 @@ pub mod cmd {
 
     /// Sent when the 'reset zoom' menu item is selected
     pub const ZOOM_DEFAULT: Selector = Selector::new("runebender.zoom-default");
+
+    /// Sent when the 'add guide' context menu item is selected
+    ///
+    /// The arguments **must** be a `Point`, where the guide will be added.
+    pub const ADD_GUIDE: Selector = Selector::new("runebender.add-guide");
+
+    /// Sent when the 'toggle guide' context menu item is selected
+    ///
+    /// The arguments **must** be a `ToggleGuideCmdArgs`.
+    pub const TOGGLE_GUIDE: Selector = Selector::new("runebender.toggle-guide");
+
+    /// Arguments passed along with the TOGGLE_GUIDE command
+    pub struct ToggleGuideCmdArgs {
+        pub id: EntityId,
+        pub pos: Point,
+    }
 }

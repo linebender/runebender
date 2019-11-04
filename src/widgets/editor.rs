@@ -1,9 +1,10 @@
 //! the main editor widget.
 
-use druid::kurbo::{Rect, Size};
+use druid::kurbo::{Point, Rect, Size};
 use druid::{
-    BaseState, BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget,
+    BaseState, BoxConstraints, Command, Data, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget,
 };
+use druid::menu::ContextMenu;
 
 use crate::consts::CANVAS_SIZE;
 use crate::data::EditorState;
@@ -32,8 +33,15 @@ impl Editor {
         data: &mut EditorState,
         env: &Env,
     ) {
-        self.tool
-            .mouse_event(event, &mut self.mouse, ctx, &mut data.session, env);
+        if !event.inner().button.is_right() {
+            self.tool
+                .mouse_event(event, &mut self.mouse, ctx, &mut data.session, env);
+        } else if let TaggedEvent::Down(m) = event {
+            let menu = crate::menus::make_context_menu(data, m.pos);
+            let menu = ContextMenu::new(menu, m.window_pos);
+            let cmd = Command::new(druid::command::sys::SHOW_CONTEXT_MENU, menu);
+            ctx.submit_command(cmd, None);
+        }
     }
 }
 
@@ -77,6 +85,14 @@ impl Widget<EditorState> for Editor {
                     cmd::SELECT_ALL => data.session.select_all(),
                     cmd::DESELECT_ALL => data.session.selection_mut().clear(),
                     cmd::DELETE => data.session.delete_selection(),
+                    cmd::ADD_GUIDE => {
+                        let point = c.get_object::<Point>().unwrap();
+                        data.session.add_guide(*point);
+                    }
+                    cmd::TOGGLE_GUIDE => {
+                        let cmd::ToggleGuideCmdArgs { id, pos } = c.get_object().unwrap();
+                        data.session.toggle_guide(*id, *pos);
+                    }
                     _ => handled = false,
                 }
                 if handled {
