@@ -1,12 +1,36 @@
 //! Application menus.
 
-use crate::consts;
+use druid::kurbo::Point;
+
 use druid::command::{sys as sys_cmd, Command};
 use druid::menu::{self, sys as sys_menu, MenuDesc, MenuItem};
 use druid::shell::dialog::{FileDialogOptions, FileSpec};
 use druid::{Data, LocalizedString, SysMods};
 
+use crate::consts;
+use crate::data::{AppState, EditorState};
+
 const UFO_FILE_TYPE: FileSpec = FileSpec::new("Font Object", &["ufo"]);
+
+/// Context menu's inner menu must have type T == the root app state.
+pub fn make_context_menu(data: &EditorState, pos: Point) -> MenuDesc<AppState> {
+    let mut menu = MenuDesc::empty().append(MenuItem::new(
+        LocalizedString::new("menu-item-add-guide").with_placeholder("Add Guide".into()),
+        Command::new(consts::cmd::ADD_GUIDE, pos),
+    ));
+
+    // only show 'toggle guide' if a guide is selected
+    if data.session.selection.len() == 1 && data.session.selection.iter().all(|s| s.is_guide()) {
+        let id = *data.session.selection.iter().next().unwrap();
+        let args = consts::cmd::ToggleGuideCmdArgs { id, pos };
+        menu = menu.append(MenuItem::new(
+            LocalizedString::new("menu-item-toggle-guide")
+                .with_placeholder("Toggle Guide Orientation".into()),
+            Command::new(consts::cmd::TOGGLE_GUIDE, args),
+        ));
+    }
+    menu
+}
 
 /// The main window/app menu.
 pub(crate) fn make_menu<T: Data>() -> MenuDesc<T> {

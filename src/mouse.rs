@@ -177,10 +177,21 @@ impl std::default::Default for Mouse {
             min_drag_distance: DEFAULT_MIN_DRAG_DISTANCE,
             state: MouseState::Up(MouseEvent {
                 pos: Point::ZERO,
+                window_pos: Point::ZERO,
                 mods: KeyModifiers::default(),
                 count: 0,
                 button: MouseButton::Left,
             }),
+        }
+    }
+}
+
+impl TaggedEvent {
+    pub fn inner(&self) -> &MouseEvent {
+        match self {
+            TaggedEvent::Down(m) => m,
+            TaggedEvent::Up(m) => m,
+            TaggedEvent::Moved(m) => m,
         }
     }
 }
