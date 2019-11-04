@@ -217,8 +217,5 @@ fn get_text_layout(text_ctx: &mut PietText, text: &str, env: &Env) -> PietTextLa
         .new_font_by_name(font_name, font_size)
         .build()
         .unwrap();
-    text_ctx
-        .new_text_layout(&font, text)
-        .build()
-        .unwrap()
+    text_ctx.new_text_layout(&font, text).build().unwrap()
 }

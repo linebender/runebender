@@ -222,4 +222,3 @@ fn rect_equality(one: Option<Rect>, two: Option<Rect>) -> bool {
         _ => false,
     }
 }
-
