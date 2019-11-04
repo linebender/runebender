@@ -18,6 +18,7 @@ pub(crate) fn make_menu<T: Data>() -> MenuDesc<T> {
 
     menu.append(file_menu())
         .append(edit_menu())
+        .append(view_menu())
         .append(glyph_menu())
         .append(tools_menu())
 }
@@ -71,6 +72,31 @@ fn edit_menu<T: Data>() -> MenuDesc<T> {
                 consts::cmd::DESELECT_ALL,
             )
             .hotkey(SysMods::CmdShift, "a"),
+        )
+}
+
+fn view_menu<T: Data>() -> MenuDesc<T> {
+    MenuDesc::new(LocalizedString::new("menu-view-menu").with_placeholder("View".into()))
+        .append(
+            MenuItem::new(
+                LocalizedString::new("menu-item-increase-zoom").with_placeholder("Zoom In".into()),
+                consts::cmd::ZOOM_IN,
+            )
+            .hotkey(SysMods::Cmd, "+"),
+        )
+        .append(
+            MenuItem::new(
+                LocalizedString::new("menu-item-decrease-zoom").with_placeholder("Zoom Out".into()),
+                consts::cmd::ZOOM_OUT,
+            )
+            .hotkey(SysMods::Cmd, "-"),
+        )
+        .append(
+            MenuItem::new(
+                LocalizedString::new("menu-item-reset-zoom").with_placeholder("Reset Zoom".into()),
+                consts::cmd::ZOOM_DEFAULT,
+            )
+            .hotkey(SysMods::Cmd, "0"),
         )
 }
 
