@@ -48,9 +48,8 @@ impl Tool for Select {
             e if e.key_code == Backspace => {
                 data.delete_selection();
             }
-            //FIXME: these two should be menu items.
+            //FIXME: this should just be a context menu item
             e if HotKey::new(SysMods::Cmd, "g").matches(e) => data.add_guide(self.last_pos),
-            e if HotKey::new(SysMods::Cmd, "a").matches(e) => data.select_all(),
             e if HotKey::new(None, KeyCode::Tab).matches(e) => data.select_next(),
             //TODO: add Shift to SysMods
             e if HotKey::new(RawMods::Shift, KeyCode::Tab).matches(e) => data.select_next(),
