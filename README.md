@@ -18,17 +18,13 @@ Until this is fixed please compile using
 
 ## Running
 
-To run the toy editor:
+To run on a UFO file:
 
 ```rust
-cargo run --bin=ufo_editor path/to/some/unifedfontobject.ufo
+cargo run -- optional/path/to/some/unifedfontobject.ufo
 ```
 
-To run the ttf viewer:
-
-```rust
-cargo run --bin=ttf_viewer path/to/my_font.tff
-```
+UFO files may also be opened with file>open in the running program.
 
 ## Contributions
 
