@@ -5,7 +5,7 @@ use druid::{
     BaseState, BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget,
 };
 
-use crate::consts::{CANVAS_SIZE, REQUEST_FOCUS};
+use crate::consts::CANVAS_SIZE;
 use crate::data::EditorState;
 use crate::draw;
 use crate::mouse::{Mouse, TaggedEvent};
@@ -67,8 +67,23 @@ impl Widget<EditorState> for Editor {
     }
 
     fn event(&mut self, event: &Event, ctx: &mut EventCtx, data: &mut EditorState, env: &Env) {
+        use crate::consts::cmd;
+
         match event {
-            Event::Command(c) if c.selector == REQUEST_FOCUS => ctx.request_focus(),
+            Event::Command(c) => {
+                let mut handled = true;
+                match c.selector {
+                    cmd::REQUEST_FOCUS => ctx.request_focus(),
+                    cmd::SELECT_ALL => data.session.select_all(),
+                    cmd::DESELECT_ALL => data.session.selection_mut().clear(),
+                    cmd::DELETE => data.session.delete_selection(),
+                    _ => handled = false,
+                }
+                if handled {
+                    ctx.is_handled();
+                    ctx.invalidate();
+                }
+            }
             Event::KeyDown(k) => self.tool.key_down(k, ctx, &mut data.session, env),
             Event::MouseUp(m) => self.send_mouse(TaggedEvent::Up(m.clone()), ctx, data, env),
             Event::MouseMoved(m) => self.send_mouse(TaggedEvent::Moved(m.clone()), ctx, data, env),

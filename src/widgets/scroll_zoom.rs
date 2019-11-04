@@ -4,7 +4,7 @@ use druid::{
     BaseState, BoxConstraints, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget,
 };
 
-use crate::consts::{CANVAS_SIZE, REQUEST_FOCUS};
+use crate::consts::{cmd::REQUEST_FOCUS, CANVAS_SIZE};
 use crate::data::EditorState;
 
 const MIN_ZOOM: f64 = 0.02;
