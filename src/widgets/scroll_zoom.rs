@@ -1,7 +1,8 @@
 use druid::kurbo::{Point, Rect, Size, Vec2};
 use druid::widget::Scroll;
 use druid::{
-    BaseState, BoxConstraints, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget,
+    BaseState, BoxConstraints, Env, Event, EventCtx, LayoutCtx, PaintCtx, Selector, UpdateCtx,
+    Widget,
 };
 
 use crate::consts::{cmd::REQUEST_FOCUS, CANVAS_SIZE};
@@ -16,7 +17,7 @@ const ZOOM_SCALE: f64 = 0.001;
 pub struct ScrollZoom<T: Widget<EditorState>> {
     mouse: Point,
     child: Scroll<EditorState, T>,
-    is_setup: bool,
+    needs_center_after_layout: bool,
 }
 
 impl<T: Widget<EditorState>> ScrollZoom<T> {
@@ -24,11 +25,12 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
         ScrollZoom {
             child: Scroll::new(inner),
             mouse: Point::ZERO,
-            is_setup: false,
+            needs_center_after_layout: true,
         }
     }
 
-    fn zoom(&mut self, data: &mut EditorState, delta: Vec2, size: Size) {
+    fn zoom(&mut self, data: &mut EditorState, delta: Vec2, size: Size, fixed_point: Option<Vec2>) {
+        let fixed_point = fixed_point.unwrap_or(self.mouse.to_vec2());
         let delta = most_significant_axis(delta);
         let delta = delta.round() * ZOOM_SCALE;
         if delta == 0. {
@@ -45,7 +47,7 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
         }
         // we keep the mouse in the same relative position after zoom
         // by adjusting the scroll offsets:
-        let scroll_off = self.child.offset() + self.mouse.to_vec2();
+        let scroll_off = self.child.offset() + fixed_point;
         let next_off = scroll_off * delta_zoom;
         let delta_off = next_off - scroll_off;
         self.child.scroll(delta_off, size);
@@ -90,6 +92,23 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
         data.session.viewport.set_offset(work_offset);
         data.session.viewport.zoom = new_zoom;
     }
+
+    fn handle_zoom_cmd(&mut self, sel: &Selector, view_size: Size, data: &mut EditorState) {
+        use crate::consts::cmd;
+        let view_center = Rect::ZERO.with_size(view_size).center().to_vec2();
+        match sel {
+            &cmd::ZOOM_IN => self.zoom(data, Vec2::new(50.0, 0.), view_size, Some(view_center)),
+            &cmd::ZOOM_OUT => self.zoom(data, Vec2::new(-50.0, 0.), view_size, Some(view_center)),
+            &cmd::ZOOM_DEFAULT => {
+                let current_zoom = data.session.viewport.zoom;
+                let delta = (1.0 - current_zoom) * ZOOM_SCALE.recip();
+                let dzoom = Vec2::new(delta, 0.0);
+                self.zoom(data, dzoom, view_size, None);
+                self.needs_center_after_layout = true;
+            }
+            _ => unreachable!("selectors have already been validated"),
+        };
+    }
 }
 
 impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
@@ -108,16 +127,28 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
         env: &Env,
     ) -> Size {
         let size = self.child.layout(ctx, bc, data, env);
-        if !self.is_setup {
+        if self.needs_center_after_layout {
             self.set_initial_scroll(data, size);
-            self.is_setup = true;
+            self.needs_center_after_layout = false;
         }
         size
     }
 
     fn event(&mut self, event: &Event, ctx: &mut EventCtx, data: &mut EditorState, env: &Env) {
+        use crate::consts::cmd;
         match event {
-            Event::Size(size) if !self.is_setup => {
+            Event::Command(c)
+                if c.selector == cmd::ZOOM_IN
+                    || c.selector == cmd::ZOOM_OUT
+                    || c.selector == cmd::ZOOM_DEFAULT =>
+            {
+                self.handle_zoom_cmd(&c.selector, ctx.size(), data);
+                self.child.reset_scrollbar_fade(ctx);
+                ctx.invalidate();
+                ctx.set_handled();
+                return;
+            }
+            Event::Size(size) if self.needs_center_after_layout => {
                 self.set_initial_viewport(data, *size);
                 //HACK: because of how WidgetPod works this event isn't propogated,
                 //so we need to use a command to tell the Editor struct to request focus
@@ -127,7 +158,7 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
                 self.mouse = mouse.pos;
             }
             Event::Wheel(wheel) if wheel.mods.meta => {
-                self.zoom(data, wheel.delta, ctx.size());
+                self.zoom(data, wheel.delta, ctx.size(), None);
                 self.child.reset_scrollbar_fade(ctx);
                 ctx.set_handled();
                 ctx.invalidate();

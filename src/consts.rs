@@ -27,4 +27,13 @@ pub mod cmd {
 
     /// Sent when the 'pen' tool should be activated
     pub const PEN_TOOL: Selector = Selector::new("runebender.tool-pen");
+
+    /// Sent when the 'zoom in' menu item is selected
+    pub const ZOOM_IN: Selector = Selector::new("runebender.zoom-in");
+
+    /// Sent when the 'zoom out' menu item is selected
+    pub const ZOOM_OUT: Selector = Selector::new("runebender.zoom-out");
+
+    /// Sent when the 'reset zoom' menu item is selected
+    pub const ZOOM_DEFAULT: Selector = Selector::new("runebender.zoom-default");
 }
