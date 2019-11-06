@@ -317,14 +317,14 @@ impl Mouse {
             MouseState::Down(prev) => {
                 if event.button == prev.button {
                     if prev.button.is_left() {
-                        delegate.left_up(&event, data);
                         delegate.left_click(&event, data);
+                        delegate.left_up(&event, data);
                     } else if prev.button.is_right() {
-                        delegate.right_up(&event, data);
                         delegate.right_click(&event, data);
+                        delegate.right_up(&event, data);
                     } else {
-                        delegate.other_up(&event, data);
                         delegate.other_click(&event, data);
+                        delegate.other_up(&event, data);
                     };
                     MouseState::Up(event)
                 } else {
@@ -339,14 +339,14 @@ impl Mouse {
                         prev: &current,
                     };
                     if start.button.is_left() {
-                        delegate.left_up(&event, data);
                         delegate.left_drag_ended(drag, data);
+                        delegate.left_up(&event, data);
                     } else if start.button.is_right() {
-                        delegate.left_up(&event, data);
                         delegate.right_drag_ended(drag, data);
+                        delegate.right_up(&event, data);
                     } else {
-                        delegate.left_up(&event, data);
                         delegate.other_drag_ended(drag, data);
+                        delegate.other_up(&event, data);
                     };
                     MouseState::Up(event)
                 } else {

@@ -3,15 +3,13 @@ use std::sync::Arc;
 
 use druid::kurbo::{Point, Rect, Vec2};
 use druid::piet::{Color, RenderContext};
-use druid::{
-    Data, Env, EventCtx, HotKey, KeyCode, KeyEvent, MouseEvent, PaintCtx, RawMods, SysMods,
-};
+use druid::{Data, Env, EventCtx, HotKey, KeyCode, KeyEvent, MouseEvent, PaintCtx, RawMods};
 
 use crate::design_space::DVec2;
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
 use crate::path::EntityId;
-use crate::tools::Tool;
+use crate::tools::{EditType, Tool};
 
 const SELECTION_RECT_BG_COLOR: Color = Color::rgba8(0xDD, 0xDD, 0xDD, 0x55);
 const SELECTION_RECT_STROKE_COLOR: Color = Color::rgb8(0x53, 0x8B, 0xBB);
@@ -25,6 +23,14 @@ pub struct Select {
     drag_rect: Option<Rect>,
     last_drag_pos: Option<Point>,
     last_pos: Point,
+    /// The edit type produced by the current event, if any.
+    ///
+    /// This is stashed here because we can't return anything from the methods in
+    /// `MouseDelegate`.
+    ///
+    /// It is an invariant that this is always `None`, except while we are in
+    /// a `key_down`, `key_up`, or `mouse_event` method.
+    this_edit_type: Option<EditType>,
 }
 
 impl Tool for Select {
@@ -35,7 +41,14 @@ impl Tool for Select {
         }
     }
 
-    fn key_down(&mut self, event: &KeyEvent, ctx: &mut EventCtx, data: &mut EditSession, _: &Env) {
+    fn key_down(
+        &mut self,
+        event: &KeyEvent,
+        ctx: &mut EventCtx,
+        data: &mut EditSession,
+        _: &Env,
+    ) -> Option<EditType> {
+        assert!(self.this_edit_type.is_none());
         use KeyCode::*;
         match event {
             e if e.key_code == ArrowLeft
@@ -47,15 +60,15 @@ impl Tool for Select {
             }
             e if e.key_code == Backspace => {
                 data.delete_selection();
+                self.this_edit_type = Some(EditType::Normal);
             }
-            //FIXME: this should just be a context menu item
-            e if HotKey::new(SysMods::Cmd, "g").matches(e) => data.add_guide(self.last_pos),
             e if HotKey::new(None, KeyCode::Tab).matches(e) => data.select_next(),
             //TODO: add Shift to SysMods
             e if HotKey::new(RawMods::Shift, KeyCode::Tab).matches(e) => data.select_next(),
-            _ => return,
+            _ => return None,
         }
         ctx.invalidate();
+        self.this_edit_type.take()
     }
 
     fn mouse_event(
@@ -65,13 +78,15 @@ impl Tool for Select {
         ctx: &mut EventCtx,
         data: &mut EditSession,
         _: &Env,
-    ) {
+    ) -> Option<EditType> {
+        assert!(self.this_edit_type.is_none());
         let pre_rect = self.drag_rect;
         let pre_data = data.clone();
         mouse.mouse_event(event, data, self);
         if !rect_equality(pre_rect, self.drag_rect) || !pre_data.same(data) {
             ctx.invalidate();
         }
+        self.this_edit_type.take()
     }
 }
 
@@ -100,11 +115,11 @@ impl Select {
     }
 
     fn nudge(&mut self, data: &mut EditSession, event: &KeyEvent) {
-        let mut nudge = match event.key_code {
-            KeyCode::ArrowLeft => Vec2::new(-1.0, 0.),
-            KeyCode::ArrowRight => Vec2::new(1.0, 0.),
-            KeyCode::ArrowUp => Vec2::new(0.0, 1.0),
-            KeyCode::ArrowDown => Vec2::new(0.0, -1.0),
+        let (mut nudge, edit_type) = match event.key_code {
+            KeyCode::ArrowLeft => (Vec2::new(-1.0, 0.), EditType::NudgeLeft),
+            KeyCode::ArrowRight => (Vec2::new(1.0, 0.), EditType::NudgeRight),
+            KeyCode::ArrowUp => (Vec2::new(0.0, 1.0), EditType::NudgeUp),
+            KeyCode::ArrowDown => (Vec2::new(0.0, -1.0), EditType::NudgeDown),
             _ => unreachable!(),
         };
 
@@ -113,7 +128,15 @@ impl Select {
         } else if event.mods.shift {
             nudge *= 10.;
         }
+
         data.nudge_selection(DVec2::from_raw(nudge));
+
+        // for the purposes of undo, we only combine single-unit nudges
+        if nudge.hypot().abs() > 1.0 {
+            self.this_edit_type = Some(EditType::Normal);
+        } else {
+            self.this_edit_type = Some(edit_type);
+        }
     }
 }
 
@@ -148,7 +171,8 @@ impl MouseDelegate<EditSession> for Select {
                         .map(|p| p.is_on_curve())
                         .unwrap_or(false) =>
                 {
-                    data.toggle_selected_on_curve_type()
+                    data.toggle_selected_on_curve_type();
+                    self.this_edit_type = Some(EditType::Normal);
                 }
                 Some(id) if id.is_guide() => data.toggle_guide(id, event.pos),
                 _ => {
@@ -164,14 +188,16 @@ impl MouseDelegate<EditSession> for Select {
     }
 
     fn left_drag_began(&mut self, drag: Drag, data: &mut EditSession) {
+        // if we're starting a rectangular selection, we save the previous selection
         self.prev_selection = if data
             .iter_items_near_point(drag.start.pos, None)
             .next()
-            .is_some()
+            .is_none()
         {
-            None
-        } else {
             Some(data.selection.clone())
+        // otherwise we are dragging some object
+        } else {
+            None
         };
     }
 
@@ -196,12 +222,16 @@ impl MouseDelegate<EditSession> for Select {
                 let mut drag_vec = drag_vec;
                 drag_vec.y = -drag_vec.y;
                 data.nudge_selection(drag_vec);
+                self.this_edit_type = Some(EditType::Drag);
             }
         }
     }
 
     fn left_drag_ended(&mut self, _drag: Drag, _data: &mut EditSession) {
         self.last_drag_pos = None;
+        if self.prev_selection.take().is_none() {
+            self.this_edit_type = Some(EditType::DragUp);
+        }
     }
 
     fn cancel(&mut self, data: &mut EditSession) {

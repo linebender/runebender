@@ -71,8 +71,8 @@ fn file_menu<T: Data>() -> MenuDesc<T> {
 
 fn edit_menu<T: Data>() -> MenuDesc<T> {
     MenuDesc::new(LocalizedString::new("common-menu-edit-menu"))
-        .append(sys_menu::common::undo().disabled())
-        .append(sys_menu::common::redo().disabled())
+        .append(sys_menu::common::undo())
+        .append(sys_menu::common::redo())
         .append_separator()
         .append(sys_menu::common::cut().disabled())
         .append(sys_menu::common::copy().disabled())

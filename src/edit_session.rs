@@ -10,8 +10,6 @@ use crate::design_space::{DPoint, DVec2, ViewPort};
 use crate::guides::Guide;
 use crate::path::{EntityId, Path, PathPoint};
 
-type UndoStack = ();
-
 /// Minimum distance in screen units that a click must occur to be considered
 /// on a point?
 //TODO: this doesn't feel very robust; items themselves should have hitzones?
@@ -26,7 +24,6 @@ pub struct EditSession {
     pub selection: Arc<BTreeSet<EntityId>>,
     pub components: Arc<Vec<Component>>,
     pub guides: Arc<Vec<Guide>>,
-    pub undo_stack: UndoStack,
     pub viewport: ViewPort,
     #[druid(same_fn = "rect_same")]
     work_bounds: Rect,
@@ -63,7 +60,6 @@ impl EditSession {
             selection: Arc::default(),
             components: Arc::new(components),
             guides: Arc::new(guides),
-            undo_stack: (),
             viewport: ViewPort::default(),
             work_bounds: work_bounds,
         }

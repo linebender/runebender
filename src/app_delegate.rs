@@ -26,16 +26,16 @@ pub fn make_delegate() -> AppDelegate<AppState> {
                 Some(OpenGlyph::Window(_window_id)) => (), // we want to show this window,
                 None => {
                     let title = payload.to_string();
-                    let payload2 = payload.clone();
+                    let session = EditSession::new(&payload, &data.file.object);
+                    let session2 = session.clone();
 
-                    let new_win = WindowDesc::new(move || make_editor(payload2.clone()))
+                    let new_win = WindowDesc::new(move || make_editor(&session2))
                         .title(LocalizedString::new("").with_placeholder(title))
                         .menu(crate::menus::make_menu::<AppState>());
                     let command = Command::new(druid::command::sys::NEW_WINDOW, new_win);
                     ctx.submit_command(command, None);
                     Arc::make_mut(&mut data.open_glyphs)
                         .insert(payload.clone(), OpenGlyph::Pending);
-                    let session = EditSession::new(&payload, &data.file.object);
                     Arc::make_mut(&mut data.sessions).insert(payload.clone(), session);
                 }
             }
@@ -45,9 +45,9 @@ pub fn make_delegate() -> AppDelegate<AppState> {
     })
 }
 
-fn make_editor(glyph: GlyphName) -> impl Widget<AppState> {
+fn make_editor(session: &EditSession) -> impl Widget<AppState> {
     Lens2Wrap::new(
-        ScrollZoom::new(Editor::new()),
-        lenses::app_state::EditorState(glyph),
+        ScrollZoom::new(Editor::new(session.clone())),
+        lenses::app_state::EditorState(session.name.clone()),
     )
 }
