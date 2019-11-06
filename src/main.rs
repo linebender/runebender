@@ -13,6 +13,7 @@ mod menus;
 mod mouse;
 mod path;
 mod tools;
+mod undo;
 pub mod widgets;
 
 use druid::widget::{Align, Column, DynLabel, Padding, Scroll, SizedBox};
