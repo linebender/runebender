@@ -3,16 +3,16 @@
 use druid::kurbo::{Point, Rect, Size};
 use druid::menu::ContextMenu;
 use druid::{
-    BaseState, BoxConstraints, Command, Data, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx,
-    Widget,
+    BaseState, BoxConstraints, Command, Data, Env, Event, EventCtx, KeyCode, LayoutCtx, PaintCtx,
+    UpdateCtx, Widget,
 };
 
-use crate::consts::CANVAS_SIZE;
+use crate::consts::{self, CANVAS_SIZE};
 use crate::data::EditorState;
 use crate::draw;
 use crate::edit_session::EditSession;
 use crate::mouse::{Mouse, TaggedEvent};
-use crate::tools::{EditType, Select, Tool};
+use crate::tools::{EditType, Pen, Select, Tool};
 use crate::undo::UndoState;
 
 /// The root widget of the glyph editor window.
@@ -76,6 +76,57 @@ impl Editor {
     fn do_redo(&mut self) -> Option<&EditSession> {
         self.undo.redo()
     }
+
+    /// handle a `Command`. Returns a bool indicating whether the command was
+    /// handled at all, and an optional `EditType` if this command did work
+    /// that should go on the undo stack.
+    fn handle_cmd(
+        &mut self,
+        cmd: &Command,
+        ctx: &mut EventCtx,
+        data: &mut EditorState,
+    ) -> (bool, Option<EditType>) {
+        match cmd.selector {
+            consts::cmd::REQUEST_FOCUS => ctx.request_focus(),
+            consts::cmd::SELECT_ALL => data.session.select_all(),
+            consts::cmd::DESELECT_ALL => data.session.clear_selection(),
+            consts::cmd::DELETE => data.session.delete_selection(),
+            consts::cmd::SELECT_TOOL => self.tool = Box::new(Select::default()),
+            consts::cmd::PEN_TOOL => self.tool = Box::new(Pen::default()),
+            consts::cmd::ADD_GUIDE => {
+                let point = cmd.get_object::<Point>().unwrap();
+                data.session.add_guide(*point);
+                return (true, Some(EditType::Normal));
+            }
+            consts::cmd::TOGGLE_GUIDE => {
+                let consts::cmd::ToggleGuideCmdArgs { id, pos } = cmd.get_object().unwrap();
+                data.session.toggle_guide(*id, *pos);
+                return (true, Some(EditType::Normal));
+            }
+            druid::command::sys::UNDO => {
+                if let Some(prev) = self.do_undo() {
+                    //HACK: because zoom & offset is part of data, and we don't
+                    //want to jump around during undo/redo, we always manually
+                    //reuse the current viewport when handling these actions.
+                    let saved_viewport = data.session.viewport;
+                    data.session = prev.clone();
+                    data.session.viewport = saved_viewport;
+                }
+            }
+            druid::command::sys::REDO => {
+                if let Some(next) = self.do_redo() {
+                    let saved_viewport = data.session.viewport;
+                    data.session = next.clone();
+                    data.session.viewport = saved_viewport;
+                }
+            }
+            // all unhandled commands:
+            _ => return (false, None),
+        }
+
+        // the default: commands with an `EditType` return explicitly.
+        (true, None)
+    }
 }
 
 impl Widget<EditorState> for Editor {
@@ -108,47 +159,20 @@ impl Widget<EditorState> for Editor {
     }
 
     fn event(&mut self, event: &Event, ctx: &mut EventCtx, data: &mut EditorState, env: &Env) {
-        use crate::consts::cmd;
+        // we invalidate if selection changes after this event;
+        let pre_selection = data.session.selection.clone();
 
         let edit = match event {
             Event::Command(c) => {
-                let mut handled = true;
-                match c.selector {
-                    cmd::REQUEST_FOCUS => ctx.request_focus(),
-                    cmd::SELECT_ALL => data.session.select_all(),
-                    cmd::DESELECT_ALL => data.session.selection_mut().clear(),
-                    cmd::DELETE => data.session.delete_selection(),
-                    cmd::ADD_GUIDE => {
-                        let point = c.get_object::<Point>().unwrap();
-                        data.session.add_guide(*point);
-                    }
-                    cmd::TOGGLE_GUIDE => {
-                        let cmd::ToggleGuideCmdArgs { id, pos } = c.get_object().unwrap();
-                        data.session.toggle_guide(*id, *pos);
-                    }
-                    druid::command::sys::UNDO => {
-                        if let Some(prev) = self.do_undo() {
-                            //HACK: because zoom & offset is part of data, and we don't
-                            //want to jump around during undo/redo, we always manually
-                            //reuse the current viewport when handling these actions.
-                            let saved_viewport = data.session.viewport;
-                            data.session = prev.clone();
-                            data.session.viewport = saved_viewport;
-                        }
-                    }
-                    druid::command::sys::REDO => {
-                        if let Some(next) = self.do_redo() {
-                            let saved_viewport = data.session.viewport;
-                            data.session = next.clone();
-                            data.session.viewport = saved_viewport;
-                        }
-                    }
-                    _ => handled = false,
-                }
+                let (handled, edit) = self.handle_cmd(c, ctx, data);
                 if handled {
                     ctx.is_handled();
                     ctx.invalidate();
                 }
+                edit
+            }
+            Event::KeyDown(k) if k.key_code == KeyCode::Escape => {
+                data.session.clear_selection();
                 None
             }
             Event::KeyDown(k) => self.tool.key_down(k, ctx, &mut data.session, env),
@@ -159,6 +183,9 @@ impl Widget<EditorState> for Editor {
         };
 
         self.update_undo(edit, &data.session);
+        if edit.is_some() || !pre_selection.same(&data.session.selection) {
+            ctx.invalidate();
+        }
     }
 
     fn update(

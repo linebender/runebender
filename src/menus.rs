@@ -150,7 +150,6 @@ fn tools_menu<T: Data>() -> MenuDesc<T> {
                 LocalizedString::new("menu-item-pen-tool").with_placeholder("Pen".into()),
                 consts::cmd::PEN_TOOL,
             )
-            .hotkey(SysMods::None, "p")
-            .disabled(),
+            .hotkey(SysMods::None, "p"),
         )
 }

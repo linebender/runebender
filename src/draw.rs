@@ -171,8 +171,7 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
 
     fn draw_path(&mut self, bez: &BezPath) {
         let path_brush = self.solid_brush(PATH_COLOR);
-        let transform = self.space.affine();
-        self.stroke(transform * bez, &path_brush, 1.0);
+        self.stroke(bez, &path_brush, 1.0);
     }
 
     fn draw_filled_paths(&mut self, paths: &[Path]) {
@@ -292,8 +291,6 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         let mut arrow = make_arrow();
         arrow.apply_affine(rotate);
         arrow.apply_affine(translate);
-        // FIXME: this scales with zoom, we want a minimum scale probably?
-        arrow.apply_affine(self.space.affine());
         self.fill(arrow, &DIRECTION_ARROW_COLOR);
     }
 
@@ -313,6 +310,7 @@ struct PointStyle {
     selected: bool,
 }
 
+#[derive(Debug, Clone)]
 enum Style {
     Open(PathSeg),
     Close(PathSeg),
@@ -414,8 +412,7 @@ pub(crate) fn draw_session(
     draw_ctx.draw_guides(&session.guides, &session.selection);
 
     for path in session.paths.iter() {
-        let bez = path.bezier();
-        //let bez = space.transform() * path.bezier().clone();
+        let bez = space.affine() * path.bezier();
         draw_ctx.draw_path(&bez);
         draw_ctx.draw_control_point_lines(path);
         draw_ctx.draw_direction_indicator(&bez);

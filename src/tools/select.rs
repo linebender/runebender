@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use druid::kurbo::{Point, Rect, Vec2};
 use druid::piet::{Color, RenderContext};
-use druid::{Data, Env, EventCtx, HotKey, KeyCode, KeyEvent, MouseEvent, PaintCtx, RawMods};
+use druid::{Env, EventCtx, HotKey, KeyCode, KeyEvent, MouseEvent, PaintCtx, RawMods};
 
 use crate::design_space::{DPoint, DVec2};
 use crate::edit_session::EditSession;
@@ -55,7 +55,7 @@ impl Tool for Select {
     fn key_down(
         &mut self,
         event: &KeyEvent,
-        ctx: &mut EventCtx,
+        _ctx: &mut EventCtx,
         data: &mut EditSession,
         _: &Env,
     ) -> Option<EditType> {
@@ -78,7 +78,6 @@ impl Tool for Select {
             e if HotKey::new(RawMods::Shift, KeyCode::Tab).matches(e) => data.select_next(),
             _ => return None,
         }
-        ctx.invalidate();
         self.this_edit_type.take()
     }
 
@@ -92,9 +91,8 @@ impl Tool for Select {
     ) -> Option<EditType> {
         assert!(self.this_edit_type.is_none());
         let pre_rect = self.drag.drag_rect();
-        let pre_data = data.clone();
         mouse.mouse_event(event, data, self);
-        if !rect_equality(pre_rect, self.drag.drag_rect()) || !pre_data.same(data) {
+        if !rect_equality(pre_rect, self.drag.drag_rect()) {
             ctx.invalidate();
         }
         self.this_edit_type.take()
@@ -162,7 +160,10 @@ impl MouseDelegate<EditSession> for Select {
                     data.toggle_selected_on_curve_type();
                     self.this_edit_type = Some(EditType::Normal);
                 }
-                Some(id) if id.is_guide() => data.toggle_guide(id, event.pos),
+                Some(id) if id.is_guide() => {
+                    data.toggle_guide(id, event.pos);
+                    self.this_edit_type = Some(EditType::Normal);
+                }
                 _ => {
                     data.select_path(event.pos, event.mods.shift);
                 }
