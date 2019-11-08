@@ -5,7 +5,7 @@ use druid::kurbo::{Point, Rect, Vec2};
 use druid::piet::{Color, RenderContext};
 use druid::{Data, Env, EventCtx, HotKey, KeyCode, KeyEvent, MouseEvent, PaintCtx, RawMods};
 
-use crate::design_space::DVec2;
+use crate::design_space::{DPoint, DVec2};
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
 use crate::path::EntityId;
@@ -14,14 +14,25 @@ use crate::tools::{EditType, Tool};
 const SELECTION_RECT_BG_COLOR: Color = Color::rgba8(0xDD, 0xDD, 0xDD, 0x55);
 const SELECTION_RECT_STROKE_COLOR: Color = Color::rgb8(0x53, 0x8B, 0xBB);
 
+#[derive(Debug, Clone)]
+enum DragState {
+    /// State for a drag that is a rectangular selection.
+    Select {
+        previous: Arc<BTreeSet<EntityId>>,
+        rect: Rect,
+    },
+    /// State for a drag that is moving a selected object.
+    Move {
+        last_used_pos: DPoint,
+    },
+    None,
+}
+
 /// The state of the selection tool.
 #[derive(Debug, Default, Clone)]
 pub struct Select {
-    /// when a drag is in progress, this is the state of the selection at the start
-    /// of the drag.
-    prev_selection: Option<Arc<BTreeSet<EntityId>>>,
-    drag_rect: Option<Rect>,
-    last_drag_pos: Option<Point>,
+    /// the state preserved between drag events.
+    drag: DragState,
     last_pos: Point,
     /// The edit type produced by the current event, if any.
     ///
@@ -35,7 +46,7 @@ pub struct Select {
 
 impl Tool for Select {
     fn paint(&mut self, ctx: &mut PaintCtx, _data: &EditSession, _env: &Env) {
-        if let Some(rect) = self.drag_rect {
+        if let DragState::Select { rect, .. } = self.drag {
             ctx.fill(rect, &SELECTION_RECT_BG_COLOR);
             ctx.stroke(rect, &SELECTION_RECT_STROKE_COLOR, 1.0);
         }
@@ -80,10 +91,10 @@ impl Tool for Select {
         _: &Env,
     ) -> Option<EditType> {
         assert!(self.this_edit_type.is_none());
-        let pre_rect = self.drag_rect;
+        let pre_rect = self.drag.drag_rect();
         let pre_data = data.clone();
         mouse.mouse_event(event, data, self);
-        if !rect_equality(pre_rect, self.drag_rect) || !pre_data.same(data) {
+        if !rect_equality(pre_rect, self.drag.drag_rect()) || !pre_data.same(data) {
             ctx.invalidate();
         }
         self.this_edit_type.take()
@@ -91,29 +102,6 @@ impl Tool for Select {
 }
 
 impl Select {
-    fn update_selection_for_drag(
-        &self,
-        data: &mut EditSession,
-        prev_sel: &BTreeSet<EntityId>,
-        rect: Rect,
-        shift: bool,
-    ) {
-        let in_select_rect = data
-            .iter_points()
-            .filter(|p| rect.contains(p.to_screen(data.viewport)))
-            .map(|p| p.id)
-            .collect();
-        let new_sel = if shift {
-            prev_sel
-                .symmetric_difference(&in_select_rect)
-                .copied()
-                .collect()
-        } else {
-            prev_sel.union(&in_select_rect).copied().collect()
-        };
-        *data.selection_mut() = new_sel;
-    }
-
     fn nudge(&mut self, data: &mut EditSession, event: &KeyEvent) {
         let (mut nudge, edit_type) = match event.key_code {
             KeyCode::ArrowLeft => (Vec2::new(-1.0, 0.), EditType::NudgeLeft),
@@ -183,63 +171,87 @@ impl MouseDelegate<EditSession> for Select {
     }
 
     fn left_up(&mut self, _event: &MouseEvent, _data: &mut EditSession) {
-        self.prev_selection = None;
-        self.drag_rect = None;
+        self.drag = DragState::None;
     }
 
     fn left_drag_began(&mut self, drag: Drag, data: &mut EditSession) {
         // if we're starting a rectangular selection, we save the previous selection
-        self.prev_selection = if data
+        let is_dragging_item = data
             .iter_items_near_point(drag.start.pos, None)
-            .next()
-            .is_none()
-        {
-            Some(data.selection.clone())
-        // otherwise we are dragging some object
+            .any(|_| true);
+        self.drag = if is_dragging_item {
+            DragState::Move {
+                last_used_pos: data.viewport.from_screen(drag.start.pos),
+            }
         } else {
-            None
-        };
-    }
-
-    fn left_drag_changed(&mut self, drag: Drag, data: &mut EditSession) {
-        if let Some(prev_selection) = self.prev_selection.as_ref() {
-            let rect = Rect::from_points(drag.current.pos, drag.start.pos);
-            self.drag_rect = Some(rect);
-            self.update_selection_for_drag(data, prev_selection, rect, drag.current.mods.shift);
-        } else {
-            let last_drag_pos = self.last_drag_pos.unwrap_or(drag.start.pos);
-            let dvec = drag.current.pos - last_drag_pos;
-            let drag_vec = dvec * data.viewport.zoom.recip();
-            let drag_vec = DVec2::from_raw((drag_vec.x.floor(), drag_vec.y.floor()));
-            if drag_vec.hypot() > 0. {
-                // multiple small drag updates that don't make up a single point in design
-                // space should be aggregated
-                let aligned_drag_delta = drag_vec.to_screen(data.viewport);
-                let aligned_last_drag = last_drag_pos + aligned_drag_delta;
-                self.last_drag_pos = Some(aligned_last_drag);
-                //HACK: because this is used to compute last_drag_pos,
-                //we only swap the y-axis at the end  ¯\_(ツ)_/¯
-                let mut drag_vec = drag_vec;
-                drag_vec.y = -drag_vec.y;
-                data.nudge_selection(drag_vec);
-                self.this_edit_type = Some(EditType::Drag);
+            DragState::Select {
+                previous: data.selection.clone(),
+                rect: Rect::from_points(drag.start.pos, drag.current.pos),
             }
         }
     }
 
+    fn left_drag_changed(&mut self, drag: Drag, data: &mut EditSession) {
+        match &mut self.drag {
+            DragState::Select {
+                previous,
+                ref mut rect,
+            } => {
+                *rect = Rect::from_points(drag.current.pos, drag.start.pos);
+                update_selection_for_drag(data, previous, *rect, drag.current.mods.shift);
+            }
+            DragState::Move {
+                ref mut last_used_pos,
+            } => {
+                let drag_pos = data.viewport.from_screen(drag.current.pos);
+                let drag_delta = drag_pos - *last_used_pos;
+                if drag_delta.hypot() > 0. {
+                    data.nudge_selection(drag_delta);
+                    *last_used_pos = drag_pos;
+                }
+            }
+            DragState::None => unreachable!("invalid state"),
+        }
+
+        if self.drag.is_move() {
+            self.this_edit_type = Some(EditType::Drag);
+        }
+    }
+
     fn left_drag_ended(&mut self, _drag: Drag, _data: &mut EditSession) {
-        self.last_drag_pos = None;
-        if self.prev_selection.take().is_none() {
+        if self.drag.is_move() {
             self.this_edit_type = Some(EditType::DragUp);
         }
     }
 
     fn cancel(&mut self, data: &mut EditSession) {
-        if let Some(prev) = self.prev_selection.take() {
-            data.selection = prev;
+        let old_state = std::mem::replace(&mut self.drag, DragState::None);
+        if let DragState::Select { previous, .. } = old_state {
+            data.selection = previous;
         }
-        self.drag_rect = None;
     }
+}
+
+fn update_selection_for_drag(
+    data: &mut EditSession,
+    prev_sel: &BTreeSet<EntityId>,
+    rect: Rect,
+    shift: bool,
+) {
+    let in_select_rect = data
+        .iter_points()
+        .filter(|p| rect.contains(p.to_screen(data.viewport)))
+        .map(|p| p.id)
+        .collect();
+    let new_sel = if shift {
+        prev_sel
+            .symmetric_difference(&in_select_rect)
+            .copied()
+            .collect()
+    } else {
+        prev_sel.union(&in_select_rect).copied().collect()
+    };
+    *data.selection_mut() = new_sel;
 }
 
 fn rect_equality(one: Option<Rect>, two: Option<Rect>) -> bool {
@@ -249,5 +261,29 @@ fn rect_equality(one: Option<Rect>, two: Option<Rect>) -> bool {
             one.x0 == two.x0 && one.x1 == two.x1 && one.y0 == two.y0 && one.y1 == two.y1
         }
         _ => false,
+    }
+}
+
+impl Default for DragState {
+    fn default() -> Self {
+        DragState::None
+    }
+}
+
+impl DragState {
+    fn drag_rect(&self) -> Option<Rect> {
+        if let DragState::Select { rect, .. } = self {
+            Some(*rect)
+        } else {
+            None
+        }
+    }
+
+    fn is_move(&self) -> bool {
+        if let DragState::Move { .. } = self {
+            true
+        } else {
+            false
+        }
     }
 }
