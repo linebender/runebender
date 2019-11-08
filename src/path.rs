@@ -329,12 +329,15 @@ impl Path {
     /// `bcp1` is the handle that has moved, and `bcp2` is the handle that needs
     /// to be adjusted.
     fn adjust_handle_angle(&mut self, bcp1: usize, on_curve: usize, bcp2: usize) {
-        let new_angle = (self.points[bcp1].point - self.points[on_curve].point) * -1.0;
-        let new_angle = new_angle.normalize();
+        let raw_angle = (self.points[bcp1].point - self.points[on_curve].point).to_raw();
+        // that angle is in the opposite direction, so flip it
+        let norm_angle = raw_angle.normalize() * -1.0;
         let handle_len = (self.points[bcp2].point - self.points[on_curve].point)
             .hypot()
             .abs();
-        let new_pos = self.points[on_curve].point + new_angle * handle_len;
+
+        let new_handle_offset = DVec2::from_raw(norm_angle * handle_len);
+        let new_pos = self.points[on_curve].point + new_handle_offset;
         self.points_mut()[bcp2].point = new_pos;
     }
 

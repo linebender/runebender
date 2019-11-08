@@ -6,7 +6,7 @@
 //! scroll offset and zoom level.
 
 use std::fmt;
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Sub};
 
 use druid::kurbo::{Affine, Point, Rect, Vec2};
 use druid::Data;
@@ -101,22 +101,15 @@ impl DVec2 {
     }
 
     /// should not be public, used internally so we can reuse math ops
+    #[doc(hidden)]
     #[inline]
-    fn to_vec2(self) -> Vec2 {
+    pub(super) fn to_raw(self) -> Vec2 {
         Vec2::new(self.x, self.y)
     }
 
     #[inline]
-    pub fn to_screen(self, vport: ViewPort) -> Vec2 {
-        self.to_vec2() * vport.zoom
-    }
-
     pub fn hypot(self) -> f64 {
-        self.to_vec2().hypot()
-    }
-
-    pub fn normalize(self) -> DVec2 {
-        DVec2::from_raw(self.to_vec2().normalize())
+        self.to_raw().hypot()
     }
 }
 
@@ -188,10 +181,7 @@ impl Add for DVec2 {
 
     #[inline]
     fn add(self, other: DVec2) -> DVec2 {
-        DVec2 {
-            x: self.x + other.x,
-            y: self.y + other.y,
-        }
+        DVec2::new((self.x + other.x).round(), (self.y + other.y).round())
     }
 }
 
@@ -200,22 +190,7 @@ impl Sub for DVec2 {
 
     #[inline]
     fn sub(self, other: DVec2) -> DVec2 {
-        DVec2 {
-            x: self.x - other.x,
-            y: self.y - other.y,
-        }
-    }
-}
-
-impl Mul<f64> for DVec2 {
-    type Output = DVec2;
-
-    #[inline]
-    fn mul(self, other: f64) -> DVec2 {
-        DVec2 {
-            x: self.x * other,
-            y: self.y * other,
-        }
+        DVec2::new(self.x - other.x, self.y - other.y)
     }
 }
 
@@ -234,6 +209,16 @@ impl fmt::Debug for DPoint {
 impl fmt::Display for DPoint {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "D(")?;
+        fmt::Display::fmt(&self.x, formatter)?;
+        write!(formatter, ", ")?;
+        fmt::Display::fmt(&self.y, formatter)?;
+        write!(formatter, ")")
+    }
+}
+
+impl fmt::Display for DVec2 {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "D𝐯=(")?;
         fmt::Display::fmt(&self.x, formatter)?;
         write!(formatter, ", ")?;
         fmt::Display::fmt(&self.y, formatter)?;
