@@ -1,6 +1,9 @@
 //! A tool accepts user input and modifies the canvas.
 
+mod pen;
 mod select;
+
+pub use pen::Pen;
 pub use select::Select;
 
 use crate::edit_session::EditSession;

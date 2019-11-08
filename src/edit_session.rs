@@ -13,7 +13,7 @@ use crate::path::{EntityId, Path, PathPoint};
 /// Minimum distance in screen units that a click must occur to be considered
 /// on a point?
 //TODO: this doesn't feel very robust; items themselves should have hitzones?
-const MIN_CLICK_DISTANCE: f64 = 10.0;
+pub const MIN_CLICK_DISTANCE: f64 = 10.0;
 
 /// The editing state of a particular glyph.
 #[derive(Debug, Clone, Data)]
@@ -144,6 +144,32 @@ impl EditSession {
         self.paths_mut().iter_mut().find(|p| **p == point)
     }
 
+    fn new_path(&mut self, start: Point) {
+        let start = self.viewport.from_screen(start);
+        let path = Path::new(start);
+        let point = path.points()[0].id;
+
+        self.paths_mut().push(path);
+        self.selection_mut().clear();
+        self.selection_mut().insert(point);
+    }
+
+    pub fn add_point(&mut self, point: Point) {
+        if self.active_path_idx().is_none() {
+            self.new_path(point);
+        } else {
+            let point = self.viewport.from_screen(point);
+            let new_point = self.active_path_mut().unwrap().append_point(point);
+            self.selection_mut().clear();
+            self.selection_mut().insert(new_point);
+        }
+    }
+
+    pub fn update_for_drag(&mut self, drag_point: Point) {
+        let drag_point = self.viewport.from_screen(drag_point);
+        self.active_path_mut().unwrap().update_for_drag(drag_point);
+    }
+
     /// If there is a single on curve point selected, toggle it between corner and smooth
     pub fn toggle_selected_on_curve_type(&mut self) {
         if self.selection.len() == 1 {
@@ -178,6 +204,10 @@ impl EditSession {
     //NOTE: should this select other things too? Which ones?
     pub fn select_all(&mut self) {
         *self.selection_mut() = self.iter_points().map(|p| p.id).collect();
+    }
+
+    pub fn clear_selection(&mut self) {
+        self.selection_mut().clear()
     }
 
     /// If the current selection is a single point, select the next point
