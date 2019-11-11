@@ -4,10 +4,11 @@ use std::sync::Arc;
 
 use druid::{
     AppDelegate, Command, DelegateCtx, Env, Event, LocalizedString, Selector, Widget, WindowDesc,
+    WindowId,
 };
 use norad::GlyphName;
 
-use crate::data::{lenses, AppState, OpenGlyph};
+use crate::data::{lenses, AppState};
 use crate::edit_session::EditSession;
 use crate::lens2::Lens2Wrap;
 use crate::widgets::{Editor, ScrollZoom};
@@ -33,28 +34,60 @@ impl AppDelegate<AppState> for Delegate {
                     .expect("EDIT_GLYPH has incorrect payload");
 
                 match data.open_glyphs.get(&payload).to_owned() {
-                    Some(OpenGlyph::Pending) => (),
-                    //TODO: when we have a window-connect event, and can stash window id, fix this
-                    Some(OpenGlyph::Window(_window_id)) => (), // we want to show this window,
+                    Some(id) => {
+                        let command = Command::new(druid::command::sys::SHOW_WINDOW, *id);
+                        ctx.submit_command(command, None);
+                    }
                     None => {
-                        let title = payload.to_string();
-                        let session = EditSession::new(&payload, &data.file.object);
-                        let session2 = session.clone();
-
-                        let new_win = WindowDesc::new(move || make_editor(&session2))
-                            .title(LocalizedString::new("").with_placeholder(title))
+                        let session = get_or_create_session(&payload, data);
+                        let new_win = WindowDesc::new(move || make_editor(&session))
+                            .title(LocalizedString::new("").with_placeholder(payload.to_string()))
                             .menu(crate::menus::make_menu::<AppState>());
+
+                        let id = new_win.id;
                         let command = Command::new(druid::command::sys::NEW_WINDOW, new_win);
                         ctx.submit_command(command, None);
-                        Arc::make_mut(&mut data.open_glyphs)
-                            .insert(payload.clone(), OpenGlyph::Pending);
-                        Arc::make_mut(&mut data.sessions).insert(payload.clone(), session);
+
+                        Arc::make_mut(&mut data.open_glyphs).insert(payload.clone(), id);
                     }
                 }
                 None
             }
             other => Some(other),
         }
+    }
+
+    /// The handler for window deletion events.
+    /// This function is called after a window has been removed.
+    fn window_removed(
+        &mut self,
+        id: WindowId,
+        data: &mut AppState,
+        _env: &Env,
+        _ctx: &mut DelegateCtx,
+    ) {
+        let to_remove = data
+            .open_glyphs
+            .iter()
+            .find(|(_k, v)| v == &&id)
+            .map(|(k, _v)| k.clone());
+        match to_remove {
+            Some(open_glyph) => {
+                log::info!("removing '{}' from open list", open_glyph);
+                Arc::make_mut(&mut data.open_glyphs).remove(&open_glyph);
+            }
+            None => log::info!("window {:?} is not an editor window", id),
+        }
+    }
+}
+
+fn get_or_create_session(name: &GlyphName, data: &mut AppState) -> EditSession {
+    if let Some(session) = data.sessions.get(name) {
+        return session.to_owned();
+    } else {
+        let session = EditSession::new(name, &data.file.object);
+        Arc::make_mut(&mut data.sessions).insert(name.clone(), session.clone());
+        session
     }
 }
 

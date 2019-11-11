@@ -15,19 +15,11 @@ use crate::edit_session::EditSession;
 /// This is by convention.
 const DEFAULT_UNITS_PER_EM: f64 = 1000.;
 
-/// A glyph that has been opened is either waiting for a window to connect,
-/// or is in a window.
-#[derive(Debug, Clone)]
-pub enum OpenGlyph {
-    Pending,
-    Window(WindowId),
-}
-
 #[derive(Clone, Default)]
 pub struct AppState {
     pub file: FontObject,
     /// glyphs that are already open in an editor window
-    pub open_glyphs: Arc<HashMap<GlyphName, OpenGlyph>>,
+    pub open_glyphs: Arc<HashMap<GlyphName, WindowId>>,
     pub sessions: Arc<HashMap<GlyphName, EditSession>>,
 }
 
