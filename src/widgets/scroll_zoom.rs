@@ -154,7 +154,7 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
                     || c.selector == cmd::ZOOM_DEFAULT =>
             {
                 self.handle_zoom_cmd(&c.selector, ctx.size(), data);
-                self.child.reset_scrollbar_fade(ctx);
+                self.child.reset_scrollbar_fade(ctx, env);
                 ctx.invalidate();
                 ctx.set_handled();
                 return;
@@ -163,14 +163,14 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
                 self.set_initial_viewport(data, *size);
                 //HACK: because of how WidgetPod works this event isn't propogated,
                 //so we need to use a command to tell the Editor struct to request focus
-                ctx.submit_command(REQUEST_FOCUS.into(), None);
+                ctx.submit_command(REQUEST_FOCUS, None);
             }
             Event::MouseMoved(mouse) => {
                 self.mouse = mouse.pos;
             }
             Event::Wheel(wheel) if wheel.mods.meta => {
                 self.zoom(data, wheel.delta, ctx.size(), None);
-                self.child.reset_scrollbar_fade(ctx);
+                self.child.reset_scrollbar_fade(ctx, env);
                 ctx.set_handled();
                 ctx.invalidate();
                 return;

@@ -32,7 +32,7 @@ fn main() {
     let state = get_initial_state();
 
     AppLauncher::with_window(main_window)
-        .delegate(app_delegate::make_delegate())
+        .delegate(app_delegate::Delegate::default())
         .use_simple_logger()
         .launch(state)
         .expect("launch failed");

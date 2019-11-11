@@ -222,6 +222,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "druid"
+version = "0.4.0"
+source = "git+https://github.com/xi-editor/druid.git?rev=e23a2a4#e23a2a4d6fd06c9a702c225c4c05791f0aa25a36"
+dependencies = [
+ "druid-derive 0.1.1 (git+https://github.com/xi-editor/druid.git?rev=e23a2a4)",
+ "druid-shell 0.3.2 (git+https://github.com/xi-editor/druid.git?rev=e23a2a4)",
+ "fluent-bundle 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fluent-locale 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fluent-syntax 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "simple_logger 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "unic-langid 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "unicode-segmentation 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "druid-derive"
+version = "0.1.1"
+source = "git+https://github.com/xi-editor/druid.git?rev=e23a2a4#e23a2a4d6fd06c9a702c225c4c05791f0aa25a36"
+dependencies = [
+ "proc-macro2 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "druid-derive"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -235,6 +261,31 @@ dependencies = [
 name = "druid-shell"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "cairo-rs 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cocoa 0.19.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "direct2d 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "directwrite 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "gdk 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "gdk-sys 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "gio 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "glib 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "glib-sys 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "gtk 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "gtk-sys 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "objc 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "piet-common 0.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "time 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wio 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "druid-shell"
+version = "0.3.2"
+source = "git+https://github.com/xi-editor/druid.git?rev=e23a2a4#e23a2a4d6fd06c9a702c225c4c05791f0aa25a36"
 dependencies = [
  "cairo-rs 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cocoa 0.19.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -910,7 +961,7 @@ dependencies = [
 name = "runebender"
 version = "0.2.0"
 dependencies = [
- "druid 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "druid 0.4.0 (git+https://github.com/xi-editor/druid.git?rev=e23a2a4)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "norad 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1193,8 +1244,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum direct3d11 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "315aa929e68ba066cb6fb86f1b22af24f517e02fd9b5734c4d07e42cb9f4aefa"
 "checksum directwrite 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "8cdcd739e9351c411b8caf5cab32a27c818cfe06260595da121382ecdd22083d"
 "checksum druid 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "0dfc2c5a80baa05c7e949e6f32c02846cca5f0e390b9deb43d24d9171ec730a0"
+"checksum druid 0.4.0 (git+https://github.com/xi-editor/druid.git?rev=e23a2a4)" = "<none>"
+"checksum druid-derive 0.1.1 (git+https://github.com/xi-editor/druid.git?rev=e23a2a4)" = "<none>"
 "checksum druid-derive 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "fa8d9846ac11feb8640aaf2fde998d57cd00d6c65f4d04a0bb025895f2076a5a"
 "checksum druid-shell 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8b72f74db43368e53c26abc5587ccfdcb5d259b647f5fd322873eeef4f7c6f18"
+"checksum druid-shell 0.3.2 (git+https://github.com/xi-editor/druid.git?rev=e23a2a4)" = "<none>"
 "checksum dxgi 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "1639bbfd6765e92a40267d217a7acbac5b49320b68013f39a8e4376aa8c1e091"
 "checksum either 1.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
 "checksum failure 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "f8273f13c977665c5db7eb2b99ae520952fe5ac831ae4cd09d80c4c7042b5ed9"
