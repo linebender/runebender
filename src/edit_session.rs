@@ -27,6 +27,8 @@ pub struct EditSession {
     pub viewport: ViewPort,
     #[druid(same_fn = "rect_same")]
     work_bounds: Rect,
+    /// A string describing the current tool
+    pub tool_desc: Arc<str>,
 }
 
 impl EditSession {
@@ -61,6 +63,7 @@ impl EditSession {
             components: Arc::new(components),
             guides: Arc::new(guides),
             viewport: ViewPort::default(),
+            tool_desc: Arc::from("Select"),
             work_bounds: work_bounds,
         }
     }
