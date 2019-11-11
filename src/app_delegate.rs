@@ -2,7 +2,9 @@
 
 use std::sync::Arc;
 
-use druid::{AppDelegate, Command, Event, LocalizedString, Selector, Widget, WindowDesc};
+use druid::{
+    AppDelegate, Command, DelegateCtx, Env, Event, LocalizedString, Selector, Widget, WindowDesc,
+};
 use norad::GlyphName;
 
 use crate::data::{lenses, AppState, OpenGlyph};
@@ -12,37 +14,48 @@ use crate::widgets::{Editor, ScrollZoom};
 
 pub const EDIT_GLYPH: Selector = Selector::new("runebender.open-editor-with-glyph");
 
-pub fn make_delegate() -> AppDelegate<AppState> {
-    AppDelegate::new().event_handler(|event, data: &mut AppState, _env, ctx| match event {
-        Event::Command(ref cmd) if cmd.selector == EDIT_GLYPH => {
-            let payload = cmd
-                .get_object::<GlyphName>()
-                .map(GlyphName::clone)
-                .expect("EDIT_GLYPH has incorrect payload");
+#[derive(Debug, Default)]
+pub struct Delegate;
 
-            match data.open_glyphs.get(&payload).to_owned() {
-                Some(OpenGlyph::Pending) => (),
-                //TODO: when we have a window-connect event, and can stash window id, fix this
-                Some(OpenGlyph::Window(_window_id)) => (), // we want to show this window,
-                None => {
-                    let title = payload.to_string();
-                    let session = EditSession::new(&payload, &data.file.object);
-                    let session2 = session.clone();
+impl AppDelegate<AppState> for Delegate {
+    fn event(
+        &mut self,
+        event: Event,
+        data: &mut AppState,
+        _env: &Env,
+        ctx: &mut DelegateCtx,
+    ) -> Option<Event> {
+        match event {
+            Event::Command(ref cmd) if cmd.selector == EDIT_GLYPH => {
+                let payload = cmd
+                    .get_object::<GlyphName>()
+                    .map(GlyphName::clone)
+                    .expect("EDIT_GLYPH has incorrect payload");
 
-                    let new_win = WindowDesc::new(move || make_editor(&session2))
-                        .title(LocalizedString::new("").with_placeholder(title))
-                        .menu(crate::menus::make_menu::<AppState>());
-                    let command = Command::new(druid::command::sys::NEW_WINDOW, new_win);
-                    ctx.submit_command(command, None);
-                    Arc::make_mut(&mut data.open_glyphs)
-                        .insert(payload.clone(), OpenGlyph::Pending);
-                    Arc::make_mut(&mut data.sessions).insert(payload.clone(), session);
+                match data.open_glyphs.get(&payload).to_owned() {
+                    Some(OpenGlyph::Pending) => (),
+                    //TODO: when we have a window-connect event, and can stash window id, fix this
+                    Some(OpenGlyph::Window(_window_id)) => (), // we want to show this window,
+                    None => {
+                        let title = payload.to_string();
+                        let session = EditSession::new(&payload, &data.file.object);
+                        let session2 = session.clone();
+
+                        let new_win = WindowDesc::new(move || make_editor(&session2))
+                            .title(LocalizedString::new("").with_placeholder(title))
+                            .menu(crate::menus::make_menu::<AppState>());
+                        let command = Command::new(druid::command::sys::NEW_WINDOW, new_win);
+                        ctx.submit_command(command, None);
+                        Arc::make_mut(&mut data.open_glyphs)
+                            .insert(payload.clone(), OpenGlyph::Pending);
+                        Arc::make_mut(&mut data.sessions).insert(payload.clone(), session);
+                    }
                 }
+                None
             }
-            None
+            other => Some(other),
         }
-        other => Some(other),
-    })
+    }
 }
 
 fn make_editor(session: &EditSession) -> impl Widget<AppState> {
