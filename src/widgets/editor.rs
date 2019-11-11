@@ -1,5 +1,7 @@
 //! the main editor widget.
 
+use std::sync::Arc;
+
 use druid::kurbo::{Point, Rect, Size};
 use druid::menu::ContextMenu;
 use druid::{
@@ -96,8 +98,14 @@ impl Editor {
             consts::cmd::SELECT_ALL => data.session.select_all(),
             consts::cmd::DESELECT_ALL => data.session.clear_selection(),
             consts::cmd::DELETE => data.session.delete_selection(),
-            consts::cmd::SELECT_TOOL => self.tool = Box::new(Select::default()),
-            consts::cmd::PEN_TOOL => self.tool = Box::new(Pen::default()),
+            consts::cmd::SELECT_TOOL => {
+                self.tool = Box::new(Select::default());
+                data.session.tool_desc = Arc::from("Select");
+            }
+            consts::cmd::PEN_TOOL => {
+                self.tool = Box::new(Pen::default());
+                data.session.tool_desc = Arc::from("Pen");
+            }
             consts::cmd::COPY_AS_CODE => self.copy_as_code(ctx, &data.session),
             consts::cmd::ADD_GUIDE => {
                 let point = cmd.get_object::<Point>().unwrap();

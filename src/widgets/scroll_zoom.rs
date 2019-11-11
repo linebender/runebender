@@ -1,8 +1,10 @@
-use druid::kurbo::{Point, Rect, Size, Vec2};
+use druid::piet::{Color, FontBuilder, RenderContext, Text, TextLayout, TextLayoutBuilder};
+
+use druid::kurbo::{Point, Rect, RoundedRect, Size, Vec2};
 use druid::widget::Scroll;
 use druid::{
-    BaseState, BoxConstraints, Env, Event, EventCtx, LayoutCtx, PaintCtx, Selector, UpdateCtx,
-    Widget,
+    BaseState, BoxConstraints, Env, Event, EventCtx, HotKey, LayoutCtx, PaintCtx, Selector,
+    UpdateCtx, Widget,
 };
 
 use crate::consts::{cmd::REQUEST_FOCUS, CANVAS_SIZE};
@@ -12,6 +14,9 @@ const MIN_ZOOM: f64 = 0.02;
 const MAX_ZOOM: f64 = 50.;
 /// mouse wheel deltas are big, so we scale them down
 const ZOOM_SCALE: f64 = 0.001;
+const TOOL_LABEL_SIZE: f64 = 18.0;
+/// A general ballpark guess at what the ascender height is, as a ratio of font size.
+const LIKELY_ASCENDER_RATIO: f64 = 0.8;
 
 /// A widget that wraps a scroll widget, adding zoom.
 pub struct ScrollZoom<T: Widget<EditorState>> {
@@ -120,14 +125,40 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
             _ => unreachable!("selectors have already been validated"),
         };
     }
+
+    fn paint_label(&mut self, ctx: &mut PaintCtx, data: &EditorState, _: &Env) {
+        let font_name = label_font_name();
+        let bg_color = Color::WHITE.with_alpha(0.7);
+        let text_color = Color::grey(0.45);
+
+        let font = ctx
+            .text()
+            .new_font_by_name(font_name, TOOL_LABEL_SIZE)
+            .build()
+            .unwrap();
+        let layout = ctx
+            .text()
+            .new_text_layout(&font, &data.session.tool_desc)
+            .build()
+            .unwrap();
+        let text_size = Size::new(layout.width(), TOOL_LABEL_SIZE);
+        let text_draw_origin = Point::new(10.0, 10.0 + TOOL_LABEL_SIZE * LIKELY_ASCENDER_RATIO);
+        let text_bounds = Rect::from_origin_size((10.0, 10.0), text_size);
+        let text_bg_bounds = text_bounds.inset(4.0);
+        //TODO: use Rect::to_rounded_rect when available
+        let text_box = RoundedRect::from_rect(text_bg_bounds, 4.0);
+        ctx.fill(text_box, &bg_color);
+        ctx.stroke(text_box, &text_color, 0.5);
+        ctx.draw_text(&layout, text_draw_origin, &text_color);
+    }
 }
 
 impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
     fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &EditorState, env: &Env) {
-        use druid::piet::{Color, RenderContext};
         //TODO: paint grid here?
         ctx.clear(Color::rgb8(100, 100, 20));
-        self.child.paint(ctx, state, data, env)
+        self.child.paint(ctx, state, data, env);
+        self.paint_label(ctx, data, env);
     }
 
     fn layout(
@@ -165,6 +196,12 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
                 //so we need to use a command to tell the Editor struct to request focus
                 ctx.submit_command(REQUEST_FOCUS, None);
             }
+            Event::KeyDown(k) if HotKey::new(None, "v").matches(k) => {
+                ctx.submit_command(cmd::SELECT_TOOL, None)
+            }
+            Event::KeyDown(k) if HotKey::new(None, "p").matches(k) => {
+                ctx.submit_command(cmd::PEN_TOOL, None)
+            }
             Event::MouseMoved(mouse) => {
                 self.mouse = mouse.pos;
             }
@@ -198,4 +235,17 @@ fn most_significant_axis(delta: Vec2) -> f64 {
     } else {
         delta.y
     }
+}
+
+#[allow(unreachable_code)]
+fn label_font_name() -> &'static str {
+    #[cfg(target_os = "macos")]
+    {
+        return "Helvetica Neue Bold";
+    }
+    #[cfg(target_os = "windows")]
+    {
+        return "Segoe UI Bold";
+    }
+    "sans-serif"
 }
