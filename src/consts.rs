@@ -51,6 +51,9 @@ pub mod cmd {
     /// The arguments **must** be a `ToggleGuideCmdArgs`.
     pub const TOGGLE_GUIDE: Selector = Selector::new("runebender.toggle-guide");
 
+    /// Sent when the 'Copy As Code' menu item is selected.
+    pub const COPY_AS_CODE: Selector = Selector::new("runebender.copy-as-code");
+
     /// Arguments passed along with the TOGGLE_GUIDE command
     pub struct ToggleGuideCmdArgs {
         pub id: EntityId,
