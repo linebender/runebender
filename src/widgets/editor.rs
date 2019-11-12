@@ -69,12 +69,17 @@ impl Editor {
     }
 
     fn do_undo(&mut self) -> Option<&EditSession> {
-        //eprintln!("updated undo");
         self.undo.undo()
     }
 
     fn do_redo(&mut self) -> Option<&EditSession> {
         self.undo.redo()
+    }
+
+    fn copy_as_code(&self, env: &mut EventCtx, data: &EditSession) {
+        if let Some(code) = crate::copy_as_code::make_code_string(data) {
+            env.set_clipboard_contents(code);
+        }
     }
 
     /// handle a `Command`. Returns a bool indicating whether the command was
@@ -93,6 +98,7 @@ impl Editor {
             consts::cmd::DELETE => data.session.delete_selection(),
             consts::cmd::SELECT_TOOL => self.tool = Box::new(Select::default()),
             consts::cmd::PEN_TOOL => self.tool = Box::new(Pen::default()),
+            consts::cmd::COPY_AS_CODE => self.copy_as_code(ctx, &data.session),
             consts::cmd::ADD_GUIDE => {
                 let point = cmd.get_object::<Point>().unwrap();
                 data.session.add_guide(*point);

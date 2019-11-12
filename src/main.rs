@@ -3,6 +3,7 @@
 mod app_delegate;
 mod component;
 mod consts;
+mod copy_as_code;
 mod data;
 mod design_space;
 mod draw;

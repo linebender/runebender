@@ -125,15 +125,22 @@ fn view_menu<T: Data>() -> MenuDesc<T> {
 }
 
 fn glyph_menu<T: Data>() -> MenuDesc<T> {
-    MenuDesc::new(LocalizedString::new("menu-glyph-menu").with_placeholder("Glyph".into())).append(
-        MenuItem::new(
-            LocalizedString::new("menu-item-add-component")
-                .with_placeholder("Add Component".into()),
-            consts::cmd::ADD_COMPONENT,
+    MenuDesc::new(LocalizedString::new("menu-glyph-menu").with_placeholder("Glyph".into()))
+        .append(
+            MenuItem::new(
+                LocalizedString::new("menu-item-add-component")
+                    .with_placeholder("Add Component".into()),
+                consts::cmd::ADD_COMPONENT,
+            )
+            .hotkey(SysMods::CmdShift, "c")
+            .disabled(),
         )
-        .hotkey(SysMods::CmdShift, "c")
-        .disabled(),
-    )
+        .append_separator()
+        .append(MenuItem::new(
+            LocalizedString::new("menu-item-copy-as-code")
+                .with_placeholder("Copy Paths as Code".into()),
+            consts::cmd::COPY_AS_CODE,
+        ))
 }
 
 fn tools_menu<T: Data>() -> MenuDesc<T> {
