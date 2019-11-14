@@ -3,6 +3,7 @@
 use std::fmt::Write;
 
 use crate::edit_session::EditSession;
+use crate::path::{Path, PointType};
 use druid::kurbo::{Affine, BezPath, PathEl, Shape};
 
 /// Generates druid-compatible drawing code for all of the `Paths` in this
@@ -32,6 +33,26 @@ pub fn make_code_string(session: &EditSession) -> Option<String> {
     Some(out)
 }
 
+pub fn make_glyphs_plist(session: &EditSession) -> Option<Vec<u8>> {
+    let paths: Vec<_> = session.paths.iter().map(GlyphPlistPath::from).collect();
+    if paths.is_empty() {
+        return None;
+    }
+
+    let plist = GlyphsPastePlist {
+        glyph: session.name.to_string(),
+        layer: "",
+        paths,
+    };
+
+    let mut data = Vec::new();
+    if let Err(e) = plist::to_writer_binary(&mut data, &plist) {
+        log::error!("failed to write plist '{}'", e);
+        return None;
+    }
+    Some(data)
+}
+
 fn append_path(path: &BezPath, out: &mut String) -> std::fmt::Result {
     out.push('\n');
     for element in path.elements() {
@@ -52,4 +73,45 @@ fn append_path(path: &BezPath, out: &mut String) -> std::fmt::Result {
         }
     }
     Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct GlyphsPastePlist {
+    glyph: String,
+    layer: &'static str,
+    paths: Vec<GlyphPlistPath>,
+}
+
+#[derive(Debug, Serialize)]
+struct GlyphPlistPath {
+    closed: u32,
+    nodes: Vec<String>,
+}
+
+impl From<&Path> for GlyphPlistPath {
+    fn from(src: &Path) -> GlyphPlistPath {
+        let mut next_is_curve = src
+            .points()
+            .last()
+            .map(|p| p.typ == PointType::OffCurve)
+            .unwrap_or(false);
+        let nodes = src
+            .points()
+            .iter()
+            .map(|p| {
+                let ptyp = match p.typ {
+                    PointType::OnCurve if next_is_curve => "CURVE",
+                    PointType::OnCurve => "LINE",
+                    PointType::OnCurveSmooth => "CURVE SMOOTH",
+                    PointType::OffCurve => "OFFCURVE",
+                };
+
+                next_is_curve = p.typ == PointType::OffCurve;
+
+                format!("\"{} {} {}\"", p.point.x, p.point.y, ptyp)
+            })
+            .collect();
+        let closed = if src.is_closed() { 1 } else { 0 };
+        GlyphPlistPath { closed, nodes }
+    }
 }

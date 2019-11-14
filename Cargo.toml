@@ -9,3 +9,6 @@ edition = "2018"
 druid = { git = "https://github.com/xi-editor/druid.git", rev = "3d8de58", version = "0.4" }
 norad = { version = "0.0.4", features = ["druid"]}
 log = "0.4.8"
+plist = "0.5"
+serde = "1.0"
+serde_derive = "1.0"
