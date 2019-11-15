@@ -2,9 +2,12 @@
 
 use std::fmt::Write;
 
+use druid::kurbo::{Affine, BezPath, PathEl, Rect, Shape};
+use lopdf::content::{Content, Operation};
+use lopdf::{Document, Object, Stream};
+
 use crate::edit_session::EditSession;
 use crate::path::{Path, PointType};
-use druid::kurbo::{Affine, BezPath, PathEl, Shape};
 
 /// Generates druid-compatible drawing code for all of the `Paths` in this
 /// session, if any exist.
@@ -51,6 +54,82 @@ pub fn make_glyphs_plist(session: &EditSession) -> Option<Vec<u8>> {
         return None;
     }
     Some(data)
+}
+
+/// Attempt to generate a minimal PDF representation of the current session,
+/// for use on the system pasteboard.
+pub fn make_pdf_data(session: &EditSession) -> Option<Vec<u8>> {
+    let mut doc = Document::with_version("1.5");
+    let pages_id = doc.new_object_id();
+    let mut ops = Vec::new();
+    let mut rect = Rect::ZERO;
+
+    for path in session.paths.iter() {
+        let bezier = path.bezier();
+        rect = rect.union(bezier.bounding_box());
+        append_pdf_ops(&mut ops, &bezier);
+    }
+
+    ops.push(Operation::new("f", vec![]));
+
+    let content = Content { operations: ops };
+    let content_id = doc.add_object(Stream::new(dictionary! {}, content.encode().unwrap()));
+
+    let page_id = doc.add_object(dictionary! {
+        "Type" => "Page",
+        "Parent" => pages_id,
+        "Contents" => content_id,
+    });
+
+    let pages = dictionary! {
+        "Type" => "Pages",
+        "Kids" => vec![page_id.into()],
+        "Count" => 1,
+        "MediaBox" => vec![rect.x0.into(), rect.y0.into(), rect.x1.into(), rect.y1.into()],
+    };
+
+    doc.objects.insert(pages_id, Object::Dictionary(pages));
+    let catalog_id = doc.add_object(dictionary! {
+        "Type" => "Catalog",
+        "Pages" => pages_id,
+    });
+
+    doc.trailer.set("Root", catalog_id);
+    doc.compress();
+    let mut out = Vec::new();
+    if let Err(e) = doc.save_to(&mut out) {
+        log::warn!("error writing pdf for clipboard: '{}'", e);
+        None
+    } else {
+        Some(out)
+    }
+}
+
+fn append_pdf_ops(ops: &mut Vec<Operation>, path: &BezPath) {
+    for element in path.elements() {
+        let op = match element {
+            PathEl::MoveTo(p) => Operation::new("m", vec![p.x.into(), p.y.into()]),
+            PathEl::LineTo(p) => Operation::new("l", vec![p.x.into(), p.y.into()]),
+            PathEl::QuadTo(_p1, _p2) => {
+                //FIXME: should we convert quads to cubes?
+                log::warn!("pdf copy does not support quadratic beziers!");
+                continue;
+            }
+            PathEl::CurveTo(p1, p2, p3) => Operation::new(
+                "c",
+                vec![
+                    p1.x.into(),
+                    p1.y.into(),
+                    p2.x.into(),
+                    p2.y.into(),
+                    p3.x.into(),
+                    p3.y.into(),
+                ],
+            ),
+            PathEl::ClosePath => Operation::new("h", vec![]),
+        };
+        ops.push(op);
+    }
 }
 
 fn append_path(path: &BezPath, out: &mut String) -> std::fmt::Result {
