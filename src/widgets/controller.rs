@@ -29,10 +29,10 @@ impl Widget<AppState> for Controller {
         self.inner.layout(ctx, bc, d, env)
     }
 
-    fn event(&mut self, event: &Event, ctx: &mut EventCtx, data: &mut AppState, env: &Env) {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppState, env: &Env) {
         match event {
             Event::OpenFile(file_info) => self.try_open_file(file_info, ctx, data),
-            other => self.inner.event(other, ctx, data, env),
+            other => self.inner.event(ctx, other, data, env),
         }
     }
 

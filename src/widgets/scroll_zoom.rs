@@ -176,7 +176,7 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
         size
     }
 
-    fn event(&mut self, event: &Event, ctx: &mut EventCtx, data: &mut EditorState, env: &Env) {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut EditorState, env: &Env) {
         use crate::consts::cmd;
         match event {
             Event::Command(c)
@@ -215,7 +215,7 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
             _ => (),
         }
 
-        self.child.event(event, ctx, data, env);
+        self.child.event(ctx, event, data, env);
     }
 
     fn update(
