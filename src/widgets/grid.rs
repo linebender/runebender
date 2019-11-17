@@ -65,9 +65,9 @@ impl Widget<GlyphSet> for GlyphGrid {
         Size::new(width, y + GLYPH_SIZE)
     }
 
-    fn event(&mut self, event: &Event, ctx: &mut EventCtx, data: &mut GlyphSet, env: &Env) {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut GlyphSet, env: &Env) {
         for child in &mut self.children {
-            child.event(event, ctx, data, env)
+            child.event(ctx, event, data, env)
         }
     }
 
@@ -174,7 +174,7 @@ impl Widget<GlyphPlus> for GridInner {
         bc.max()
     }
 
-    fn event(&mut self, event: &Event, ctx: &mut EventCtx, data: &mut GlyphPlus, _env: &Env) {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut GlyphPlus, _env: &Env) {
         match event {
             Event::MouseDown(_) => {
                 ctx.set_active(true);

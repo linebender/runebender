@@ -37,8 +37,8 @@ impl Editor {
 
     fn send_mouse(
         &mut self,
-        event: TaggedEvent,
         ctx: &mut EventCtx,
+        event: TaggedEvent,
         data: &mut EditorState,
         env: &Env,
     ) -> Option<EditType> {
@@ -172,7 +172,7 @@ impl Widget<EditorState> for Editor {
         (CANVAS_SIZE.to_vec2() * data.session.viewport.zoom).to_size()
     }
 
-    fn event(&mut self, event: &Event, ctx: &mut EventCtx, data: &mut EditorState, env: &Env) {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut EditorState, env: &Env) {
         // we invalidate if selection changes after this event;
         let pre_selection = data.session.selection.clone();
 
@@ -190,9 +190,9 @@ impl Widget<EditorState> for Editor {
                 None
             }
             Event::KeyDown(k) => self.tool.key_down(k, ctx, &mut data.session, env),
-            Event::MouseUp(m) => self.send_mouse(TaggedEvent::Up(m.clone()), ctx, data, env),
-            Event::MouseMoved(m) => self.send_mouse(TaggedEvent::Moved(m.clone()), ctx, data, env),
-            Event::MouseDown(m) => self.send_mouse(TaggedEvent::Down(m.clone()), ctx, data, env),
+            Event::MouseUp(m) => self.send_mouse(ctx, TaggedEvent::Up(m.clone()), data, env),
+            Event::MouseMoved(m) => self.send_mouse(ctx, TaggedEvent::Moved(m.clone()), data, env),
+            Event::MouseDown(m) => self.send_mouse(ctx, TaggedEvent::Down(m.clone()), data, env),
             _ => None,
         };
 
