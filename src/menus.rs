@@ -4,7 +4,7 @@ use druid::kurbo::Point;
 
 use druid::command::{sys as sys_cmd, Command};
 use druid::menu::{self, sys as sys_menu, MenuDesc, MenuItem};
-use druid::shell::dialog::{FileDialogOptions, FileSpec};
+use druid::shell::{FileDialogOptions, FileSpec};
 use druid::{Data, LocalizedString, SysMods};
 
 use crate::consts;
