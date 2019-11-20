@@ -1,7 +1,7 @@
 //! The root widget.
 
 use druid::kurbo::Size;
-use druid::shell::window::FileInfo;
+use druid::shell::FileInfo;
 use druid::{
     BaseState, BoxConstraints, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget,
 };
