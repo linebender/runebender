@@ -1,8 +1,10 @@
 //! shared constants
 
 use druid::kurbo::Size;
+use druid::FormatId;
 
 pub const CANVAS_SIZE: Size = Size::new(5000., 5000.);
+pub const GLYPHS_APP_PASTEBOARD_TYPE: FormatId = "Glyphs elements pasteboard type";
 
 /// Commands and Selectors
 pub mod cmd {
@@ -50,9 +52,6 @@ pub mod cmd {
     ///
     /// The arguments **must** be a `ToggleGuideCmdArgs`.
     pub const TOGGLE_GUIDE: Selector = Selector::new("runebender.toggle-guide");
-
-    /// Sent when the 'Copy As Code' menu item is selected.
-    pub const COPY_AS_CODE: Selector = Selector::new("runebender.copy-as-code");
 
     /// Arguments passed along with the TOGGLE_GUIDE command
     pub struct ToggleGuideCmdArgs {
