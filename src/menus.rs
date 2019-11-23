@@ -2,10 +2,11 @@
 
 use druid::kurbo::Point;
 
-use druid::command::{sys as sys_cmd, Command};
-use druid::menu::{self, sys as sys_menu, MenuDesc, MenuItem};
-use druid::shell::{FileDialogOptions, FileSpec};
-use druid::{Data, LocalizedString, SysMods};
+use druid::commands;
+use druid::platform_menus;
+use druid::{
+    Command, Data, FileDialogOptions, FileSpec, LocalizedString, MenuDesc, MenuItem, SysMods,
+};
 
 use crate::consts;
 use crate::data::{AppState, EditorState};
@@ -37,7 +38,7 @@ pub(crate) fn make_menu<T: Data>() -> MenuDesc<T> {
     let mut menu = MenuDesc::empty();
     #[cfg(target_os = "macos")]
     {
-        menu = menu.append(menu::sys::mac::application::default());
+        menu = menu.append(platform_menus::mac::application::default());
     }
 
     menu.append(file_menu())
@@ -49,34 +50,34 @@ pub(crate) fn make_menu<T: Data>() -> MenuDesc<T> {
 
 fn file_menu<T: Data>() -> MenuDesc<T> {
     MenuDesc::new(LocalizedString::new("common-menu-file-menu"))
-        .append(sys_menu::mac::file::new_file().disabled())
+        .append(platform_menus::mac::file::new_file().disabled())
         .append(
             MenuItem::new(
                 LocalizedString::new("common-menu-file-open"),
                 Command::new(
-                    sys_cmd::OPEN_FILE,
+                    commands::OPEN_FILE,
                     FileDialogOptions::new().allowed_types(vec![UFO_FILE_TYPE]),
                 ),
             )
             .hotkey(SysMods::Cmd, "o"),
         )
         .append_separator()
-        .append(sys_menu::mac::file::close())
-        .append(sys_menu::mac::file::save().disabled())
-        .append(sys_menu::mac::file::save_as().disabled())
+        .append(platform_menus::mac::file::close())
+        .append(platform_menus::mac::file::save().disabled())
+        .append(platform_menus::mac::file::save_as().disabled())
         .append_separator()
-        .append(sys_menu::mac::file::page_setup().disabled())
-        .append(sys_menu::mac::file::print().disabled())
+        .append(platform_menus::mac::file::page_setup().disabled())
+        .append(platform_menus::mac::file::print().disabled())
 }
 
 fn edit_menu<T: Data>() -> MenuDesc<T> {
     MenuDesc::new(LocalizedString::new("common-menu-edit-menu"))
-        .append(sys_menu::common::undo())
-        .append(sys_menu::common::redo())
+        .append(platform_menus::common::undo())
+        .append(platform_menus::common::redo())
         .append_separator()
-        .append(sys_menu::common::cut().disabled())
-        .append(sys_menu::common::copy().disabled())
-        .append(sys_menu::common::paste().disabled())
+        .append(platform_menus::common::cut().disabled())
+        .append(platform_menus::common::copy().disabled())
+        .append(platform_menus::common::paste().disabled())
         .append(MenuItem::new(
             LocalizedString::new("menu-item-delete").with_placeholder("Delete".into()),
             consts::cmd::DELETE,

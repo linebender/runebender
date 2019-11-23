@@ -1,9 +1,9 @@
 //! The root widget.
 
 use druid::kurbo::Size;
-use druid::shell::FileInfo;
 use druid::{
-    BaseState, BoxConstraints, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget,
+    BaseState, BoxConstraints, Env, Event, EventCtx, FileInfo, LayoutCtx, PaintCtx, UpdateCtx,
+    Widget,
 };
 use log;
 use norad::Ufo;
@@ -49,10 +49,10 @@ impl Controller {
     }
 
     fn try_open_file(&mut self, info: &FileInfo, ctx: &mut EventCtx, data: &mut AppState) {
-        match Ufo::load(&info.path) {
-            Ok(ufo) => data.set_file(ufo, info.path.clone()),
+        match Ufo::load(info.path()) {
+            Ok(ufo) => data.set_file(ufo, info.path().to_owned()),
             Err(e) => {
-                log::error!("failed to open file {:?}, errror: '{:?}'", &info.path, e);
+                log::error!("failed to open file {:?}, errror: '{:?}'", info.path(), e);
                 return;
             }
         };
