@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use druid::kurbo::{Point, Rect, Size};
 use druid::{
-    Application, BaseState, BoxConstraints, Command, ContextMenu, Data, Env, Event, EventCtx,
-    KeyCode, LayoutCtx, PaintCtx, UpdateCtx, Widget,
+    Application, BaseState, BoxConstraints, ClipboardFormat, Command, ContextMenu, Data, Env,
+    Event, EventCtx, KeyCode, LayoutCtx, PaintCtx, UpdateCtx, Widget,
 };
 
 use crate::consts::{self, CANVAS_SIZE};
@@ -77,9 +77,29 @@ impl Editor {
         self.undo.redo()
     }
 
-    fn copy_as_code(&self, _env: &mut EventCtx, data: &EditSession) {
-        if let Some(code) = crate::copy_as_code::make_code_string(data) {
-            Application::clipboard().put_string(code);
+    fn do_copy(&self, data: &EditSession) {
+        let mut formats = Vec::new();
+        if let Some(data) = crate::clipboard::make_glyphs_plist(data) {
+            formats.push(ClipboardFormat::new(
+                crate::consts::GLYPHS_APP_PASTEBOARD_TYPE,
+                data,
+            ));
+        }
+
+        if let Some(bytes) = crate::clipboard::make_pdf_data(data) {
+            formats.push(ClipboardFormat::new(ClipboardFormat::PDF, bytes));
+        }
+
+        if let Some(bytes) = crate::clipboard::make_svg_data(data) {
+            formats.push(ClipboardFormat::new(ClipboardFormat::SVG, bytes))
+        }
+
+        if let Some(code) = crate::clipboard::make_code_string(data) {
+            formats.push(code.into());
+        }
+
+        if !formats.is_empty() {
+            Application::clipboard().put_formats(&formats);
         }
     }
 
@@ -105,7 +125,6 @@ impl Editor {
                 self.tool = Box::new(Pen::default());
                 data.session.tool_desc = Arc::from("Pen");
             }
-            consts::cmd::COPY_AS_CODE => self.copy_as_code(ctx, &data.session),
             consts::cmd::ADD_GUIDE => {
                 let point = cmd.get_object::<Point>().unwrap();
                 data.session.add_guide(*point);
@@ -116,6 +135,7 @@ impl Editor {
                 data.session.toggle_guide(*id, *pos);
                 return (true, Some(EditType::Normal));
             }
+            druid::commands::COPY => self.do_copy(&data.session),
             druid::commands::UNDO => {
                 if let Some(prev) = self.do_undo() {
                     //HACK: because zoom & offset is part of data, and we don't

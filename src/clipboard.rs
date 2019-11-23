@@ -1,8 +1,9 @@
-//! Converting paths to piet drawing code.
+//! encoding and decoding paths for use with the clipboard.
 
 use std::fmt::Write;
 
 use druid::kurbo::{Affine, BezPath, PathEl, Rect, Shape};
+
 use lopdf::content::{Content, Operation};
 use lopdf::{Document, Object, Stream};
 
@@ -34,6 +35,28 @@ pub fn make_code_string(session: &EditSession) -> Option<String> {
     }
 
     Some(out)
+}
+
+fn append_path(path: &BezPath, out: &mut String) -> std::fmt::Result {
+    out.push('\n');
+    for element in path.elements() {
+        match element {
+            PathEl::MoveTo(p) => writeln!(out, "bez.move_to(({:.1}, {:.1}));", p.x, p.y)?,
+            PathEl::LineTo(p) => writeln!(out, "bez.line_to(({:.1}, {:.1}));", p.x, p.y)?,
+            PathEl::QuadTo(p1, p2) => writeln!(
+                out,
+                "bez.quad_to(({:.1}, {:.1}), ({:.1}, {:.1}));",
+                p1.x, p1.y, p2.x, p2.y
+            )?,
+            PathEl::CurveTo(p1, p2, p3) => writeln!(
+                out,
+                "bez.curve_to(({:.1}, {:.1}), ({:.1}, {:.1}), ({:.1}, {:.1}));",
+                p1.x, p1.y, p2.x, p2.y, p3.x, p3.y
+            )?,
+            PathEl::ClosePath => writeln!(out, "bez.close_path();")?,
+        }
+    }
+    Ok(())
 }
 
 pub fn make_glyphs_plist(session: &EditSession) -> Option<Vec<u8>> {
@@ -132,26 +155,47 @@ fn append_pdf_ops(ops: &mut Vec<Operation>, path: &BezPath) {
     }
 }
 
-fn append_path(path: &BezPath, out: &mut String) -> std::fmt::Result {
-    out.push('\n');
-    for element in path.elements() {
-        match element {
-            PathEl::MoveTo(p) => writeln!(out, "bez.move_to(({:.1}, {:.1}));", p.x, p.y)?,
-            PathEl::LineTo(p) => writeln!(out, "bez.line_to(({:.1}, {:.1}));", p.x, p.y)?,
-            PathEl::QuadTo(p1, p2) => writeln!(
-                out,
-                "bez.quad_to(({:.1}, {:.1}), ({:.1}, {:.1}));",
-                p1.x, p1.y, p2.x, p2.y
-            )?,
-            PathEl::CurveTo(p1, p2, p3) => writeln!(
-                out,
-                "bez.curve_to(({:.1}, {:.1}), ({:.1}, {:.1}), ({:.1}, {:.1}));",
-                p1.x, p1.y, p2.x, p2.y, p3.x, p3.y
-            )?,
-            PathEl::ClosePath => writeln!(out, "bez.close_path();")?,
+pub fn make_svg_data(session: &EditSession) -> Option<Vec<u8>> {
+    use svg::node::element::path::Data;
+    use svg::node::element::Path;
+    use svg::Document;
+
+    let mut bbox = Rect::ZERO;
+    let mut data = Data::new();
+
+    for path in session.paths.iter() {
+        let bezier = path.bezier();
+        bbox = bbox.union(bezier.bounding_box());
+        for element in bezier.elements() {
+            data = match element {
+                PathEl::MoveTo(p) => data.move_to((p.x, p.y)),
+                PathEl::LineTo(p) => data.line_to((p.x, p.y)),
+                PathEl::QuadTo(p1, p2) => data.quadratic_curve_to((p1.x, p1.y, p2.x, p2.y)),
+                PathEl::CurveTo(p1, p2, p3) => {
+                    data.cubic_curve_to((p1.x, p1.y, p2.x, p2.y, p3.x, p3.y))
+                }
+                PathEl::ClosePath => data.close(),
+            };
         }
     }
-    Ok(())
+
+    let path = Path::new()
+        .set("fill", "none")
+        .set("stroke", "black")
+        .set("stroke-width", 1)
+        .set("d", data);
+
+    let document = Document::new()
+        .set("viewBox", (bbox.x0, bbox.y0, bbox.x1, bbox.y1))
+        .add(path);
+
+    let mut data = Vec::new();
+    if let Err(e) = svg::write(&mut data, &document) {
+        log::warn!("error writing svg data: '{}'", e);
+        None
+    } else {
+        Some(data)
+    }
 }
 
 #[derive(Debug, Serialize)]

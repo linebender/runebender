@@ -76,7 +76,7 @@ fn edit_menu<T: Data>() -> MenuDesc<T> {
         .append(platform_menus::common::redo())
         .append_separator()
         .append(platform_menus::common::cut().disabled())
-        .append(platform_menus::common::copy().disabled())
+        .append(platform_menus::common::copy())
         .append(platform_menus::common::paste().disabled())
         .append(MenuItem::new(
             LocalizedString::new("menu-item-delete").with_placeholder("Delete".into()),
@@ -126,22 +126,15 @@ fn view_menu<T: Data>() -> MenuDesc<T> {
 }
 
 fn glyph_menu<T: Data>() -> MenuDesc<T> {
-    MenuDesc::new(LocalizedString::new("menu-glyph-menu").with_placeholder("Glyph".into()))
-        .append(
-            MenuItem::new(
-                LocalizedString::new("menu-item-add-component")
-                    .with_placeholder("Add Component".into()),
-                consts::cmd::ADD_COMPONENT,
-            )
-            .hotkey(SysMods::CmdShift, "c")
-            .disabled(),
+    MenuDesc::new(LocalizedString::new("menu-glyph-menu").with_placeholder("Glyph".into())).append(
+        MenuItem::new(
+            LocalizedString::new("menu-item-add-component")
+                .with_placeholder("Add Component".into()),
+            consts::cmd::ADD_COMPONENT,
         )
-        .append_separator()
-        .append(MenuItem::new(
-            LocalizedString::new("menu-item-copy-as-code")
-                .with_placeholder("Copy Paths as Code".into()),
-            consts::cmd::COPY_AS_CODE,
-        ))
+        .hotkey(SysMods::CmdShift, "c")
+        .disabled(),
+    )
 }
 
 fn tools_menu<T: Data>() -> MenuDesc<T> {
