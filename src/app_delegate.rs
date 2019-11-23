@@ -35,7 +35,7 @@ impl AppDelegate<AppState> for Delegate {
 
                 match data.open_glyphs.get(&payload).to_owned() {
                     Some(id) => {
-                        let command = Command::new(druid::command::sys::SHOW_WINDOW, *id);
+                        let command = Command::new(druid::commands::SHOW_WINDOW, *id);
                         ctx.submit_command(command, None);
                     }
                     None => {
@@ -45,7 +45,7 @@ impl AppDelegate<AppState> for Delegate {
                             .menu(crate::menus::make_menu::<AppState>());
 
                         let id = new_win.id;
-                        let command = Command::new(druid::command::sys::NEW_WINDOW, new_win);
+                        let command = Command::new(druid::commands::NEW_WINDOW, new_win);
                         ctx.submit_command(command, None);
 
                         Arc::make_mut(&mut data.open_glyphs).insert(payload.clone(), id);

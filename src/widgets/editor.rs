@@ -3,10 +3,9 @@
 use std::sync::Arc;
 
 use druid::kurbo::{Point, Rect, Size};
-use druid::menu::ContextMenu;
 use druid::{
-    BaseState, BoxConstraints, Command, Data, Env, Event, EventCtx, KeyCode, LayoutCtx, PaintCtx,
-    UpdateCtx, Widget,
+    Application, BaseState, BoxConstraints, Command, ContextMenu, Data, Env, Event, EventCtx,
+    KeyCode, LayoutCtx, PaintCtx, UpdateCtx, Widget,
 };
 
 use crate::consts::{self, CANVAS_SIZE};
@@ -49,7 +48,7 @@ impl Editor {
         } else if let TaggedEvent::Down(m) = event {
             let menu = crate::menus::make_context_menu(data, m.pos);
             let menu = ContextMenu::new(menu, m.window_pos);
-            let cmd = Command::new(druid::command::sys::SHOW_CONTEXT_MENU, menu);
+            let cmd = Command::new(druid::commands::SHOW_CONTEXT_MENU, menu);
             ctx.submit_command(cmd, None);
         }
         None
@@ -78,9 +77,9 @@ impl Editor {
         self.undo.redo()
     }
 
-    fn copy_as_code(&self, env: &mut EventCtx, data: &EditSession) {
+    fn copy_as_code(&self, _env: &mut EventCtx, data: &EditSession) {
         if let Some(code) = crate::copy_as_code::make_code_string(data) {
-            env.set_clipboard_contents(code);
+            Application::clipboard().put_string(code);
         }
     }
 
@@ -117,7 +116,7 @@ impl Editor {
                 data.session.toggle_guide(*id, *pos);
                 return (true, Some(EditType::Normal));
             }
-            druid::command::sys::UNDO => {
+            druid::commands::UNDO => {
                 if let Some(prev) = self.do_undo() {
                     //HACK: because zoom & offset is part of data, and we don't
                     //want to jump around during undo/redo, we always manually
@@ -127,7 +126,7 @@ impl Editor {
                     data.session.viewport = saved_viewport;
                 }
             }
-            druid::command::sys::REDO => {
+            druid::commands::REDO => {
                 if let Some(next) = self.do_redo() {
                     let saved_viewport = data.session.viewport;
                     data.session = next.clone();
