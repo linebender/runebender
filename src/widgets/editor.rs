@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use druid::kurbo::{Point, Rect, Size};
 use druid::{
-    Application, BaseState, BoxConstraints, ClipboardFormat, Command, ContextMenu, Data, Env,
-    Event, EventCtx, KeyCode, LayoutCtx, PaintCtx, UpdateCtx, Widget,
+    Application, BaseState, BoxConstraints, Clipboard, ClipboardFormat, Command, ContextMenu, Data,
+    Env, Event, EventCtx, KeyCode, LayoutCtx, PaintCtx, UpdateCtx, Widget,
 };
 
 use crate::consts::{self, CANVAS_SIZE};
@@ -101,6 +101,31 @@ impl Editor {
         if !formats.is_empty() {
             Application::clipboard().put_formats(&formats);
         }
+    }
+
+    fn do_paste(&self, session: &mut EditSession, clipboard: &Clipboard) -> Option<EditType> {
+        let paste_types = [
+            crate::consts::GLYPHS_APP_PASTEBOARD_TYPE,
+            ClipboardFormat::PDF,
+            ClipboardFormat::SVG,
+        ];
+        if let Some(match_) = clipboard.preferred_format(&paste_types) {
+            let paths = match (match_, clipboard.get_format(match_)) {
+                (_, None) => {
+                    log::warn!("no data returned for declared clipboard format {}", match_);
+                    return None;
+                }
+                (crate::consts::GLYPHS_APP_PASTEBOARD_TYPE, Some(data)) => {
+                    crate::clipboard::from_glyphs_plist(data)
+                }
+                _ => None,
+            };
+            if let Some(paths) = paths {
+                session.paste_paths(paths);
+            }
+        }
+
+        None
     }
 
     /// handle a `Command`. Returns a bool indicating whether the command was
@@ -212,6 +237,7 @@ impl Widget<EditorState> for Editor {
             Event::MouseUp(m) => self.send_mouse(ctx, TaggedEvent::Up(m.clone()), data, env),
             Event::MouseMoved(m) => self.send_mouse(ctx, TaggedEvent::Moved(m.clone()), data, env),
             Event::MouseDown(m) => self.send_mouse(ctx, TaggedEvent::Down(m.clone()), data, env),
+            Event::Paste(clipboard) => self.do_paste(&mut data.session, clipboard),
             _ => None,
         };
 
