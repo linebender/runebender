@@ -23,7 +23,7 @@ mod tools;
 mod undo;
 pub mod widgets;
 
-use druid::widget::{Align, Column, DynLabel, Padding, Scroll, SizedBox};
+use druid::widget::{Align, DynLabel, Flex, Padding, Scroll, SizedBox};
 use druid::{AppLauncher, LocalizedString, Widget, WindowDesc};
 
 use data::{lenses, AppState};
@@ -46,7 +46,7 @@ fn main() {
 }
 
 fn make_ui() -> impl Widget<AppState> {
-    let mut col = Column::new();
+    let mut col = Flex::column();
     let label = DynLabel::new(|data: &AppState, _| {
         data.file
             .object

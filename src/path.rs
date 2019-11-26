@@ -9,7 +9,7 @@ const RESERVED_ID_COUNT: usize = 5;
 const GUIDE_TYPE_ID: usize = 1;
 
 /// We give paths & points unique integer identifiers.
-fn next_id() -> usize {
+pub fn next_id() -> usize {
     use std::sync::atomic::{AtomicUsize, Ordering};
     static NEXT_ID: AtomicUsize = AtomicUsize::new(RESERVED_ID_COUNT);
     NEXT_ID.fetch_add(1, Ordering::Relaxed)
@@ -136,6 +136,20 @@ impl Path {
         }
     }
 
+    pub fn from_raw_parts(
+        id: usize,
+        points: Vec<PathPoint>,
+        trailing: Option<DPoint>,
+        closed: bool,
+    ) -> Self {
+        Path {
+            id,
+            points: Arc::new(points),
+            trailing,
+            closed,
+        }
+    }
+
     pub fn from_norad(src: &norad::glyph::Contour) -> Path {
         use norad::glyph::PointType as NoradPType;
         assert!(
@@ -179,12 +193,7 @@ impl Path {
             points.rotate_left(1);
         }
 
-        Path {
-            id: path_id,
-            points: Arc::new(points),
-            trailing: None,
-            closed,
-        }
+        Path::from_raw_parts(path_id, points, None, closed)
     }
 
     pub fn is_closed(&self) -> bool {

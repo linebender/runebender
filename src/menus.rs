@@ -77,7 +77,7 @@ fn edit_menu<T: Data>() -> MenuDesc<T> {
         .append_separator()
         .append(platform_menus::common::cut().disabled())
         .append(platform_menus::common::copy())
-        .append(platform_menus::common::paste().disabled())
+        .append(platform_menus::common::paste())
         .append(MenuItem::new(
             LocalizedString::new("menu-item-delete").with_placeholder("Delete".into()),
             consts::cmd::DELETE,

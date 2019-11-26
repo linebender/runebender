@@ -153,8 +153,15 @@ impl EditSession {
         let point = path.points()[0].id;
 
         self.paths_mut().push(path);
-        self.selection_mut().clear();
+        self.clear_selection();
         self.selection_mut().insert(point);
+    }
+
+    pub fn paste_paths(&mut self, paths: Vec<Path>) {
+        self.clear_selection();
+        self.selection_mut()
+            .extend(paths.iter().flat_map(|p| p.points().iter().map(|pt| pt.id)));
+        self.paths_mut().extend(paths);
     }
 
     pub fn add_point(&mut self, point: Point) {

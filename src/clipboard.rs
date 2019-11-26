@@ -7,8 +7,9 @@ use druid::kurbo::{Affine, BezPath, PathEl, Rect, Shape};
 use lopdf::content::{Content, Operation};
 use lopdf::{Document, Object, Stream};
 
+use crate::design_space::DPoint;
 use crate::edit_session::EditSession;
-use crate::path::{Path, PointType};
+use crate::path::{EntityId, Path, PathPoint, PointType};
 
 /// Generates druid-compatible drawing code for all of the `Paths` in this
 /// session, if any exist.
@@ -67,7 +68,7 @@ pub fn make_glyphs_plist(session: &EditSession) -> Option<Vec<u8>> {
 
     let plist = GlyphsPastePlist {
         glyph: session.name.to_string(),
-        layer: "",
+        layer: String::new(),
         paths,
     };
 
@@ -77,6 +78,17 @@ pub fn make_glyphs_plist(session: &EditSession) -> Option<Vec<u8>> {
         return None;
     }
     Some(data)
+}
+
+pub fn from_glyphs_plist(data: Vec<u8>) -> Option<Vec<Path>> {
+    let cursor = std::io::Cursor::new(data);
+    match plist::from_reader(cursor) {
+        Ok(GlyphsPastePlist { paths, .. }) => Some(paths.iter().map(Path::from).collect()),
+        Err(e) => {
+            log::warn!("failed to parse glyphs plist: '{}'", e);
+            None
+        }
+    }
 }
 
 /// Attempt to generate a minimal PDF representation of the current session,
@@ -198,14 +210,14 @@ pub fn make_svg_data(session: &EditSession) -> Option<Vec<u8>> {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct GlyphsPastePlist {
     glyph: String,
-    layer: &'static str,
+    layer: String,
     paths: Vec<GlyphPlistPath>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct GlyphPlistPath {
     closed: u32,
     nodes: Vec<String>,
@@ -236,5 +248,52 @@ impl From<&Path> for GlyphPlistPath {
             .collect();
         let closed = if src.is_closed() { 1 } else { 0 };
         GlyphPlistPath { closed, nodes }
+    }
+}
+
+impl From<&GlyphPlistPath> for Path {
+    fn from(src: &GlyphPlistPath) -> Path {
+        let path_id = crate::path::next_id();
+        let paths: Vec<PathPoint> = src
+            .nodes
+            .iter()
+            .flat_map(|node| from_glyphs_plist_point(node, path_id))
+            .collect();
+        Path::from_raw_parts(path_id, paths, None, src.closed > 0)
+    }
+}
+
+fn from_glyphs_plist_point(s: &str, parent_id: usize) -> Option<PathPoint> {
+    let mut iter = s.trim_matches('"').split(' ');
+    match (iter.next(), iter.next(), iter.next()) {
+        (Some(x_), Some(y_), Some(typ_)) => {
+            let x: f64 = x_
+                .parse()
+                .or_else(|_| x_.parse::<i64>().map(|i| i as f64))
+                .map_err(|e| log::warn!("bad glyphs plist point x val in '{}': '{}'", x_, e))
+                .ok()?;
+            let y: f64 = y_
+                .parse()
+                .or_else(|_| y_.parse::<i64>().map(|i| i as f64))
+                .map_err(|e| log::warn!("bad glyphs plist point y val in '{}': '{}'", y_, e))
+                .ok()?;
+            let typ = match typ_ {
+                "CURVE" => PointType::OnCurve,
+                "LINE" => PointType::OnCurve,
+                "CURVE SMOOTH" => PointType::OnCurveSmooth,
+                "OFFCURVE" => PointType::OffCurve,
+                other => {
+                    log::warn!("unhandled glyphs point type '{}'", other);
+                    return None;
+                }
+            };
+            let point = DPoint::new(x.round(), y.round());
+            let id = EntityId::new_with_parent(parent_id);
+            Some(PathPoint { id, point, typ })
+        }
+        _other => {
+            log::warn!("unrecognized glyphs point format: '{}'", s);
+            None
+        }
     }
 }

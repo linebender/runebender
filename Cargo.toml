@@ -6,7 +6,7 @@ license = "Apache-2.0"
 edition = "2018"
 
 [dependencies]
-druid = { git = "https://github.com/xi-editor/druid.git", rev = "3d8de58", version = "0.4" }
+druid = { git = "https://github.com/xi-editor/druid.git", rev = "516e832", version = "0.4" }
 norad = { version = "0.0.4", features = ["druid"]}
 log = "0.4.8"
 plist = "0.5"
