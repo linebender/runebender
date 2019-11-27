@@ -116,12 +116,16 @@ impl Editor {
                     return None;
                 }
                 (crate::consts::GLYPHS_APP_PASTEBOARD_TYPE, Some(data)) => {
-                    crate::clipboard::from_glyphs_plist(data)
+                    match String::from_utf8(data) {
+                        Ok(s) => crate::clipboard::from_glyphs_plist_string(s),
+                        Err(e) => crate::clipboard::from_glyphs_plist(e.into_bytes()),
+                    }
                 }
                 _ => None,
             };
             if let Some(paths) = paths {
                 session.paste_paths(paths);
+                return Some(EditType::Normal);
             }
         }
 

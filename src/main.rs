@@ -19,6 +19,7 @@ mod lens2;
 mod menus;
 mod mouse;
 mod path;
+mod plist;
 mod tools;
 mod undo;
 pub mod widgets;
