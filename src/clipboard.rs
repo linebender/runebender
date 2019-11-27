@@ -1,5 +1,6 @@
 //! encoding and decoding paths for use with the clipboard.
 
+use std::collections::HashMap;
 use std::fmt::Write;
 
 use druid::kurbo::{Affine, BezPath, PathEl, Rect, Shape};
@@ -10,6 +11,7 @@ use lopdf::{Document, Object, Stream};
 use crate::design_space::DPoint;
 use crate::edit_session::EditSession;
 use crate::path::{EntityId, Path, PathPoint, PointType};
+use crate::plist::Plist;
 
 /// Generates druid-compatible drawing code for all of the `Paths` in this
 /// session, if any exist.
@@ -89,6 +91,34 @@ pub fn from_glyphs_plist(data: Vec<u8>) -> Option<Vec<Path>> {
             None
         }
     }
+}
+
+pub fn from_glyphs_plist_string(text: String) -> Option<Vec<Path>> {
+    let plist = match Plist::parse(&text) {
+        Ok(Plist::Dictionary(d)) => d,
+        Ok(other) => {
+            log::warn!("unexpected plist value {:?}", other);
+            return None;
+        }
+        Err(e) => {
+            log::warn!("failed to parse string plist: '{:?}'", e);
+            return None;
+        }
+    };
+    paths_from_plist_dict(plist)
+}
+
+fn paths_from_plist_dict(dict: HashMap<String, Plist>) -> Option<Vec<Path>> {
+    let paths = dict.get("paths").and_then(Plist::as_array)?;
+    let mut result = Vec::new();
+    for path in paths {
+        if let Plist::Dictionary(dict) = path {
+            if let Some(path) = GlyphPlistPath::from_dict(dict).as_ref().map(Path::from) {
+                result.push(path);
+            }
+        }
+    }
+    Some(result)
 }
 
 /// Attempt to generate a minimal PDF representation of the current session,
@@ -221,6 +251,22 @@ struct GlyphsPastePlist {
 struct GlyphPlistPath {
     closed: u32,
     nodes: Vec<String>,
+}
+
+impl GlyphPlistPath {
+    fn from_dict(dict: &HashMap<String, Plist>) -> Option<Self> {
+        let closed = dict.get("closed").and_then(Plist::as_i64)? as u32;
+        let nodes = dict.get("nodes").and_then(Plist::as_array)?;
+        let nodes = nodes
+            .iter()
+            .flat_map(|pl| match pl {
+                Plist::String(s) => Some(s.to_owned()),
+                _ => None,
+            })
+            .collect();
+
+        Some(GlyphPlistPath { closed, nodes })
+    }
 }
 
 impl From<&Path> for GlyphPlistPath {
