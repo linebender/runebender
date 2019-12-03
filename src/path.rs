@@ -196,6 +196,46 @@ impl Path {
         Path::from_raw_parts(path_id, points, None, closed)
     }
 
+    pub fn to_norad(&self) -> norad::glyph::Contour {
+        use norad::glyph::{Contour, ContourPoint, PointType as NoradPType};
+        let mut points = Vec::new();
+        let mut prev_off_curve = self.points.last().map(|p| p.typ) == Some(PointType::OffCurve);
+        for p in self.points.iter() {
+            let typ = match p.typ {
+                PointType::OnCurve | PointType::OnCurveSmooth
+                    if points.is_empty() && !self.closed =>
+                {
+                    NoradPType::Move
+                }
+                PointType::OffCurve => NoradPType::OffCurve,
+                PointType::OnCurve | PointType::OnCurveSmooth if prev_off_curve => {
+                    NoradPType::Curve
+                }
+                _ => NoradPType::Line,
+            };
+            let smooth = p.typ == PointType::OnCurveSmooth;
+            let x = p.point.x as f32;
+            let y = p.point.y as f32;
+            points.push(ContourPoint {
+                x,
+                y,
+                typ,
+                smooth,
+                identifier: None,
+                name: None,
+            });
+            prev_off_curve = p.typ == PointType::OffCurve;
+        }
+
+        if self.closed {
+            points.rotate_right(1);
+        }
+        Contour {
+            points,
+            identifier: None,
+        }
+    }
+
     pub fn is_closed(&self) -> bool {
         self.closed
     }

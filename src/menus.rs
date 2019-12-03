@@ -11,7 +11,7 @@ use druid::{
 use crate::consts;
 use crate::data::{AppState, EditorState};
 
-const UFO_FILE_TYPE: FileSpec = FileSpec::new("Font Object", &["ufo"]);
+pub const UFO_FILE_TYPE: FileSpec = FileSpec::new("Font Object", &["ufo"]);
 
 /// Context menu's inner menu must have type T == the root app state.
 pub fn make_context_menu(data: &EditorState, pos: Point) -> MenuDesc<AppState> {
@@ -34,38 +34,60 @@ pub fn make_context_menu(data: &EditorState, pos: Point) -> MenuDesc<AppState> {
 }
 
 /// The main window/app menu.
-pub(crate) fn make_menu<T: Data>() -> MenuDesc<T> {
+pub(crate) fn make_menu(data: &AppState) -> MenuDesc<AppState> {
     let mut menu = MenuDesc::empty();
     #[cfg(target_os = "macos")]
     {
         menu = menu.append(platform_menus::mac::application::default());
     }
 
-    menu.append(file_menu())
+    menu.append(file_menu(data))
         .append(edit_menu())
         .append(view_menu())
         .append(glyph_menu())
         .append(tools_menu())
 }
 
-fn file_menu<T: Data>() -> MenuDesc<T> {
-    MenuDesc::new(LocalizedString::new("common-menu-file-menu"))
+fn file_menu(data: &AppState) -> MenuDesc<AppState> {
+    let has_path = data.file.path.is_some();
+    let mut menu = MenuDesc::new(LocalizedString::new("common-menu-file-menu"))
         .append(platform_menus::mac::file::new_file().disabled())
         .append(
             MenuItem::new(
                 LocalizedString::new("common-menu-file-open"),
                 Command::new(
-                    commands::OPEN_FILE,
+                    commands::SHOW_OPEN_PANEL,
                     FileDialogOptions::new().allowed_types(vec![UFO_FILE_TYPE]),
                 ),
             )
             .hotkey(SysMods::Cmd, "o"),
         )
         .append_separator()
-        .append(platform_menus::mac::file::close())
-        .append(platform_menus::mac::file::save().disabled())
-        .append(platform_menus::mac::file::save_as().disabled())
-        .append_separator()
+        .append(platform_menus::mac::file::close());
+    if has_path {
+        menu = menu.append(platform_menus::mac::file::save()).append(
+            MenuItem::new(
+                LocalizedString::new("common-menu-file-save-as"),
+                Command::new(
+                    commands::SHOW_SAVE_PANEL,
+                    FileDialogOptions::new().allowed_types(vec![UFO_FILE_TYPE]),
+                ),
+            )
+            .hotkey(SysMods::CmdShift, "s"),
+        );
+    } else {
+        menu = menu.append(
+            MenuItem::new(
+                LocalizedString::new("common-menu-file-save-as"),
+                Command::new(
+                    commands::SHOW_SAVE_PANEL,
+                    FileDialogOptions::new().allowed_types(vec![UFO_FILE_TYPE]),
+                ),
+            )
+            .hotkey(SysMods::Cmd, "s"),
+        );
+    }
+    menu.append_separator()
         .append(platform_menus::mac::file::page_setup().disabled())
         .append(platform_menus::mac::file::print().disabled())
 }

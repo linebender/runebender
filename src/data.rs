@@ -2,13 +2,15 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::error::Error;
+use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use druid::kurbo::{Affine, BezPath, Point, Rect, Size};
 use druid::{Data, WindowId};
 use norad::glyph::{Contour, ContourPoint, Glyph, GlyphName, PointType};
-use norad::{FontInfo, FormatVersion, MetaInfo, Ufo};
+use norad::{FontInfo, MetaInfo, Ufo};
 
 use crate::edit_session::EditSession;
 
@@ -84,6 +86,43 @@ impl AppState {
             resolved,
         };
         self.file = obj;
+    }
+
+    pub fn save(&mut self) -> Result<(), Box<dyn Error>> {
+        if let Some(path) = self.file.path.as_ref() {
+            log::info!("saving to {:?}", path);
+            // flush all open sessions
+            for session in self.sessions.values() {
+                let glyph = session.to_norad_glyph();
+                Arc::make_mut(&mut self.file.object)
+                    .get_default_layer_mut()
+                    .unwrap()
+                    .insert_glyph(glyph);
+            }
+            let tmp_file_name = format!(
+                "{}.savefile",
+                path.file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("Untitled")
+            );
+            let tmp_path = path.with_file_name(tmp_file_name);
+            if tmp_path.exists() {
+                fs::remove_dir_all(&tmp_path)?;
+            }
+            self.file.object.save(&tmp_path)?;
+            if path.exists() {
+                fs::remove_dir_all(path)?;
+            }
+            // see docs for fs::rename; the target directory must exist on unix.
+            // http://doc.rust-lang.org/1.39.0/std/fs/fn.rename.html
+            if cfg!(unix) {
+                fs::create_dir(path)?;
+            }
+            fs::rename(&tmp_path, path)?;
+        } else {
+            log::error!("save called with no path set");
+        }
+        Ok(())
     }
 }
 
@@ -172,17 +211,12 @@ pub fn get_bezier(name: &str, ufo: &Ufo, resolved: Option<&BezCache>) -> Option<
 
 impl std::default::Default for FontObject {
     fn default() -> FontObject {
-        let meta = MetaInfo {
-            creator: "Runebender".into(),
-            format_version: FormatVersion::V3,
-        };
-
         let font_info = FontInfo {
             family_name: Some(String::from("Untitled")),
             ..Default::default()
         };
 
-        let mut ufo = Ufo::new(meta);
+        let mut ufo = Ufo::new(MetaInfo::default());
         ufo.font_info = Some(font_info);
 
         FontObject {

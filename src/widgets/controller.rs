@@ -35,6 +35,14 @@ impl Widget<AppState> for Controller {
                 let info = cmd.get_object::<FileInfo>().expect("api violation");
                 self.try_open_file(info, ctx, data);
             }
+            Event::Command(cmd) if cmd.selector == druid::commands::SAVE_FILE => {
+                if let Some(info) = cmd.get_object::<FileInfo>() {
+                    data.file.path = Some(info.path().into());
+                }
+                if let Err(e) = data.save() {
+                    log::error!("saving failed: '{}'", e);
+                }
+            }
             other => self.inner.event(ctx, other, data, env),
         }
     }
