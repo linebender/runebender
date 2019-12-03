@@ -103,4 +103,25 @@ impl Guide {
         let id = EntityId::new_with_parent(0);
         Guide { guide, id }
     }
+
+    pub fn to_norad(&self) -> norad::Guideline {
+        let line = match self.guide {
+            GuideLine::Horiz(p) => norad::Line::Horizontal(p.y as f32),
+            GuideLine::Vertical(p) => norad::Line::Vertical(p.x as f32),
+            GuideLine::Angle { p1, p2 } => {
+                let x = p1.x as f32;
+                let y = p1.y as f32;
+                let angle = p2 - p1;
+                let degrees = angle.to_raw().atan2() as f32;
+                norad::Line::Angle { x, y, degrees }
+            }
+        };
+
+        norad::Guideline {
+            line,
+            name: None,
+            color: None,
+            identifier: None,
+        }
+    }
 }

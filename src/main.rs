@@ -31,11 +31,11 @@ use data::{lenses, AppState};
 use widgets::{Controller, GlyphGrid};
 
 fn main() {
+    let state = get_initial_state();
+
     let main_window = WindowDesc::new(make_ui)
         .title(LocalizedString::new("Runebender"))
-        .menu(menus::make_menu());
-
-    let state = get_initial_state();
+        .menu(menus::make_menu(&state));
 
     AppLauncher::with_window(main_window)
         .delegate(app_delegate::Delegate::default())

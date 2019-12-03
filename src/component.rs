@@ -32,4 +32,15 @@ impl Component {
             id,
         }
     }
+
+    pub fn to_norad(&self) -> norad::glyph::Component {
+        let base = self.base.to_string();
+        let transform = self.transform.into();
+        let identifier = None;
+        norad::glyph::Component {
+            base,
+            transform,
+            identifier,
+        }
+    }
 }

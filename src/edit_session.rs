@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use druid::kurbo::{Point, Rect, Shape};
 use druid::Data;
+use norad::glyph::Outline;
 use norad::{Glyph, GlyphName, Ufo};
 
 use crate::component::Component;
@@ -324,6 +325,28 @@ impl EditSession {
         self.selection_mut().clear();
         self.selection_mut().insert(guide.id);
         self.guides_mut().push(guide);
+    }
+
+    /// Convert the current session back into a norad `Glyph`, for saving.
+    pub fn to_norad_glyph(&self) -> Glyph {
+        let mut glyph = Glyph::new_named("");
+        glyph.name = self.name.clone();
+        glyph.advance = self.glyph.advance.clone();
+
+        let contours: Vec<_> = self.paths.iter().map(Path::to_norad).collect();
+        let components: Vec<_> = self.components.iter().map(Component::to_norad).collect();
+        if !contours.is_empty() || !components.is_empty() {
+            glyph.outline = Some(Outline {
+                components,
+                contours,
+            });
+        }
+        let guidelines: Vec<_> = self.guides.iter().map(Guide::to_norad).collect();
+        if !guidelines.is_empty() {
+            glyph.guidelines = Some(guidelines);
+        }
+        // codepoints
+        glyph
     }
 }
 

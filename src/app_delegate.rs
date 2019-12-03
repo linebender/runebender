@@ -43,7 +43,7 @@ impl AppDelegate<AppState> for Delegate {
                         let session = get_or_create_session(&payload, data);
                         let new_win = WindowDesc::new(move || make_editor(&session))
                             .title(LocalizedString::new("").with_placeholder(payload.to_string()))
-                            .menu(crate::menus::make_menu::<AppState>());
+                            .menu(crate::menus::make_menu(data));
 
                         let id = new_win.id;
                         let command = Command::new(druid::commands::NEW_WINDOW, new_win);
