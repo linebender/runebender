@@ -86,8 +86,8 @@ impl Guide {
         }
     }
 
-    pub fn from_norad(src: &norad::glyph::Guideline) -> Self {
-        use norad::glyph::Line;
+    pub fn from_norad(src: &norad::Guideline) -> Self {
+        use norad::Line;
 
         let guide = match src.line {
             Line::Vertical(x) => GuideLine::Vertical(DPoint::new(x as f64, 0.)),

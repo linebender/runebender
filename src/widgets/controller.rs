@@ -31,7 +31,10 @@ impl Widget<AppState> for Controller {
 
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppState, env: &Env) {
         match event {
-            Event::OpenFile(file_info) => self.try_open_file(file_info, ctx, data),
+            Event::Command(cmd) if cmd.selector == druid::commands::OPEN_FILE => {
+                let info = cmd.get_object::<FileInfo>().expect("api violation");
+                self.try_open_file(info, ctx, data);
+            }
             other => self.inner.event(ctx, other, data, env),
         }
     }

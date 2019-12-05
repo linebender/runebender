@@ -6,11 +6,12 @@ use druid::{
     AppDelegate, Command, DelegateCtx, Env, Event, LocalizedString, Selector, Widget, WindowDesc,
     WindowId,
 };
+
+use druid::widget::WidgetExt;
 use norad::GlyphName;
 
 use crate::data::{lenses, AppState};
 use crate::edit_session::EditSession;
-use crate::lens2::Lens2Wrap;
 use crate::widgets::{Editor, ScrollZoom};
 
 pub const EDIT_GLYPH: Selector = Selector::new("runebender.open-editor-with-glyph");
@@ -92,8 +93,6 @@ fn get_or_create_session(name: &GlyphName, data: &mut AppState) -> EditSession {
 }
 
 fn make_editor(session: &EditSession) -> impl Widget<AppState> {
-    Lens2Wrap::new(
-        ScrollZoom::new(Editor::new(session.clone())),
-        lenses::app_state::EditorState(session.name.clone()),
-    )
+    ScrollZoom::new(Editor::new(session.clone()))
+        .lens(lenses::app_state::EditorState(session.name.clone()))
 }
