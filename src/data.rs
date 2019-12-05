@@ -220,11 +220,10 @@ pub mod lenses {
     pub mod app_state {
         use std::sync::Arc;
 
-        use druid::Data;
+        use druid::{Data, Lens};
         use norad::GlyphName;
 
         use super::super::{AppState, EditorState as EditorState_, GlyphSet as GlyphSet_};
-        use crate::lens2::Lens2;
 
         /// AppState -> GlyphSet_
         pub struct GlyphSet;
@@ -232,8 +231,8 @@ pub mod lenses {
         /// AppState -> EditorState
         pub struct EditorState(pub GlyphName);
 
-        impl Lens2<AppState, GlyphSet_> for GlyphSet {
-            fn get<V, F: FnOnce(&GlyphSet_) -> V>(&self, data: &AppState, f: F) -> V {
+        impl Lens<AppState, GlyphSet_> for GlyphSet {
+            fn with<V, F: FnOnce(&GlyphSet_) -> V>(&self, data: &AppState, f: F) -> V {
                 let glyphs = GlyphSet_ {
                     object: Arc::clone(&data.file.object),
                     resolved: Arc::clone(&data.file.resolved),
@@ -249,8 +248,8 @@ pub mod lenses {
             }
         }
 
-        impl Lens2<AppState, EditorState_> for EditorState {
-            fn get<V, F: FnOnce(&EditorState_) -> V>(&self, data: &AppState, f: F) -> V {
+        impl Lens<AppState, EditorState_> for EditorState {
+            fn with<V, F: FnOnce(&EditorState_) -> V>(&self, data: &AppState, f: F) -> V {
                 let metrics = data
                     .file
                     .object
@@ -302,21 +301,21 @@ pub mod lenses {
     }
 
     pub mod glyph_set {
+        use druid::Lens;
         use norad::GlyphName;
         use std::sync::Arc;
 
         use super::super::{GlyphPlus, GlyphSet as GlyphSet_};
-        use crate::lens2::Lens2;
 
         /// GlyphSet_ -> GlyphPlus
         pub struct Glyph(pub GlyphName);
 
-        impl Lens2<GlyphSet_, GlyphPlus> for Glyph {
-            fn get<V, F: FnOnce(&GlyphPlus) -> V>(&self, data: &GlyphSet_, f: F) -> V {
+        impl Lens<GlyphSet_, GlyphPlus> for Glyph {
+            fn with<V, F: FnOnce(&GlyphPlus) -> V>(&self, data: &GlyphSet_, f: F) -> V {
                 let glyph = data
                     .object
                     .get_glyph(&self.0)
-                    .expect("missing glyph in lens2");
+                    .expect("missing glyph in lens");
                 let glyph = GlyphPlus {
                     glyph: Arc::clone(glyph),
                     ufo: Arc::clone(&data.object),
@@ -332,7 +331,7 @@ pub mod lenses {
                 let glyph = data
                     .object
                     .get_glyph(&self.0)
-                    .expect("missing glyph in lens2");
+                    .expect("missing glyph in lens");
                 let mut glyph = GlyphPlus {
                     glyph: Arc::clone(glyph),
                     ufo: Arc::clone(&data.object),

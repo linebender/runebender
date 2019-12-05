@@ -15,7 +15,6 @@ mod design_space;
 mod draw;
 mod edit_session;
 mod guides;
-mod lens2;
 mod menus;
 mod mouse;
 mod path;
@@ -24,11 +23,10 @@ mod tools;
 mod undo;
 pub mod widgets;
 
-use druid::widget::{Align, DynLabel, Flex, Padding, Scroll, SizedBox};
+use druid::widget::{DynLabel, Flex, Scroll, WidgetExt};
 use druid::{AppLauncher, LocalizedString, Widget, WindowDesc};
 
 use data::{lenses, AppState};
-use lens2::Lens2Wrap;
 
 use widgets::{Controller, GlyphGrid};
 
@@ -56,16 +54,9 @@ fn make_ui() -> impl Widget<AppState> {
             .and_then(|info| info.family_name.clone())
             .unwrap_or_else(|| "Untitled".to_string())
     });
+    col.add_child(label.padding(5.0).center().fix_height(40.), 0.);
     col.add_child(
-        SizedBox::new(Align::centered(Padding::new(5.0, label))).height(40.),
-        0.,
-    );
-    col.add_child(
-        Scroll::new(Lens2Wrap::new(
-            GlyphGrid::new(),
-            lenses::app_state::GlyphSet,
-        ))
-        .vertical(),
+        Scroll::new(GlyphGrid::new().lens(lenses::app_state::GlyphSet)).vertical(),
         1.,
     );
     Controller::new(col)

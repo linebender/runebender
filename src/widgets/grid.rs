@@ -5,16 +5,15 @@ use druid::piet::{
     FontBuilder, PietText, PietTextLayout, RenderContext, Text, TextLayout, TextLayoutBuilder,
 };
 use druid::{
-    theme, BaseState, BoxConstraints, Command, Data, Env, Event, EventCtx, LayoutCtx, PaintCtx,
-    UpdateCtx, Widget, WidgetPod,
+    theme, BaseState, BoxConstraints, Command, Data, Env, Event, EventCtx, LayoutCtx, LensWrap,
+    PaintCtx, UpdateCtx, Widget, WidgetPod,
 };
 
 use crate::app_delegate::EDIT_GLYPH;
 use crate::data::{lenses, GlyphPlus, GlyphSet};
-use crate::lens2::Lens2Wrap;
 
 pub struct GlyphGrid {
-    children: Vec<WidgetPod<GlyphSet, Lens2Wrap<GlyphPlus, lenses::glyph_set::Glyph, GridInner>>>,
+    children: Vec<WidgetPod<GlyphSet, LensWrap<GlyphPlus, lenses::glyph_set::Glyph, GridInner>>>,
 }
 
 const GLYPH_SIZE: f64 = 100.;
@@ -82,7 +81,7 @@ impl Widget<GlyphSet> for GlyphGrid {
             let widget = GridInner { units_per_em };
             self.children.clear();
             for key in new.object.iter_names() {
-                self.children.push(WidgetPod::new(Lens2Wrap::new(
+                self.children.push(WidgetPod::new(LensWrap::new(
                     widget,
                     lenses::glyph_set::Glyph(key),
                 )));
