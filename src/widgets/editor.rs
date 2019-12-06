@@ -121,6 +121,7 @@ impl Editor {
                         Err(e) => crate::clipboard::from_glyphs_plist(e.into_bytes()),
                     }
                 }
+                (ClipboardFormat::PDF, Some(data)) => crate::clipboard::from_pdf_data(data),
                 _ => None,
             };
             if let Some(paths) = paths {

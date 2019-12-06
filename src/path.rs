@@ -83,7 +83,7 @@ impl PointType {
 }
 
 impl PathPoint {
-    fn off_curve(path: usize, point: DPoint) -> PathPoint {
+    pub fn off_curve(path: usize, point: DPoint) -> PathPoint {
         let id = EntityId {
             parent: path,
             point: next_id(),
@@ -95,7 +95,7 @@ impl PathPoint {
         }
     }
 
-    fn on_curve(path: usize, point: DPoint) -> PathPoint {
+    pub fn on_curve(path: usize, point: DPoint) -> PathPoint {
         let id = EntityId {
             parent: path,
             point: next_id(),
@@ -142,6 +142,7 @@ impl Path {
         trailing: Option<DPoint>,
         closed: bool,
     ) -> Self {
+        assert!(!points.is_empty(), "path may not be empty");
         Path {
             id,
             points: Arc::new(points),
@@ -225,6 +226,7 @@ impl Path {
 
     /// Returns the start point of the path.
     pub fn start_point(&self) -> &PathPoint {
+        assert!(!self.points.is_empty(), "empty path is not constructable");
         if self.closed {
             self.points.last().unwrap()
         } else {

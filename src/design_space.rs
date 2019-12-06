@@ -71,8 +71,7 @@ impl DPoint {
     /// Create a new `DPoint` from a `Point` in design space. This should only
     /// be used to convert back to a `DPoint` after using `Point` to do vector
     /// math in design space.
-    //TODO: don't expose these, implement the fns you need
-    fn from_raw(point: impl Into<Point>) -> DPoint {
+    pub fn from_raw(point: impl Into<Point>) -> DPoint {
         let point = point.into();
         DPoint::new(point.x.round(), point.y.round())
     }
