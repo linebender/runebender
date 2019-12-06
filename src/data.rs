@@ -15,7 +15,7 @@ use crate::edit_session::EditSession;
 /// This is by convention.
 const DEFAULT_UNITS_PER_EM: f64 = 1000.;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Data, Default)]
 pub struct AppState {
     pub file: FontObject,
     /// glyphs that are already open in an editor window
@@ -26,8 +26,9 @@ pub struct AppState {
 /// A shared map from glyph names to resolved `BezPath`s.
 type BezCache = Arc<RefCell<HashMap<String, Arc<BezPath>>>>;
 
-#[derive(Clone)]
+#[derive(Clone, Data)]
 pub struct FontObject {
+    #[druid(same_fn = "PartialEq::eq")]
     pub path: Option<PathBuf>,
     pub object: Arc<Ufo>,
     resolved: BezCache,
@@ -151,20 +152,6 @@ pub fn get_bezier(name: &str, ufo: &Ufo, resolved: Option<&BezCache>) -> Option<
         resolved.borrow_mut().insert(name.to_string(), path.clone());
     }
     Some(path)
-}
-
-impl Data for FontObject {
-    fn same(&self, other: &Self) -> bool {
-        self.path == other.path
-            && other.object.same(&self.object)
-            && self.resolved.same(&other.resolved)
-    }
-}
-
-impl Data for AppState {
-    fn same(&self, other: &Self) -> bool {
-        self.file.same(&other.file)
-    }
 }
 
 impl std::default::Default for FontObject {

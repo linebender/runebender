@@ -6,19 +6,16 @@ use norad::GlyphName;
 
 use crate::path::EntityId;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Data, Clone)]
 pub struct Component {
     pub base: GlyphName,
+    #[druid(same_fn = "affine_eq")]
     pub transform: Affine,
     pub id: EntityId,
 }
 
-impl Data for Component {
-    fn same(&self, other: &Component) -> bool {
-        self.base.same(&other.base)
-            && self.id.same(&other.id)
-            && self.transform.as_coeffs() == other.transform.as_coeffs()
-    }
+fn affine_eq(left: &Affine, right: &Affine) -> bool {
+    left.as_coeffs() == right.as_coeffs()
 }
 
 impl Component {
