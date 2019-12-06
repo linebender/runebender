@@ -14,6 +14,7 @@ use crate::edit_session::EditSession;
 
 /// This is by convention.
 const DEFAULT_UNITS_PER_EM: f64 = 1000.;
+static PLACEHOLDER_GLYPH_KEY: &str = "runebender.magic-placeholder-key ;)";
 
 #[derive(Clone, Data, Default)]
 pub struct AppState {
@@ -24,7 +25,7 @@ pub struct AppState {
 }
 
 /// A shared map from glyph names to resolved `BezPath`s.
-type BezCache = Arc<RefCell<HashMap<String, Arc<BezPath>>>>;
+type BezCache = Arc<RefCell<HashMap<GlyphName, Arc<BezPath>>>>;
 
 #[derive(Clone, Data)]
 pub struct FontObject {
@@ -71,10 +72,16 @@ pub struct EditorState {
 
 impl AppState {
     pub fn set_file(&mut self, object: Ufo, path: impl Into<Option<PathBuf>>) {
+        // add the placeholder glyph
+        let mut resolved: BezCache = Arc::new(Default::default());
+        Arc::make_mut(&mut resolved)
+            .borrow_mut()
+            .insert(PLACEHOLDER_GLYPH_KEY.into(), placeholder_outline().into());
+
         let obj = FontObject {
             path: path.into(),
             object: Arc::new(object),
-            resolved: Arc::new(Default::default()),
+            resolved,
         };
         self.file = obj;
     }
@@ -84,6 +91,15 @@ impl GlyphPlus {
     /// Get the fully resolved (including components) bezier path for this glyph.
     pub fn get_bezier(&self) -> Option<Arc<BezPath>> {
         get_bezier(&self.glyph.name, &self.ufo, Some(&self.resolved))
+    }
+
+    /// Return a placeholder glyph.
+    pub fn get_placeholder(&self) -> Arc<BezPath> {
+        self.resolved
+            .borrow()
+            .get(PLACEHOLDER_GLYPH_KEY)
+            .unwrap()
+            .to_owned()
     }
 }
 
@@ -129,7 +145,7 @@ pub fn get_bezier(name: &str, ufo: &Ufo, resolved: Option<&BezCache>) -> Option<
     }
 
     let glyph = ufo.get_glyph(name)?;
-    let mut path = path_for_glyph(glyph);
+    let mut path = path_for_glyph(glyph)?;
     for comp in glyph
         .outline
         .as_ref()
@@ -149,7 +165,7 @@ pub fn get_bezier(name: &str, ufo: &Ufo, resolved: Option<&BezCache>) -> Option<
 
     let path = Arc::new(path);
     if let Some(resolved) = resolved {
-        resolved.borrow_mut().insert(name.to_string(), path.clone());
+        resolved.borrow_mut().insert(name.into(), path.clone());
     }
     Some(path)
 }
@@ -332,7 +348,7 @@ pub mod lenses {
 
 /// Convert this glyph's path from the UFO representation into a `kurbo::BezPath`
 /// (which we know how to draw.)
-pub fn path_for_glyph(glyph: &Glyph) -> BezPath {
+pub fn path_for_glyph(glyph: &Glyph) -> Option<BezPath> {
     /// An outline can have multiple contours, which correspond to subpaths
     fn add_contour(path: &mut BezPath, contour: &Contour) {
         let mut close: Option<&ContourPoint> = None;
@@ -384,12 +400,38 @@ pub fn path_for_glyph(glyph: &Glyph) -> BezPath {
         }
     }
 
-    let mut path = BezPath::new();
     if let Some(outline) = glyph.outline.as_ref() {
+        let mut path = BezPath::new();
         outline
             .contours
             .iter()
             .for_each(|c| add_contour(&mut path, c));
+        Some(path)
+    } else {
+        None
     }
-    path
+}
+
+/// a poorly drawn question mark glyph, used as a placeholder
+fn placeholder_outline() -> BezPath {
+    let mut bez = BezPath::new();
+
+    bez.move_to((51.0, 482.0));
+    bez.line_to((112.0, 482.0));
+    bez.curve_to((112.0, 482.0), (134.0, 631.0), (246.0, 631.0));
+    bez.curve_to((308.0, 631.0), (356.0, 625.0), (356.0, 551.0));
+    bez.curve_to((356.0, 487.0), (202.0, 432.0), (202.0, 241.0));
+    bez.line_to((275.0, 241.0));
+    bez.curve_to((276.0, 417.0), (430.0, 385.0), (430.0, 562.0));
+    bez.curve_to((430.0, 699.0), (301.0, 700.0), (246.0, 700.0));
+    bez.curve_to((201.0, 700.0), (51.0, 653.0), (51.0, 482.0));
+    bez.close_path();
+
+    bez.move_to((202.0, 172.0));
+    bez.line_to((275.0, 172.0));
+    bez.line_to((275.0, 105.0));
+    bez.line_to((203.0, 105.0));
+    bez.line_to((202.0, 172.0));
+    bez.close_path();
+    bez
 }

@@ -65,10 +65,9 @@ fn make_ui() -> impl Widget<AppState> {
 /// If there was an argument passed at the command line, try to open it as a .ufo
 /// file, otherwise return blank state.
 fn get_initial_state() -> AppState {
-    let mut state = AppState::default();
-    if let Some(arg) = std::env::args().skip(1).next() {
+    let (font_file, path) = if let Some(arg) = std::env::args().skip(1).next() {
         match norad::Ufo::load(&arg) {
-            Ok(ufo) => state.set_file(ufo, std::path::PathBuf::from(arg)),
+            Ok(ufo) => (ufo, Some(std::path::PathBuf::from(arg))),
             Err(e) => {
                 eprintln!(
                     "Failed to load first arg '{}' as ufo file.\nError:'{}'",
@@ -77,6 +76,27 @@ fn get_initial_state() -> AppState {
                 std::process::exit(1);
             }
         }
-    }
+    } else {
+        (create_blank_font(), None)
+    };
+
+    let mut state = AppState::default();
+    state.set_file(font_file, path);
     state
+}
+
+/// temporary; creates a new blank  font with some placeholder glyphs.
+fn create_blank_font() -> norad::Ufo {
+    let mut ufo = norad::Ufo::new(norad::MetaInfo::default());
+    let a_ = 'a' as u32;
+    #[allow(non_snake_case)]
+    let A_ = 'A' as u32;
+
+    let layer = ufo.get_default_layer_mut().unwrap();
+    (0..25)
+        .map(|i| std::char::from_u32(a_ + i).unwrap())
+        .chain((0..25).map(|i| std::char::from_u32(A_ + i).unwrap()))
+        .map(|chr| norad::Glyph::new_named(chr.to_string()))
+        .for_each(|glyph| layer.insert_glyph(glyph));
+    ufo
 }
