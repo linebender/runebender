@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::fmt::Write;
 
-use druid::kurbo::{Affine, BezPath, PathEl, Rect, Shape};
+use druid::kurbo::{Affine, BezPath, PathEl, Point, Rect, Shape};
 
 use lopdf::content::{Content, Operation};
 use lopdf::{Document, Object, Stream};
@@ -170,6 +170,26 @@ pub fn make_pdf_data(session: &EditSession) -> Option<Vec<u8>> {
     }
 }
 
+pub fn from_pdf_data(data: Vec<u8>) -> Option<Vec<Path>> {
+    match Document::load_mem(&data) {
+        Ok(doc) => {
+            if doc.get_pages().len() > 1 {
+                log::warn!("pasted pdf has multiple pages, we will only look at the first.");
+            }
+            let page = doc.page_iter().next()?;
+            let content = doc
+                .get_and_decode_page_content(page)
+                .map_err(|e| log::warn!("failed to decode pdf content: '{}'", e))
+                .ok()?;
+            Some(paths_for_pdf_contents(content))
+        }
+        Err(e) => {
+            log::warn!("failed to load pdf data: '{}'", e);
+            None
+        }
+    }
+}
+
 fn append_pdf_ops(ops: &mut Vec<Operation>, path: &BezPath) {
     for element in path.elements() {
         let op = match element {
@@ -194,6 +214,146 @@ fn append_pdf_ops(ops: &mut Vec<Operation>, path: &BezPath) {
             PathEl::ClosePath => Operation::new("h", vec![]),
         };
         ops.push(op);
+    }
+}
+
+fn paths_for_pdf_contents(contents: Content) -> Vec<Path> {
+    //contents.operations.iter().for_each(|op| eprintln!("{}: [{:?}]", op.operator, op.operands));
+    let bez = bez_path_for_pdf_contents(contents);
+    let mut result = Vec::new();
+    for path in iter_paths_for_bez_path(&bez) {
+        if !result.last().map(|p| approx_eq(p, &path)).unwrap_or(false) {
+            result.push(path)
+        }
+    }
+    result
+}
+
+//HACK: in some instances, at least on mac, a PDF on the pasteboard will have
+//two different paths for each of fill and stroke; we try to deduplicate that.
+fn approx_eq(path1: &Path, path2: &Path) -> bool {
+    // that's pretty close in my opinion
+    const ARBITRARY_DISTANCE_THRESHOLD: f64 = 0.00001;
+    path1.points().len() == path2.points().len()
+        && path1.points().iter().zip(path2.points()).all(|(p1, p2)| {
+            p1.typ == p2.typ && (p1.point - p2.point).hypot() < ARBITRARY_DISTANCE_THRESHOLD
+        })
+}
+
+// going to unjustifiable lengths to avoid an unecessary allocation :|
+fn iter_paths_for_bez_path(src: &BezPath) -> impl Iterator<Item = Path> + '_ {
+    let mut cur_path_id = crate::path::next_id();
+    let mut cur_points = Vec::new();
+    let mut closed = false;
+    let mut iter = src.elements().iter();
+
+    std::iter::from_fn(move || loop {
+        let path_el = match iter.next() {
+            Some(el) => el,
+            None => {
+                if !cur_points.is_empty() {
+                    let points = std::mem::replace(&mut cur_points, Vec::new());
+                    return Some(Path::from_raw_parts(cur_path_id, points, None, closed));
+                }
+                return None;
+            }
+        };
+
+        match path_el {
+            PathEl::MoveTo(pt) => {
+                let points = std::mem::replace(&mut cur_points, Vec::new());
+                let path = if points.is_empty() {
+                    None
+                } else {
+                    Some(Path::from_raw_parts(cur_path_id, points, None, closed))
+                };
+                cur_path_id = crate::path::next_id();
+                closed = false;
+                cur_points.push(PathPoint::on_curve(cur_path_id, DPoint::from_raw(*pt)));
+                if let Some(path) = path {
+                    return Some(path);
+                }
+            }
+            PathEl::LineTo(pt) => {
+                cur_points.push(PathPoint::on_curve(cur_path_id, DPoint::from_raw(*pt)))
+            }
+            PathEl::QuadTo(..) => log::warn!("ignoring quad_to in paste"),
+            PathEl::CurveTo(p1, p2, p3) => {
+                cur_points.push(PathPoint::off_curve(cur_path_id, DPoint::from_raw(*p1)));
+                cur_points.push(PathPoint::off_curve(cur_path_id, DPoint::from_raw(*p2)));
+                cur_points.push(PathPoint::on_curve(cur_path_id, DPoint::from_raw(*p3)));
+            }
+            PathEl::ClosePath => closed = true,
+        }
+    })
+}
+
+fn bez_path_for_pdf_contents(contents: Content) -> BezPath {
+    let mut bez = BezPath::new();
+    let mut transform = Affine::default();
+
+    for op in contents.operations.into_iter() {
+        let Operation { operator, operands } = op;
+        match (operator.as_str(), operands.as_slice()) {
+            (op, args) if ["m", "l", "c", "h"].contains(&op) => {
+                if let Some(el) = path_el_for_operation(op, args) {
+                    bez.push(transform * el);
+                }
+            }
+            ("cm", args) => {
+                if let Some(affine) = affine_for_args(args) {
+                    transform *= affine;
+                }
+            }
+            (other, _) => log::warn!("unhandled pdf operation '{}'", other),
+        }
+    }
+    bez
+}
+
+fn affine_for_args(args: &[lopdf::Object]) -> Option<Affine> {
+    fn float(x: &lopdf::Object) -> Option<f64> {
+        x.as_f64().or_else(|_| x.as_i64().map(|i| i as f64)).ok()
+    }
+    if args.len() == 6 {
+        let mut coeffs: [f64; 6] = [0.0; 6];
+        for (i, arg) in args.iter().enumerate() {
+            coeffs[i] = float(arg)?;
+        }
+        Some(Affine::new(coeffs))
+    } else {
+        None
+    }
+}
+
+fn path_el_for_operation(op: &str, operands: &[lopdf::Object]) -> Option<PathEl> {
+    fn pt(x_: &lopdf::Object, y_: &lopdf::Object) -> Option<Point> {
+        let x = x_
+            .as_f64()
+            .or_else(|_| x_.as_i64().map(|i| i as f64))
+            .map_err(|e| log::warn!("bad point x val in '{:?}': '{}'", x_, e));
+        let y = y_
+            .as_f64()
+            .or_else(|_| y_.as_i64().map(|i| i as f64))
+            .map_err(|e| log::warn!("bad point y val in '{:?}': '{}'", y_, e));
+        if let (Ok(x), Ok(y)) = (x, y) {
+            Some(Point::new(x, y))
+        } else {
+            None
+        }
+    }
+
+    match (op, operands) {
+        ("m", &[ref x, ref y]) => Some(PathEl::MoveTo(pt(x, y)?)),
+        ("l", &[ref x, ref y]) => Some(PathEl::LineTo(pt(x, y)?)),
+        ("c", &[ref x1, ref y1, ref x2, ref y2, ref x3, ref y3]) => {
+            Some(PathEl::CurveTo(pt(x1, y1)?, pt(x2, y2)?, pt(x3, y3)?))
+        }
+        ("h", &[]) => Some(PathEl::ClosePath),
+        (other, _) => {
+            log::warn!("unhandled pdf operation '{}'", other);
+            None
+        }
     }
 }
 
