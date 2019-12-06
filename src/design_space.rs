@@ -12,7 +12,7 @@ use druid::kurbo::{Affine, Point, Rect, Vec2};
 use druid::Data;
 
 /// The position of the view, relative to the design space.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Data, Debug, Clone, Copy, PartialEq)]
 //TODO: rename to DesignSpace
 pub struct ViewPort {
     /// The offset from (0, 0) in view space (the top left corner) and (0, 0) in
@@ -223,14 +223,6 @@ impl fmt::Display for DVec2 {
         write!(formatter, ", ")?;
         fmt::Display::fmt(&self.y, formatter)?;
         write!(formatter, ")")
-    }
-}
-
-impl Data for ViewPort {
-    fn same(&self, other: &ViewPort) -> bool {
-        self.offset.x.same(&other.offset.x)
-            && self.offset.y.same(&other.offset.y)
-            && self.zoom.same(&other.zoom)
     }
 }
 

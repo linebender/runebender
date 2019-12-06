@@ -35,7 +35,7 @@ pub struct PathPoint {
     pub typ: PointType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Data, Clone)]
 pub struct Path {
     id: usize,
     points: std::sync::Arc<Vec<PathPoint>>,
@@ -560,13 +560,5 @@ impl Path {
         let idx = self.idx_for_point(point).expect("bad input to next_point");
         let idx = self.next_idx(idx);
         self.points[idx]
-    }
-}
-
-impl Data for Path {
-    fn same(&self, other: &Self) -> bool {
-        self.points.same(&other.points)
-            && self.closed.same(&other.closed)
-            && self.trailing == other.trailing
     }
 }
