@@ -1,6 +1,6 @@
 //! Application state.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
@@ -27,7 +27,18 @@ pub struct AppState {
 }
 
 /// A shared map from glyph names to resolved `BezPath`s.
-type BezCache = Arc<RefCell<HashMap<GlyphName, Arc<BezPath>>>>;
+///
+/// Because we use a refcell to share the cache, we can't just compare
+/// the pointers to determine mutation. Instead we maintain the invariant
+/// that every mutating operation increments the generation counter.
+#[derive(Debug, Data, Clone)]
+pub struct BezCache {
+    #[druid(ignore)]
+    inner: Arc<RefCell<HashMap<GlyphName, Arc<BezPath>>>>,
+    // we track mutations to the cache so that we can place nice with Data
+    #[druid(same_fn = "PartialEq::eq")]
+    generation: Arc<Cell<usize>>,
+}
 
 #[derive(Clone, Data)]
 pub struct FontObject {
@@ -74,16 +85,10 @@ pub struct EditorState {
 
 impl AppState {
     pub fn set_file(&mut self, object: Ufo, path: impl Into<Option<PathBuf>>) {
-        // add the placeholder glyph
-        let mut resolved: BezCache = Arc::new(Default::default());
-        Arc::make_mut(&mut resolved)
-            .borrow_mut()
-            .insert(PLACEHOLDER_GLYPH_KEY.into(), placeholder_outline().into());
-
         let obj = FontObject {
             path: path.into(),
             object: Arc::new(object),
-            resolved,
+            resolved: BezCache::default(),
         };
         self.file = obj;
     }
@@ -126,6 +131,26 @@ impl AppState {
     }
 }
 
+impl BezCache {
+    fn get<Q: ?Sized>(&self, key: &Q) -> Option<Arc<BezPath>>
+    where
+        GlyphName: std::borrow::Borrow<Q>,
+        Q: std::hash::Hash + Eq,
+    {
+        self.inner.borrow().get(key).cloned()
+    }
+
+    fn insert(&self, key: impl Into<GlyphName>, value: impl Into<Arc<BezPath>>) {
+        self.bump();
+        self.inner.borrow_mut().insert(key.into(), value.into());
+    }
+
+    /// increment the generation.
+    fn bump(&self) {
+        self.generation.set(self.generation.get() + 1);
+    }
+}
+
 impl GlyphPlus {
     /// Get the fully resolved (including components) bezier path for this glyph.
     pub fn get_bezier(&self) -> Option<Arc<BezPath>> {
@@ -134,11 +159,7 @@ impl GlyphPlus {
 
     /// Return a placeholder glyph.
     pub fn get_placeholder(&self) -> Arc<BezPath> {
-        self.resolved
-            .borrow()
-            .get(PLACEHOLDER_GLYPH_KEY)
-            .unwrap()
-            .to_owned()
+        self.resolved.get(PLACEHOLDER_GLYPH_KEY).unwrap() // placeholder always exists
     }
 }
 
@@ -179,7 +200,7 @@ impl EditorState {
 /// Given a glyph name, a `Ufo`, and an optional cache, returns the fully resolved
 /// (including all sub components) `BezPath` for this glyph.
 pub fn get_bezier(name: &str, ufo: &Ufo, resolved: Option<&BezCache>) -> Option<Arc<BezPath>> {
-    if let Some(resolved) = resolved.and_then(|r| r.borrow().get(name).map(Arc::clone)) {
+    if let Some(resolved) = resolved.and_then(|r| r.get(name)) {
         return Some(resolved);
     }
 
@@ -204,12 +225,12 @@ pub fn get_bezier(name: &str, ufo: &Ufo, resolved: Option<&BezCache>) -> Option<
 
     let path = Arc::new(path);
     if let Some(resolved) = resolved {
-        resolved.borrow_mut().insert(name.into(), path.clone());
+        resolved.insert(name, path.clone());
     }
     Some(path)
 }
 
-impl std::default::Default for FontObject {
+impl Default for FontObject {
     fn default() -> FontObject {
         let font_info = FontInfo {
             family_name: Some(String::from("Untitled")),
@@ -222,7 +243,7 @@ impl std::default::Default for FontObject {
         FontObject {
             path: None,
             object: Arc::new(ufo),
-            resolved: Arc::new(Default::default()),
+            resolved: BezCache::default(),
         }
     }
 }
@@ -240,7 +261,7 @@ impl<'a> From<&'a FontInfo> for FontMetrics {
     }
 }
 
-impl std::default::Default for FontMetrics {
+impl Default for FontMetrics {
     fn default() -> Self {
         FontMetrics {
             units_per_em: DEFAULT_UNITS_PER_EM,
@@ -249,6 +270,20 @@ impl std::default::Default for FontMetrics {
             cap_height: None,
             ascender: None,
             italic_angle: None,
+        }
+    }
+}
+
+impl Default for BezCache {
+    fn default() -> Self {
+        let mut inner: Arc<RefCell<HashMap<GlyphName, Arc<BezPath>>>> = Default::default();
+        Arc::make_mut(&mut inner)
+            .borrow_mut()
+            .insert(PLACEHOLDER_GLYPH_KEY.into(), placeholder_outline().into());
+
+        BezCache {
+            inner,
+            generation: Default::default(),
         }
     }
 }
@@ -272,14 +307,14 @@ pub mod lenses {
             fn with<V, F: FnOnce(&GlyphSet_) -> V>(&self, data: &AppState, f: F) -> V {
                 let glyphs = GlyphSet_ {
                     object: Arc::clone(&data.file.object),
-                    resolved: Arc::clone(&data.file.resolved),
+                    resolved: data.file.resolved.clone(),
                 };
                 f(&glyphs)
             }
             fn with_mut<V, F: FnOnce(&mut GlyphSet_) -> V>(&self, data: &mut AppState, f: F) -> V {
                 let mut glyphs = GlyphSet_ {
                     object: Arc::clone(&data.file.object),
-                    resolved: Arc::clone(&data.file.resolved),
+                    resolved: data.file.resolved.clone(),
                 };
                 f(&mut glyphs)
             }
@@ -356,7 +391,7 @@ pub mod lenses {
                 let glyph = GlyphPlus {
                     glyph: Arc::clone(glyph),
                     ufo: Arc::clone(&data.object),
-                    resolved: Arc::clone(&data.resolved),
+                    resolved: data.resolved.clone(),
                 };
                 f(&glyph)
             }
@@ -372,7 +407,7 @@ pub mod lenses {
                 let mut glyph = GlyphPlus {
                     glyph: Arc::clone(glyph),
                     ufo: Arc::clone(&data.object),
-                    resolved: Arc::clone(&data.resolved),
+                    resolved: data.resolved.clone(),
                 };
                 f(&mut glyph)
             }
@@ -421,7 +456,7 @@ pub fn path_for_glyph(glyph: &Glyph) -> Option<BezPath> {
                 }
                 PointType::Curve => add_curve(point, &mut controls),
                 PointType::QCurve => {
-                    eprintln!("TODO: handle qcurve");
+                    log::warn!("quadratic curves are currently ignored");
                     add_curve(point, &mut controls);
                 }
                 PointType::Move => debug_assert!(false, "illegal move point in path?"),
