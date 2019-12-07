@@ -71,16 +71,17 @@ impl Widget<GlyphSet> for GlyphGrid {
     }
 
     fn update(&mut self, ctx: &mut UpdateCtx, _old: Option<&GlyphSet>, new: &GlyphSet, _env: &Env) {
-        if new.object.glyph_count() != self.children.len() {
+        if new.font.ufo.glyph_count() != self.children.len() {
             let units_per_em = new
-                .object
+                .font
+                .ufo
                 .font_info
                 .as_ref()
                 .and_then(|info| info.units_per_em.clone())
                 .unwrap_or(1000.);
             let widget = GridInner { units_per_em };
             self.children.clear();
-            for key in new.object.iter_names() {
+            for key in new.font.ufo.iter_names() {
                 self.children.push(WidgetPod::new(LensWrap::new(
                     widget,
                     lenses::glyph_set::Glyph(key),

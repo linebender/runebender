@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use crate::component::Component;
-use crate::data::FontMetrics;
+use crate::data::{FontMetrics, FontObject};
 use crate::design_space::ViewPort;
 use crate::edit_session::EditSession;
 use crate::guides::{Guide, GuideLine};
@@ -13,7 +13,7 @@ use druid::kurbo::{Affine, BezPath, Circle, CubicBez, Line, PathSeg, Point, Rect
 use druid::piet::{Color, Piet, RenderContext};
 use druid::PaintCtx;
 
-use norad::{Glyph, Ufo};
+use norad::Glyph;
 
 const PATH_COLOR: Color = Color::rgb8(0x00, 0x00, 0x00);
 const METRICS_COLOR: Color = Color::rgb8(0xA0, 0xA0, 0xA0);
@@ -294,8 +294,8 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         self.fill(arrow, &DIRECTION_ARROW_COLOR);
     }
 
-    fn draw_component(&mut self, component: &Component, ufo: &Ufo) {
-        if let Some(bez) = crate::data::get_bezier(&component.base, ufo, None) {
+    fn draw_component(&mut self, component: &Component, font: &FontObject) {
+        if let Some(bez) = font.get_bezier(&component.base) {
             let mut bez = Arc::try_unwrap(bez).expect("just created, guaranteed unique");
             bez.apply_affine(component.transform);
             bez.apply_affine(self.space.affine());
@@ -397,7 +397,7 @@ pub(crate) fn draw_session(
     visible_rect: Rect,
     metrics: &FontMetrics,
     session: &EditSession,
-    ufo: &Ufo,
+    font: &FontObject,
 ) {
     //ctx.clear(Color::WHITE);
 
@@ -429,7 +429,7 @@ pub(crate) fn draw_session(
     }
 
     for component in session.components.iter() {
-        draw_ctx.draw_component(component, ufo);
+        draw_ctx.draw_component(component, font);
     }
 
     //if let Some(rect) = tool.selection_rect() {
