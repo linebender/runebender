@@ -40,7 +40,7 @@ impl AppDelegate<AppState> for Delegate {
             }
             Event::Command(cmd) if cmd.selector == druid::commands::SAVE_FILE => {
                 if let Some(info) = cmd.get_object::<FileInfo>() {
-                    data.file.path = Some(info.path().into());
+                    Arc::make_mut(&mut data.file).path = Some(info.path().into());
                     ctx.submit_command(consts::cmd::REBUILD_MENUS.into(), None);
                 }
                 if let Err(e) = data.save() {
@@ -106,7 +106,7 @@ fn get_or_create_session(name: &GlyphName, data: &mut AppState) -> EditSession {
     if let Some(session) = data.sessions.get(name) {
         return session.to_owned();
     } else {
-        let session = EditSession::new(name, &data.file.object);
+        let session = EditSession::new(name, &data.file);
         Arc::make_mut(&mut data.sessions).insert(name.clone(), session.clone());
         session
     }

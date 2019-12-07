@@ -48,7 +48,7 @@ fn make_ui() -> impl Widget<AppState> {
     let mut col = Flex::column();
     let label = DynLabel::new(|data: &AppState, _| {
         data.file
-            .object
+            .ufo
             .font_info
             .as_ref()
             .and_then(|info| info.family_name.clone())

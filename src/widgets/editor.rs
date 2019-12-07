@@ -205,7 +205,7 @@ impl Widget<EditorState> for Editor {
             ctx.region().to_rect(),
             &data.metrics,
             &data.session,
-            &data.ufo,
+            &data.font,
         );
 
         self.tool.paint(ctx, &data.session, env);

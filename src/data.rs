@@ -4,7 +4,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use druid::kurbo::{Affine, BezPath, Point, Rect, Size};
@@ -20,7 +20,7 @@ static PLACEHOLDER_GLYPH_KEY: &str = "runebender.magic-placeholder-key ;)";
 
 #[derive(Clone, Data, Default)]
 pub struct AppState {
-    pub file: FontObject,
+    pub file: Arc<FontObject>,
     /// glyphs that are already open in an editor window
     pub open_glyphs: Arc<HashMap<GlyphName, WindowId>>,
     pub sessions: Arc<HashMap<GlyphName, EditSession>>,
@@ -42,16 +42,16 @@ pub struct BezCache {
 
 #[derive(Clone, Data)]
 pub struct FontObject {
-    #[druid(same_fn = "PartialEq::eq")]
-    pub path: Option<PathBuf>,
-    pub object: Arc<Ufo>,
+    pub path: Option<Arc<Path>>,
+    #[druid(ignore)]
+    pub ufo: Ufo,
     resolved: BezCache,
 }
 
 /// The main data type for the grid view.
 #[derive(Clone, Data)]
 pub struct GlyphSet {
-    pub object: Arc<Ufo>,
+    pub font: Arc<FontObject>,
     resolved: BezCache,
 }
 
@@ -60,8 +60,7 @@ pub struct GlyphSet {
 #[derive(Clone, Data)]
 pub struct GlyphPlus {
     pub glyph: Arc<Glyph>,
-    pub ufo: Arc<Ufo>,
-    resolved: BezCache,
+    pub font: Arc<FontObject>,
 }
 
 /// Things in `FontInfo` that are relevant while editing or drawing.
@@ -79,27 +78,29 @@ pub struct FontMetrics {
 #[derive(Clone, Data)]
 pub struct EditorState {
     pub metrics: FontMetrics,
-    pub ufo: Arc<Ufo>,
+    pub font: Arc<FontObject>,
     pub session: EditSession,
 }
 
 impl AppState {
-    pub fn set_file(&mut self, object: Ufo, path: impl Into<Option<PathBuf>>) {
+    pub fn set_file(&mut self, ufo: Ufo, path: impl Into<Option<PathBuf>>) {
         let obj = FontObject {
-            path: path.into(),
-            object: Arc::new(object),
+            path: path.into().map(Into::into),
+            ufo,
             resolved: BezCache::default(),
         };
-        self.file = obj;
+        self.file = obj.into();
     }
 
     pub fn save(&mut self) -> Result<(), Box<dyn Error>> {
-        if let Some(path) = self.file.path.as_ref() {
+        let font_obj = Arc::make_mut(&mut self.file);
+        if let Some(path) = font_obj.path.as_ref() {
             log::info!("saving to {:?}", path);
             // flush all open sessions
             for session in self.sessions.values() {
                 let glyph = session.to_norad_glyph();
-                Arc::make_mut(&mut self.file.object)
+                font_obj
+                    .ufo
                     .get_default_layer_mut()
                     .unwrap()
                     .insert_glyph(glyph);
@@ -114,7 +115,7 @@ impl AppState {
             if tmp_path.exists() {
                 fs::remove_dir_all(&tmp_path)?;
             }
-            self.file.object.save(&tmp_path)?;
+            font_obj.ufo.save(&tmp_path)?;
             if path.exists() {
                 fs::remove_dir_all(path)?;
             }
@@ -151,15 +152,48 @@ impl BezCache {
     }
 }
 
+impl FontObject {
+    /// Given a glyph name, a `Ufo`, and an optional cache, returns the fully resolved
+    /// (including all sub components) `BezPath` for this glyph.
+    pub fn get_bezier(&self, name: &str) -> Option<Arc<BezPath>> {
+        if let Some(resolved) = self.resolved.get(name) {
+            return Some(resolved);
+        }
+
+        let glyph = self.ufo.get_glyph(name)?;
+        let mut path = path_for_glyph(glyph)?;
+        for comp in glyph
+            .outline
+            .as_ref()
+            .iter()
+            .flat_map(|o| o.components.iter())
+        {
+            match self.get_bezier(&comp.base) {
+                Some(comp_path) => {
+                    let affine: Affine = comp.transform.clone().into();
+                    for comp_elem in (affine * &*comp_path).elements() {
+                        path.push(*comp_elem);
+                    }
+                }
+                None => log::warn!("missing component {} in glyph {}", comp.base, name),
+            }
+        }
+
+        let path = Arc::new(path);
+        self.resolved.insert(name, path.clone());
+        Some(path)
+    }
+}
+
 impl GlyphPlus {
     /// Get the fully resolved (including components) bezier path for this glyph.
     pub fn get_bezier(&self) -> Option<Arc<BezPath>> {
-        get_bezier(&self.glyph.name, &self.ufo, Some(&self.resolved))
+        self.font.get_bezier(&self.glyph.name)
     }
 
     /// Return a placeholder glyph.
     pub fn get_placeholder(&self) -> Arc<BezPath> {
-        self.resolved.get(PLACEHOLDER_GLYPH_KEY).unwrap() // placeholder always exists
+        self.font.resolved.get(PLACEHOLDER_GLYPH_KEY).unwrap() // placeholder always exists
     }
 }
 
@@ -197,38 +231,8 @@ impl EditorState {
     }
 }
 
-/// Given a glyph name, a `Ufo`, and an optional cache, returns the fully resolved
-/// (including all sub components) `BezPath` for this glyph.
-pub fn get_bezier(name: &str, ufo: &Ufo, resolved: Option<&BezCache>) -> Option<Arc<BezPath>> {
-    if let Some(resolved) = resolved.and_then(|r| r.get(name)) {
-        return Some(resolved);
-    }
-
-    let glyph = ufo.get_glyph(name)?;
-    let mut path = path_for_glyph(glyph)?;
-    for comp in glyph
-        .outline
-        .as_ref()
-        .iter()
-        .flat_map(|o| o.components.iter())
-    {
-        match get_bezier(&comp.base, ufo, resolved) {
-            Some(comp_path) => {
-                let affine: Affine = comp.transform.clone().into();
-                for comp_elem in (affine * &*comp_path).elements() {
-                    path.push(*comp_elem);
-                }
-            }
-            None => log::warn!("missing component {} in glyph {}", comp.base, name),
-        }
-    }
-
-    let path = Arc::new(path);
-    if let Some(resolved) = resolved {
-        resolved.insert(name, path.clone());
-    }
-    Some(path)
-}
+//fn get_bezier(name: &str, ufo: &Ufo, resolved: Option<&BezCache>) -> Option<Arc<BezPath>> {
+//}
 
 impl Default for FontObject {
     fn default() -> FontObject {
@@ -242,7 +246,7 @@ impl Default for FontObject {
 
         FontObject {
             path: None,
-            object: Arc::new(ufo),
+            ufo,
             resolved: BezCache::default(),
         }
     }
@@ -306,14 +310,14 @@ pub mod lenses {
         impl Lens<AppState, GlyphSet_> for GlyphSet {
             fn with<V, F: FnOnce(&GlyphSet_) -> V>(&self, data: &AppState, f: F) -> V {
                 let glyphs = GlyphSet_ {
-                    object: Arc::clone(&data.file.object),
+                    font: Arc::clone(&data.file),
                     resolved: data.file.resolved.clone(),
                 };
                 f(&glyphs)
             }
             fn with_mut<V, F: FnOnce(&mut GlyphSet_) -> V>(&self, data: &mut AppState, f: F) -> V {
                 let mut glyphs = GlyphSet_ {
-                    object: Arc::clone(&data.file.object),
+                    font: Arc::clone(&data.file),
                     resolved: data.file.resolved.clone(),
                 };
                 f(&mut glyphs)
@@ -324,14 +328,14 @@ pub mod lenses {
             fn with<V, F: FnOnce(&EditorState_) -> V>(&self, data: &AppState, f: F) -> V {
                 let metrics = data
                     .file
-                    .object
+                    .ufo
                     .font_info
                     .as_ref()
                     .map(Into::into)
                     .unwrap_or_default();
                 let session = data.sessions.get(&self.0).unwrap().to_owned();
                 let glyph = EditorState_ {
-                    ufo: Arc::clone(&data.file.object),
+                    font: Arc::clone(&data.file),
                     metrics,
                     session,
                 };
@@ -347,14 +351,14 @@ pub mod lenses {
                 //this is just so that the signatures work for now, we aren't actually doing any
                 let metrics = data
                     .file
-                    .object
+                    .ufo
                     .font_info
                     .as_ref()
                     .map(Into::into)
                     .unwrap_or_default();
                 let session = data.sessions.get(&self.0).unwrap().to_owned();
                 let mut glyph = EditorState_ {
-                    ufo: Arc::clone(&data.file.object),
+                    font: Arc::clone(&data.file),
                     metrics,
                     session,
                 };
@@ -385,13 +389,13 @@ pub mod lenses {
         impl Lens<GlyphSet_, GlyphPlus> for Glyph {
             fn with<V, F: FnOnce(&GlyphPlus) -> V>(&self, data: &GlyphSet_, f: F) -> V {
                 let glyph = data
-                    .object
+                    .font
+                    .ufo
                     .get_glyph(&self.0)
                     .expect("missing glyph in lens");
                 let glyph = GlyphPlus {
                     glyph: Arc::clone(glyph),
-                    ufo: Arc::clone(&data.object),
-                    resolved: data.resolved.clone(),
+                    font: Arc::clone(&data.font),
                 };
                 f(&glyph)
             }
@@ -401,13 +405,13 @@ pub mod lenses {
                 //this is just so that the signatures work for now, we aren't actually doing any
                 //mutating
                 let glyph = data
-                    .object
+                    .font
+                    .ufo
                     .get_glyph(&self.0)
                     .expect("missing glyph in lens");
                 let mut glyph = GlyphPlus {
                     glyph: Arc::clone(glyph),
-                    ufo: Arc::clone(&data.object),
-                    resolved: data.resolved.clone(),
+                    font: Arc::clone(&data.font),
                 };
                 f(&mut glyph)
             }
@@ -417,7 +421,7 @@ pub mod lenses {
 
 /// Convert this glyph's path from the UFO representation into a `kurbo::BezPath`
 /// (which we know how to draw.)
-pub fn path_for_glyph(glyph: &Glyph) -> Option<BezPath> {
+fn path_for_glyph(glyph: &Glyph) -> Option<BezPath> {
     /// An outline can have multiple contours, which correspond to subpaths
     fn add_contour(path: &mut BezPath, contour: &Contour) {
         let mut close: Option<&ContourPoint> = None;

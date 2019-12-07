@@ -4,9 +4,10 @@ use std::sync::Arc;
 use druid::kurbo::{Point, Rect, Shape};
 use druid::Data;
 use norad::glyph::Outline;
-use norad::{Glyph, GlyphName, Ufo};
+use norad::{Glyph, GlyphName};
 
 use crate::component::Component;
+use crate::data::FontObject;
 use crate::design_space::{DPoint, DVec2, ViewPort};
 use crate::guides::Guide;
 use crate::path::{EntityId, Path, PathPoint};
@@ -33,9 +34,9 @@ pub struct EditSession {
 }
 
 impl EditSession {
-    pub fn new(name: &GlyphName, ufo: &Ufo) -> Self {
+    pub fn new(name: &GlyphName, font: &FontObject) -> Self {
         let name = name.to_owned();
-        let glyph = ufo.get_glyph(&name).unwrap().to_owned();
+        let glyph = font.ufo.get_glyph(&name).unwrap().to_owned();
         let paths: Vec<Path> = glyph
             .outline
             .as_ref()
@@ -52,7 +53,8 @@ impl EditSession {
             .map(|guides| guides.iter().map(Guide::from_norad).collect())
             .unwrap_or_default();
 
-        let work_bounds = crate::data::get_bezier(&name, ufo, None)
+        let work_bounds = font
+            .get_bezier(&name)
             .map(|o| o.bounding_box())
             .unwrap_or_default();
 
