@@ -16,6 +16,9 @@ pub mod cmd {
     /// Hack. Sent at launch to the editor widget, so it knows to request keyboard focus.
     pub const REQUEST_FOCUS: Selector = Selector::new("runebender.request-focus");
 
+    /// Sent when windows should rebuild their menus.
+    pub const REBUILD_MENUS: Selector = Selector::new("runebender.rebuid-menus");
+
     /// sent by the 'delete' menu item
     pub const DELETE: Selector = Selector::new("runebender.delete");
 

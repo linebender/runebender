@@ -2,14 +2,15 @@
 
 use druid::kurbo::Size;
 use druid::{
-    BaseState, BoxConstraints, Env, Event, EventCtx, FileInfo, LayoutCtx, PaintCtx, UpdateCtx,
+    BaseState, BoxConstraints, Command, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx,
     Widget,
 };
-use log;
-use norad::Ufo;
 
+use crate::consts;
 use crate::data::AppState;
+use crate::menus;
 
+/// A widget that wraps all root widgets
 pub struct Controller {
     inner: Box<dyn Widget<AppState> + 'static>,
 }
@@ -31,17 +32,10 @@ impl Widget<AppState> for Controller {
 
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppState, env: &Env) {
         match event {
-            Event::Command(cmd) if cmd.selector == druid::commands::OPEN_FILE => {
-                let info = cmd.get_object::<FileInfo>().expect("api violation");
-                self.try_open_file(info, ctx, data);
-            }
-            Event::Command(cmd) if cmd.selector == druid::commands::SAVE_FILE => {
-                if let Some(info) = cmd.get_object::<FileInfo>() {
-                    data.file.path = Some(info.path().into());
-                }
-                if let Err(e) = data.save() {
-                    log::error!("saving failed: '{}'", e);
-                }
+            Event::Command(cmd) if cmd.selector == consts::cmd::REBUILD_MENUS => {
+                let menu = menus::make_menu(data);
+                let cmd = Command::new(druid::commands::SET_MENU, menu);
+                ctx.submit_command(cmd, None);
             }
             other => self.inner.event(ctx, other, data, env),
         }
@@ -57,16 +51,5 @@ impl Controller {
         Controller {
             inner: Box::new(inner),
         }
-    }
-
-    fn try_open_file(&mut self, info: &FileInfo, ctx: &mut EventCtx, data: &mut AppState) {
-        match Ufo::load(info.path()) {
-            Ok(ufo) => data.set_file(ufo, info.path().to_owned()),
-            Err(e) => {
-                log::error!("failed to open file {:?}, errror: '{:?}'", info.path(), e);
-                return;
-            }
-        };
-        ctx.invalidate();
     }
 }

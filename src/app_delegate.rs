@@ -3,16 +3,17 @@
 use std::sync::Arc;
 
 use druid::{
-    AppDelegate, Command, DelegateCtx, Env, Event, LocalizedString, Selector, Widget, WindowDesc,
-    WindowId,
+    AppDelegate, Command, DelegateCtx, Env, Event, FileInfo, LocalizedString, Selector, Widget,
+    WindowDesc, WindowId,
 };
 
 use druid::widget::WidgetExt;
-use norad::GlyphName;
+use norad::{GlyphName, Ufo};
 
+use crate::consts;
 use crate::data::{lenses, AppState};
 use crate::edit_session::EditSession;
-use crate::widgets::{Editor, ScrollZoom};
+use crate::widgets::{Controller, Editor, ScrollZoom};
 
 pub const EDIT_GLYPH: Selector = Selector::new("runebender.open-editor-with-glyph");
 
@@ -28,6 +29,25 @@ impl AppDelegate<AppState> for Delegate {
         ctx: &mut DelegateCtx,
     ) -> Option<Event> {
         match event {
+            Event::Command(cmd) if cmd.selector == druid::commands::OPEN_FILE => {
+                let info = cmd.get_object::<FileInfo>().expect("api violation");
+                match Ufo::load(info.path()) {
+                    Ok(ufo) => data.set_file(ufo, info.path().to_owned()),
+                    Err(e) => log::error!("failed to open file {:?}: '{:?}'", info.path(), e),
+                };
+                ctx.submit_command(consts::cmd::REBUILD_MENUS.into(), None);
+                None
+            }
+            Event::Command(cmd) if cmd.selector == druid::commands::SAVE_FILE => {
+                if let Some(info) = cmd.get_object::<FileInfo>() {
+                    data.file.path = Some(info.path().into());
+                    ctx.submit_command(consts::cmd::REBUILD_MENUS.into(), None);
+                }
+                if let Err(e) = data.save() {
+                    log::error!("saving failed: '{}'", e);
+                }
+                None
+            }
             Event::Command(ref cmd) if cmd.selector == EDIT_GLYPH => {
                 let payload = cmd
                     .get_object::<GlyphName>()
@@ -93,6 +113,8 @@ fn get_or_create_session(name: &GlyphName, data: &mut AppState) -> EditSession {
 }
 
 fn make_editor(session: &EditSession) -> impl Widget<AppState> {
-    ScrollZoom::new(Editor::new(session.clone()))
-        .lens(lenses::app_state::EditorState(session.name.clone()))
+    Controller::new(
+        ScrollZoom::new(Editor::new(session.clone()))
+            .lens(lenses::app_state::EditorState(session.name.clone())),
+    )
 }
