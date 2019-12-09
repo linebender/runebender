@@ -248,6 +248,9 @@ impl Widget<EditorState> for Editor {
 
         self.update_undo(edit, &data.session);
         if edit.is_some() || !pre_selection.same(&data.session.selection) {
+            let new_bezier = data.session.to_bezier();
+            data.font
+                .update_outline_for_glyph(&data.session.glyph, new_bezier);
             ctx.invalidate();
         }
     }

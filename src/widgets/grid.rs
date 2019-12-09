@@ -108,7 +108,7 @@ struct GridInner {
 impl Widget<GlyphPlus> for GridInner {
     fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &GlyphPlus, env: &Env) {
         //TODO: replacement for missing glyphs
-        let path = data.get_bezier().unwrap_or_else(|| data.get_placeholder());
+        let path = data.get_bezier();
         let bb = path.bounding_box();
         let geom = Rect::ZERO.with_size(state.size());
         let scale = geom.height() as f64 / self.units_per_em;

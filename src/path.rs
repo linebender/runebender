@@ -276,6 +276,11 @@ impl Path {
 
     pub fn bezier(&self) -> BezPath {
         let mut bez = BezPath::new();
+        self.append_to_bezier(&mut bez);
+        bez
+    }
+
+    pub(crate) fn append_to_bezier(&self, bez: &mut BezPath) {
         bez.move_to(self.start_point().point.to_raw());
         let mut i = if self.closed { 0 } else { 1 };
         //self.debug_print_points();
@@ -296,7 +301,6 @@ impl Path {
         if self.closed {
             bez.close_path();
         }
-        bez
     }
 
     pub fn screen_dist(&self, vport: ViewPort, point: Point) -> f64 {
