@@ -897,7 +897,7 @@ dependencies = [
 [[package]]
 name = "norad"
 version = "0.1.0"
-source = "git+https://github.com/linebender/norad.git?rev=221f808#221f808efde22f0fd57235d3e7ae6fcaf7fda7db"
+source = "git+https://github.com/linebender/norad.git?rev=8af840e#8af840e8627100b7436d429a220ac1130431d010"
 dependencies = [
  "druid 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "plist 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1232,7 +1232,7 @@ dependencies = [
  "druid 0.4.0 (git+https://github.com/xi-editor/druid.git?rev=caef3e3)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "lopdf 0.23.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "norad 0.1.0 (git+https://github.com/linebender/norad.git?rev=221f808)",
+ "norad 0.1.0 (git+https://github.com/linebender/norad.git?rev=8af840e)",
  "plist 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.102 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.102 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1617,7 +1617,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum miniz_oxide 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "6f3f74f726ae935c3f514300cc6773a0c9492abc5e972d42ba0c0ebb88757625"
 "checksum nodrop 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)" = "72ef4a56884ca558e5ddb05a1d1e7e1bfd9a68d9ed024c21704cc98872dae1bb"
 "checksum nom 4.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "2ad2a91a8e869eeb30b9cb3119ae87773a8f4ae617f41b1eb9c154b2905f7bd6"
-"checksum norad 0.1.0 (git+https://github.com/linebender/norad.git?rev=221f808)" = "<none>"
+"checksum norad 0.1.0 (git+https://github.com/linebender/norad.git?rev=8af840e)" = "<none>"
 "checksum num 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)" = "4703ad64153382334aa8db57c637364c322d3372e097840c72000dabdcf6156e"
 "checksum num-bigint 0.1.44 (registry+https://github.com/rust-lang/crates.io-index)" = "e63899ad0da84ce718c14936262a41cee2c79c981fc0a0e7c7beb47d5a07e8c1"
 "checksum num-complex 0.1.43 (registry+https://github.com/rust-lang/crates.io-index)" = "b288631d7878aaf59442cffd36910ea604ecd7745c36054328595114001c9656"

@@ -7,7 +7,7 @@ edition = "2018"
 
 [dependencies]
 druid = { git = "https://github.com/xi-editor/druid.git", rev = "caef3e3", version = "0.4" }
-norad = { git = "https://github.com/linebender/norad.git", rev = "221f808", version = "0.1.0", features = ["druid"]}
+norad = { git = "https://github.com/linebender/norad.git", rev = "8af840e", version = "0.1.0", features = ["druid"]}
 log = "0.4.8"
 plist = "0.5"
 serde = "1.0"

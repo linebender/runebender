@@ -1,7 +1,7 @@
 //! Application state.
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -35,6 +35,10 @@ pub struct AppState {
 pub struct BezCache {
     #[druid(ignore)]
     inner: Arc<RefCell<HashMap<GlyphName, Arc<BezPath>>>>,
+    /// a map from component names to the names of glyphs that contain that component.
+    /// We use this to keep track of what glyphs need to be updated when a component
+    /// changes.
+    components: Arc<RefCell<HashMap<GlyphName, HashSet<GlyphName>>>>,
     // we track mutations to the cache so that we can place nice with Data
     #[druid(same_fn = "PartialEq::eq")]
     generation: Arc<Cell<usize>>,
@@ -60,7 +64,7 @@ pub struct GlyphSet {
 #[derive(Clone, Data)]
 pub struct GlyphPlus {
     pub glyph: Arc<Glyph>,
-    pub font: Arc<FontObject>,
+    outline: Arc<BezPath>,
 }
 
 /// Things in `FontInfo` that are relevant while editing or drawing.
@@ -142,8 +146,13 @@ impl BezCache {
     }
 
     fn insert(&self, key: impl Into<GlyphName>, value: impl Into<Arc<BezPath>>) {
+        let key = key.into();
+        // if this is a component of other glyphs, remove them from cache
+        for user in users_of_component(&key, &self.components.borrow()) {
+            self.inner.borrow_mut().remove(&user);
+        }
         self.bump();
-        self.inner.borrow_mut().insert(key.into(), value.into());
+        self.inner.borrow_mut().insert(key, value.into());
     }
 
     /// increment the generation.
@@ -152,48 +161,92 @@ impl BezCache {
     }
 }
 
+fn users_of_component(
+    glyph: &GlyphName,
+    components: &HashMap<GlyphName, HashSet<GlyphName>>,
+) -> Vec<GlyphName> {
+    fn recursive_impl(
+        glyph: &GlyphName,
+        components: &HashMap<GlyphName, HashSet<GlyphName>>,
+        users: &mut Vec<GlyphName>,
+        depth: usize,
+    ) {
+        if depth > 10 {
+            log::warn!("possible component recursion for '{}'", glyph);
+            return;
+        }
+
+        if let Some(comps) = components.get(glyph) {
+            for comp in comps.iter() {
+                users.push(comp.clone());
+                recursive_impl(comp, components, users, depth + 1);
+            }
+        }
+    }
+
+    let mut result = Vec::new();
+    recursive_impl(glyph, components, &mut result, 1);
+    result
+}
+
 impl FontObject {
     /// Given a glyph name, a `Ufo`, and an optional cache, returns the fully resolved
     /// (including all sub components) `BezPath` for this glyph.
-    pub fn get_bezier(&self, name: &str) -> Option<Arc<BezPath>> {
-        if let Some(resolved) = self.resolved.get(name) {
-            return Some(resolved);
+    pub fn get_bezier(&self, name: &GlyphName) -> Option<Arc<BezPath>> {
+        match self.resolved.get(name) {
+            Some(bez) => Some(bez),
+            None => {
+                let glyph = self.ufo.get_glyph(name)?;
+                let path = path_for_glyph(glyph)?;
+                Some(self.resolve_components(glyph, path))
+            }
         }
+    }
 
-        let glyph = self.ufo.get_glyph(name)?;
-        let mut path = path_for_glyph(glyph)?;
+    /// takes a glyph outline and appends the outlines of any components,
+    /// resolving them as necessary, and caching the results.
+    fn resolve_components(&self, glyph: &Glyph, mut bez: BezPath) -> Arc<BezPath> {
         for comp in glyph
             .outline
             .as_ref()
             .iter()
             .flat_map(|o| o.components.iter())
         {
+            self.resolved
+                .components
+                .borrow_mut()
+                .entry(comp.base.clone())
+                .or_insert(HashSet::new())
+                .insert(glyph.name.clone());
+
             match self.get_bezier(&comp.base) {
                 Some(comp_path) => {
                     let affine: Affine = comp.transform.clone().into();
                     for comp_elem in (affine * &*comp_path).elements() {
-                        path.push(*comp_elem);
+                        bez.push(*comp_elem);
                     }
                 }
-                None => log::warn!("missing component {} in glyph {}", comp.base, name),
+                None => log::warn!("missing component {} in glyph {}", comp.base, glyph.name),
             }
         }
 
-        let path = Arc::new(path);
-        self.resolved.insert(name, path.clone());
-        Some(path)
+        let path = Arc::new(bez);
+        self.resolved.insert(glyph.name.clone(), path.clone());
+        path
+    }
+
+    /// called after editing; takes the new outline for a glyph and updates the cache.
+    pub(crate) fn update_outline_for_glyph(&self, glyph: &Glyph, outline: BezPath) {
+        self.resolve_components(glyph, outline);
     }
 }
 
 impl GlyphPlus {
     /// Get the fully resolved (including components) bezier path for this glyph.
-    pub fn get_bezier(&self) -> Option<Arc<BezPath>> {
-        self.font.get_bezier(&self.glyph.name)
-    }
-
-    /// Return a placeholder glyph.
-    pub fn get_placeholder(&self) -> Arc<BezPath> {
-        self.font.resolved.get(PLACEHOLDER_GLYPH_KEY).unwrap() // placeholder always exists
+    ///
+    /// Returns the placeholder glyph if this glyph has no outline.
+    pub fn get_bezier(&self) -> Arc<BezPath> {
+        self.outline.clone()
     }
 }
 
@@ -230,9 +283,6 @@ impl EditorState {
         Rect::from_points((result.x0, -result.y0), (result.x1, -result.y1))
     }
 }
-
-//fn get_bezier(name: &str, ufo: &Ufo, resolved: Option<&BezCache>) -> Option<Arc<BezPath>> {
-//}
 
 impl Default for FontObject {
     fn default() -> FontObject {
@@ -288,6 +338,7 @@ impl Default for BezCache {
         BezCache {
             inner,
             generation: Default::default(),
+            components: Default::default(),
         }
     }
 }
@@ -381,7 +432,7 @@ pub mod lenses {
         use norad::GlyphName;
         use std::sync::Arc;
 
-        use super::super::{GlyphPlus, GlyphSet as GlyphSet_};
+        use super::super::{GlyphPlus, GlyphSet as GlyphSet_, PLACEHOLDER_GLYPH_KEY};
 
         /// GlyphSet_ -> GlyphPlus
         pub struct Glyph(pub GlyphName);
@@ -393,9 +444,15 @@ pub mod lenses {
                     .ufo
                     .get_glyph(&self.0)
                     .expect("missing glyph in lens");
+                let outline = data.font.get_bezier(&glyph.name).unwrap_or_else(|| {
+                    data.font
+                        .resolved
+                        .get(PLACEHOLDER_GLYPH_KEY)
+                        .expect("missing placeholder")
+                });
                 let glyph = GlyphPlus {
                     glyph: Arc::clone(glyph),
-                    font: Arc::clone(&data.font),
+                    outline,
                 };
                 f(&glyph)
             }
@@ -409,9 +466,15 @@ pub mod lenses {
                     .ufo
                     .get_glyph(&self.0)
                     .expect("missing glyph in lens");
+                let outline = data.font.get_bezier(&glyph.name).unwrap_or_else(|| {
+                    data.font
+                        .resolved
+                        .get(PLACEHOLDER_GLYPH_KEY)
+                        .expect("missing placeholder")
+                });
                 let mut glyph = GlyphPlus {
                     glyph: Arc::clone(glyph),
-                    font: Arc::clone(&data.font),
+                    outline,
                 };
                 f(&mut glyph)
             }

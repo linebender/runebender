@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use druid::kurbo::{Point, Rect, Shape};
+use druid::kurbo::{BezPath, Point, Rect, Shape};
 use druid::Data;
 use norad::glyph::Outline;
 use norad::{Glyph, GlyphName};
@@ -69,6 +69,15 @@ impl EditSession {
             tool_desc: Arc::from("Select"),
             work_bounds: work_bounds,
         }
+    }
+
+    /// Construct a bezier of the paths in this glyph, ignoring components.
+    pub fn to_bezier(&self) -> BezPath {
+        let mut bez = BezPath::new();
+        for path in self.paths.iter() {
+            path.append_to_bezier(&mut bez);
+        }
+        bez
     }
 
     /// Returns the current layout bounds of the 'work', that is, all the things
