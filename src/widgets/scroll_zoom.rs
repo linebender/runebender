@@ -70,7 +70,7 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
         let next_off = scroll_off * delta_zoom;
         let delta_off = next_off - scroll_off;
         self.child.scroll(delta_off, size);
-        data.session.viewport.zoom = new_zoom;
+        data.session_mut().viewport.zoom = new_zoom;
     }
 
     /// center the glyph on the canvas
@@ -108,8 +108,8 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
 
         let canvas_rect = Rect::ZERO.with_size(CANVAS_SIZE);
         let work_offset = canvas_rect.center() - content_region.center();
-        data.session.viewport.set_offset(work_offset);
-        data.session.viewport.zoom = new_zoom;
+        data.session_mut().viewport.set_offset(work_offset);
+        data.session_mut().viewport.zoom = new_zoom;
     }
 
     fn handle_zoom_cmd(&mut self, sel: &Selector, view_size: Size, data: &mut EditorState) {

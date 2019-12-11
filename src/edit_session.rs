@@ -7,7 +7,7 @@ use norad::glyph::Outline;
 use norad::{Glyph, GlyphName};
 
 use crate::component::Component;
-use crate::data::FontObject;
+use crate::data::GlyphSet;
 use crate::design_space::{DPoint, DVec2, ViewPort};
 use crate::guides::Guide;
 use crate::path::{EntityId, Path, PathPoint};
@@ -34,9 +34,9 @@ pub struct EditSession {
 }
 
 impl EditSession {
-    pub fn new(name: &GlyphName, font: &FontObject) -> Self {
+    pub fn new(name: &GlyphName, glyphs: &GlyphSet) -> Self {
         let name = name.to_owned();
-        let glyph = font.ufo.get_glyph(&name).unwrap().to_owned();
+        let glyph = glyphs.font.ufo.get_glyph(&name).unwrap().to_owned();
         let paths: Vec<Path> = glyph
             .outline
             .as_ref()
@@ -53,9 +53,9 @@ impl EditSession {
             .map(|guides| guides.iter().map(Guide::from_norad).collect())
             .unwrap_or_default();
 
-        let work_bounds = font
+        let work_bounds = glyphs
             .get_bezier(&name)
-            .map(|o| o.bounding_box())
+            .map(|b| b.bounding_box())
             .unwrap_or_default();
 
         EditSession {
@@ -78,6 +78,11 @@ impl EditSession {
             path.append_to_bezier(&mut bez);
         }
         bez
+    }
+
+    pub fn rebuild_glyph(&mut self) {
+        let new_glyph = self.to_norad_glyph();
+        *Arc::make_mut(&mut self.glyph) = new_glyph;
     }
 
     /// Returns the current layout bounds of the 'work', that is, all the things

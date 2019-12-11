@@ -20,12 +20,12 @@ use crate::undo::UndoState;
 pub struct Editor {
     mouse: Mouse,
     tool: Box<dyn Tool>,
-    undo: UndoState<EditSession>,
+    undo: UndoState<Arc<EditSession>>,
     last_edit: EditType,
 }
 
 impl Editor {
-    pub fn new(session: EditSession) -> Editor {
+    pub fn new(session: Arc<EditSession>) -> Editor {
         Editor {
             mouse: Mouse::default(),
             tool: Box::new(Select::default()),
@@ -44,7 +44,7 @@ impl Editor {
         if !event.inner().button.is_right() {
             return self
                 .tool
-                .mouse_event(event, &mut self.mouse, ctx, &mut data.session, env);
+                .mouse_event(event, &mut self.mouse, ctx, data.session_mut(), env);
         } else if let TaggedEvent::Down(m) = event {
             let menu = crate::menus::make_context_menu(data, m.pos);
             let menu = ContextMenu::new(menu, m.window_pos);
@@ -54,7 +54,7 @@ impl Editor {
         None
     }
 
-    fn update_undo(&mut self, edit: Option<EditType>, data: &EditSession) {
+    fn update_undo(&mut self, edit: Option<EditType>, data: &Arc<EditSession>) {
         match edit {
             Some(edit) if self.last_edit.needs_new_undo_group(edit) => {
                 self.undo.add_undo_group(data.clone())
@@ -69,11 +69,11 @@ impl Editor {
         self.last_edit = edit.unwrap_or(self.last_edit);
     }
 
-    fn do_undo(&mut self) -> Option<&EditSession> {
+    fn do_undo(&mut self) -> Option<&Arc<EditSession>> {
         self.undo.undo()
     }
 
-    fn do_redo(&mut self) -> Option<&EditSession> {
+    fn do_redo(&mut self) -> Option<&Arc<EditSession>> {
         self.undo.redo()
     }
 
@@ -144,25 +144,25 @@ impl Editor {
     ) -> (bool, Option<EditType>) {
         match cmd.selector {
             consts::cmd::REQUEST_FOCUS => ctx.request_focus(),
-            consts::cmd::SELECT_ALL => data.session.select_all(),
-            consts::cmd::DESELECT_ALL => data.session.clear_selection(),
-            consts::cmd::DELETE => data.session.delete_selection(),
+            consts::cmd::SELECT_ALL => data.session_mut().select_all(),
+            consts::cmd::DESELECT_ALL => data.session_mut().clear_selection(),
+            consts::cmd::DELETE => data.session_mut().delete_selection(),
             consts::cmd::SELECT_TOOL => {
                 self.tool = Box::new(Select::default());
-                data.session.tool_desc = Arc::from("Select");
+                data.session_mut().tool_desc = Arc::from("Select");
             }
             consts::cmd::PEN_TOOL => {
                 self.tool = Box::new(Pen::default());
-                data.session.tool_desc = Arc::from("Pen");
+                data.session_mut().tool_desc = Arc::from("Pen");
             }
             consts::cmd::ADD_GUIDE => {
                 let point = cmd.get_object::<Point>().unwrap();
-                data.session.add_guide(*point);
+                data.session_mut().add_guide(*point);
                 return (true, Some(EditType::Normal));
             }
             consts::cmd::TOGGLE_GUIDE => {
                 let consts::cmd::ToggleGuideCmdArgs { id, pos } = cmd.get_object().unwrap();
-                data.session.toggle_guide(*id, *pos);
+                data.session_mut().toggle_guide(*id, *pos);
                 return (true, Some(EditType::Normal));
             }
             druid::commands::COPY => self.do_copy(&data.session),
@@ -173,14 +173,14 @@ impl Editor {
                     //reuse the current viewport when handling these actions.
                     let saved_viewport = data.session.viewport;
                     data.session = prev.clone();
-                    data.session.viewport = saved_viewport;
+                    data.session_mut().viewport = saved_viewport;
                 }
             }
             druid::commands::REDO => {
                 if let Some(next) = self.do_redo() {
                     let saved_viewport = data.session.viewport;
                     data.session = next.clone();
-                    data.session.viewport = saved_viewport;
+                    data.session_mut().viewport = saved_viewport;
                 }
             }
             // all unhandled commands:
@@ -224,6 +224,8 @@ impl Widget<EditorState> for Editor {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut EditorState, env: &Env) {
         // we invalidate if selection changes after this event;
         let pre_selection = data.session.selection.clone();
+        let pre_paths = data.session.paths.clone();
+        let pre_components = data.session.components.clone();
 
         let edit = match event {
             Event::Command(c) => {
@@ -235,23 +237,24 @@ impl Widget<EditorState> for Editor {
                 edit
             }
             Event::KeyDown(k) if k.key_code == KeyCode::Escape => {
-                data.session.clear_selection();
+                data.session_mut().clear_selection();
                 None
             }
-            Event::KeyDown(k) => self.tool.key_down(k, ctx, &mut data.session, env),
+            Event::KeyDown(k) => self.tool.key_down(k, ctx, data.session_mut(), env),
             Event::MouseUp(m) => self.send_mouse(ctx, TaggedEvent::Up(m.clone()), data, env),
             Event::MouseMoved(m) => self.send_mouse(ctx, TaggedEvent::Moved(m.clone()), data, env),
             Event::MouseDown(m) => self.send_mouse(ctx, TaggedEvent::Down(m.clone()), data, env),
-            Event::Paste(clipboard) => self.do_paste(&mut data.session, clipboard),
+            Event::Paste(clipboard) => self.do_paste(data.session_mut(), clipboard),
             _ => None,
         };
 
         self.update_undo(edit, &data.session);
         if edit.is_some() || !pre_selection.same(&data.session.selection) {
-            let new_bezier = data.session.to_bezier();
-            data.font
-                .update_outline_for_glyph(&data.session.glyph, new_bezier);
             ctx.invalidate();
+        }
+
+        if !pre_paths.same(&data.session.paths) || !pre_components.same(&data.session.components) {
+            data.session_mut().rebuild_glyph();
         }
     }
 
