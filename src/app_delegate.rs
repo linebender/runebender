@@ -102,17 +102,16 @@ impl AppDelegate<AppState> for Delegate {
     }
 }
 
-fn get_or_create_session(name: &GlyphName, data: &mut AppState) -> EditSession {
-    if let Some(session) = data.sessions.get(name) {
-        return session.to_owned();
-    } else {
-        let session = EditSession::new(name, &data.file);
+fn get_or_create_session(name: &GlyphName, data: &mut AppState) -> Arc<EditSession> {
+    data.sessions.get(name).cloned().unwrap_or_else(|| {
+        let glyphs = (&*data).into();
+        let session = Arc::new(EditSession::new(name, &glyphs));
         Arc::make_mut(&mut data.sessions).insert(name.clone(), session.clone());
         session
-    }
+    })
 }
 
-fn make_editor(session: &EditSession) -> impl Widget<AppState> {
+fn make_editor(session: &Arc<EditSession>) -> impl Widget<AppState> {
     Controller::new(
         ScrollZoom::new(Editor::new(session.clone()))
             .lens(lenses::app_state::EditorState(session.name.clone())),
