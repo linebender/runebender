@@ -7,6 +7,7 @@ use druid::{
     WindowDesc, WindowId,
 };
 
+use druid::lens::LensExt;
 use druid::widget::WidgetExt;
 use norad::{GlyphName, Ufo};
 
@@ -32,7 +33,7 @@ impl AppDelegate<AppState> for Delegate {
             Event::Command(cmd) if cmd.selector == druid::commands::OPEN_FILE => {
                 let info = cmd.get_object::<FileInfo>().expect("api violation");
                 match Ufo::load(info.path()) {
-                    Ok(ufo) => data.set_file(ufo, info.path().to_owned()),
+                    Ok(ufo) => data.workspace.set_file(ufo, info.path().to_owned()),
                     Err(e) => log::error!("failed to open file {:?}: '{:?}'", info.path(), e),
                 };
                 ctx.submit_command(consts::cmd::REBUILD_MENUS.into(), None);
@@ -40,10 +41,10 @@ impl AppDelegate<AppState> for Delegate {
             }
             Event::Command(cmd) if cmd.selector == druid::commands::SAVE_FILE => {
                 if let Some(info) = cmd.get_object::<FileInfo>() {
-                    Arc::make_mut(&mut data.file).path = Some(info.path().into());
+                    Arc::make_mut(&mut data.workspace.font).path = Some(info.path().into());
                     ctx.submit_command(consts::cmd::REBUILD_MENUS.into(), None);
                 }
-                if let Err(e) = data.save() {
+                if let Err(e) = data.workspace.save() {
                     log::error!("saving failed: '{}'", e);
                 }
                 None
@@ -54,7 +55,7 @@ impl AppDelegate<AppState> for Delegate {
                     .map(GlyphName::clone)
                     .expect("EDIT_GLYPH has incorrect payload");
 
-                match data.open_glyphs.get(&payload).to_owned() {
+                match data.workspace.open_glyphs.get(&payload).to_owned() {
                     Some(id) => {
                         let command = Command::new(druid::commands::SHOW_WINDOW, *id);
                         ctx.submit_command(command, None);
@@ -63,13 +64,13 @@ impl AppDelegate<AppState> for Delegate {
                         let session = get_or_create_session(&payload, data);
                         let new_win = WindowDesc::new(move || make_editor(&session))
                             .title(LocalizedString::new("").with_placeholder(payload.to_string()))
-                            .menu(crate::menus::make_menu(data));
+                            .menu(crate::menus::make_menu(&data));
 
                         let id = new_win.id;
                         let command = Command::new(druid::commands::NEW_WINDOW, new_win);
                         ctx.submit_command(command, None);
 
-                        Arc::make_mut(&mut data.open_glyphs).insert(payload.clone(), id);
+                        Arc::make_mut(&mut data.workspace.open_glyphs).insert(payload.clone(), id);
                     }
                 }
                 None
@@ -88,6 +89,7 @@ impl AppDelegate<AppState> for Delegate {
         _ctx: &mut DelegateCtx,
     ) {
         let to_remove = data
+            .workspace
             .open_glyphs
             .iter()
             .find(|(_k, v)| v == &&id)
@@ -95,7 +97,7 @@ impl AppDelegate<AppState> for Delegate {
         match to_remove {
             Some(open_glyph) => {
                 log::info!("removing '{}' from open list", open_glyph);
-                Arc::make_mut(&mut data.open_glyphs).remove(&open_glyph);
+                Arc::make_mut(&mut data.workspace.open_glyphs).remove(&open_glyph);
             }
             None => log::info!("window {:?} is not an editor window", id),
         }
@@ -103,17 +105,20 @@ impl AppDelegate<AppState> for Delegate {
 }
 
 fn get_or_create_session(name: &GlyphName, data: &mut AppState) -> Arc<EditSession> {
-    data.sessions.get(name).cloned().unwrap_or_else(|| {
-        let glyphs = (&*data).into();
-        let session = Arc::new(EditSession::new(name, &glyphs));
-        Arc::make_mut(&mut data.sessions).insert(name.clone(), session.clone());
-        session
-    })
+    data.workspace
+        .sessions
+        .get(name)
+        .cloned()
+        .unwrap_or_else(|| {
+            let session = Arc::new(EditSession::new(name, &data.workspace));
+            Arc::make_mut(&mut data.workspace.sessions).insert(name.clone(), session.clone());
+            session
+        })
 }
 
 fn make_editor(session: &Arc<EditSession>) -> impl Widget<AppState> {
     Controller::new(
         ScrollZoom::new(Editor::new(session.clone()))
-            .lens(lenses::app_state::EditorState(session.name.clone())),
+            .lens(AppState::workspace.then(lenses::app_state::EditorState(session.name.clone()))),
     )
 }

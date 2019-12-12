@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use druid::kurbo::{Affine, BezPath, Point, Rect, Size};
-use druid::{Data, WindowId};
+use druid::{Data, Lens, WindowId};
 use norad::glyph::{Contour, ContourPoint, Glyph, GlyphName, PointType};
 use norad::{FontInfo, MetaInfo, Ufo};
 
@@ -16,9 +16,19 @@ use crate::edit_session::EditSession;
 /// This is by convention.
 const DEFAULT_UNITS_PER_EM: f64 = 1000.;
 
-#[derive(Clone, Data, Default)]
+/// The top level data structure.
+///
+/// Currently this just wraps `Workspace`; in the future multiple workspaces
+/// will be possible.
+#[derive(Clone, Data, Default, Lens)]
 pub struct AppState {
-    pub file: Arc<FontObject>,
+    pub workspace: Workspace,
+}
+
+/// A workspace is a single font, corresponding to a UFO file on disk.
+#[derive(Clone, Data, Default)]
+pub struct Workspace {
+    pub font: Arc<FontObject>,
     /// glyphs that are already open in an editor window
     pub open_glyphs: Arc<HashMap<GlyphName, WindowId>>,
     pub sessions: Arc<HashMap<GlyphName, Arc<EditSession>>>,
@@ -30,13 +40,6 @@ pub struct FontObject {
     #[druid(ignore)]
     pub ufo: Ufo,
     placeholder: Arc<BezPath>,
-}
-
-/// The main data type for the grid view.
-#[derive(Clone, Data)]
-pub struct GlyphSet {
-    pub font: Arc<FontObject>,
-    pub sessions: Arc<HashMap<GlyphName, Arc<EditSession>>>,
 }
 
 /// A glyph, plus access to the main UFO in order to resolve components in that
@@ -62,22 +65,22 @@ pub struct FontMetrics {
 #[derive(Clone, Data)]
 pub struct EditorState {
     pub metrics: FontMetrics,
-    pub font: GlyphSet,
+    pub font: Workspace,
     pub session: Arc<EditSession>,
 }
 
-impl AppState {
+impl Workspace {
     pub fn set_file(&mut self, ufo: Ufo, path: impl Into<Option<PathBuf>>) {
         let obj = FontObject {
             path: path.into().map(Into::into),
             ufo,
             placeholder: Arc::new(placeholder_outline()),
         };
-        self.file = obj.into();
+        self.font = obj.into();
     }
 
     pub fn save(&mut self) -> Result<(), Box<dyn Error>> {
-        let font_obj = Arc::make_mut(&mut self.file);
+        let font_obj = Arc::make_mut(&mut self.font);
         if let Some(path) = font_obj.path.as_ref() {
             log::info!("saving to {:?}", path);
             // flush all open sessions
@@ -114,9 +117,7 @@ impl AppState {
         }
         Ok(())
     }
-}
 
-impl GlyphSet {
     /// Given a glyph name, a `Ufo`, and an optional cache, returns the fully resolved
     /// (including all sub components) `BezPath` for this glyph.
     pub fn get_bezier(&self, name: &GlyphName) -> Option<Arc<BezPath>> {
@@ -244,15 +245,6 @@ impl Default for FontMetrics {
     }
 }
 
-impl From<&AppState> for GlyphSet {
-    fn from(src: &AppState) -> GlyphSet {
-        GlyphSet {
-            sessions: src.sessions.clone(),
-            font: src.file.clone(),
-        }
-    }
-}
-
 pub mod lenses {
     pub mod app_state {
         use std::sync::Arc;
@@ -260,46 +252,26 @@ pub mod lenses {
         use druid::{Data, Lens};
         use norad::GlyphName;
 
-        use super::super::{AppState, EditorState as EditorState_, GlyphSet as GlyphSet_};
+        use super::super::{EditorState as EditorState_, GlyphPlus, Workspace};
 
-        /// AppState -> GlyphSet_
-        pub struct GlyphSet;
-
-        /// AppState -> EditorState
+        /// Workspace -> EditorState
         pub struct EditorState(pub GlyphName);
 
-        impl Lens<AppState, GlyphSet_> for GlyphSet {
-            fn with<V, F: FnOnce(&GlyphSet_) -> V>(&self, data: &AppState, f: F) -> V {
-                let glyphs = data.into();
-                f(&glyphs)
-            }
-            fn with_mut<V, F: FnOnce(&mut GlyphSet_) -> V>(&self, data: &mut AppState, f: F) -> V {
-                let mut glyphs = (&*data).into();
-                let v = f(&mut glyphs);
-                let GlyphSet_ { font, sessions } = glyphs;
-                if !font.same(&data.file) {
-                    data.file = font;
-                }
-                if !sessions.same(&data.sessions) {
-                    data.sessions = sessions;
-                }
-                v
-            }
-        }
+        /// GlyphSet_ -> GlyphPlus
+        pub struct Glyph(pub GlyphName);
 
-        impl Lens<AppState, EditorState_> for EditorState {
-            fn with<V, F: FnOnce(&EditorState_) -> V>(&self, data: &AppState, f: F) -> V {
+        impl Lens<Workspace, EditorState_> for EditorState {
+            fn with<V, F: FnOnce(&EditorState_) -> V>(&self, data: &Workspace, f: F) -> V {
                 let metrics = data
-                    .file
+                    .font
                     .ufo
                     .font_info
                     .as_ref()
                     .map(Into::into)
                     .unwrap_or_default();
                 let session = data.sessions.get(&self.0).cloned().unwrap();
-                let font = data.into();
                 let glyph = EditorState_ {
-                    font,
+                    font: data.clone(),
                     metrics,
                     session,
                 };
@@ -308,22 +280,21 @@ pub mod lenses {
 
             fn with_mut<V, F: FnOnce(&mut EditorState_) -> V>(
                 &self,
-                data: &mut AppState,
+                data: &mut Workspace,
                 f: F,
             ) -> V {
                 //FIXME: this is creating a new copy and then throwing it away
                 //this is just so that the signatures work for now, we aren't actually doing any
                 let metrics = data
-                    .file
+                    .font
                     .ufo
                     .font_info
                     .as_ref()
                     .map(Into::into)
                     .unwrap_or_default();
                 let session = data.sessions.get(&self.0).unwrap().to_owned();
-                let font = (&*data).into();
                 let mut glyph = EditorState_ {
-                    font,
+                    font: data.clone(),
                     metrics,
                     session,
                 };
@@ -339,20 +310,9 @@ pub mod lenses {
                 v
             }
         }
-    }
 
-    pub mod glyph_set {
-        use druid::Lens;
-        use norad::GlyphName;
-        use std::sync::Arc;
-
-        use super::super::{GlyphPlus, GlyphSet as GlyphSet_};
-
-        /// GlyphSet_ -> GlyphPlus
-        pub struct Glyph(pub GlyphName);
-
-        impl Lens<GlyphSet_, GlyphPlus> for Glyph {
-            fn with<V, F: FnOnce(&GlyphPlus) -> V>(&self, data: &GlyphSet_, f: F) -> V {
+        impl Lens<Workspace, GlyphPlus> for Glyph {
+            fn with<V, F: FnOnce(&GlyphPlus) -> V>(&self, data: &Workspace, f: F) -> V {
                 let glyph = data
                     .font
                     .ufo
@@ -368,7 +328,7 @@ pub mod lenses {
                 f(&glyph)
             }
 
-            fn with_mut<V, F: FnOnce(&mut GlyphPlus) -> V>(&self, data: &mut GlyphSet_, f: F) -> V {
+            fn with_mut<V, F: FnOnce(&mut GlyphPlus) -> V>(&self, data: &mut Workspace, f: F) -> V {
                 //FIXME: this is creating a new copy and then throwing it away
                 //this is just so that the signatures work for now, we aren't actually doing any
                 //mutating

@@ -10,16 +10,16 @@ use druid::{
 };
 
 use crate::app_delegate::EDIT_GLYPH;
-use crate::data::{lenses, GlyphPlus, GlyphSet};
+use crate::data::{lenses, GlyphPlus, Workspace};
 
 pub struct GlyphGrid {
-    children: Vec<WidgetPod<GlyphSet, LensWrap<GlyphPlus, lenses::glyph_set::Glyph, GridInner>>>,
+    children: Vec<WidgetPod<Workspace, LensWrap<GlyphPlus, lenses::app_state::Glyph, GridInner>>>,
 }
 
 const GLYPH_SIZE: f64 = 100.;
 
-impl Widget<GlyphSet> for GlyphGrid {
-    fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &GlyphSet, env: &Env) {
+impl Widget<Workspace> for GlyphGrid {
+    fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &Workspace, env: &Env) {
         ctx.render_ctx.clear(env.get(theme::BACKGROUND_LIGHT));
         let row_len = 1.0_f64.max(state.size().width / GLYPH_SIZE).floor() as usize;
         let row_count = if self.children.is_empty() {
@@ -43,7 +43,7 @@ impl Widget<GlyphSet> for GlyphGrid {
         &mut self,
         ctx: &mut LayoutCtx,
         bc: &BoxConstraints,
-        data: &GlyphSet,
+        data: &Workspace,
         env: &Env,
     ) -> Size {
         let width = (bc.max().width / GLYPH_SIZE).floor() * GLYPH_SIZE;
@@ -64,13 +64,19 @@ impl Widget<GlyphSet> for GlyphGrid {
         Size::new(width, y + GLYPH_SIZE)
     }
 
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut GlyphSet, env: &Env) {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut Workspace, env: &Env) {
         for child in &mut self.children {
             child.event(ctx, event, data, env)
         }
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, _old: Option<&GlyphSet>, new: &GlyphSet, _env: &Env) {
+    fn update(
+        &mut self,
+        ctx: &mut UpdateCtx,
+        _old: Option<&Workspace>,
+        new: &Workspace,
+        _env: &Env,
+    ) {
         if new.font.ufo.glyph_count() != self.children.len() {
             let units_per_em = new
                 .font
@@ -84,7 +90,7 @@ impl Widget<GlyphSet> for GlyphGrid {
             for key in new.font.ufo.iter_names() {
                 self.children.push(WidgetPod::new(LensWrap::new(
                     widget,
-                    lenses::glyph_set::Glyph(key),
+                    lenses::app_state::Glyph(key),
                 )));
             }
         }

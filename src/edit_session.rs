@@ -7,7 +7,7 @@ use norad::glyph::Outline;
 use norad::{Glyph, GlyphName};
 
 use crate::component::Component;
-use crate::data::GlyphSet;
+use crate::data::Workspace;
 use crate::design_space::{DPoint, DVec2, ViewPort};
 use crate::guides::Guide;
 use crate::path::{EntityId, Path, PathPoint};
@@ -34,7 +34,7 @@ pub struct EditSession {
 }
 
 impl EditSession {
-    pub fn new(name: &GlyphName, glyphs: &GlyphSet) -> Self {
+    pub fn new(name: &GlyphName, glyphs: &Workspace) -> Self {
         let name = name.to_owned();
         let glyph = glyphs.font.ufo.get_glyph(&name).unwrap().to_owned();
         let paths: Vec<Path> = glyph
