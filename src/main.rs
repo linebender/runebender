@@ -26,7 +26,7 @@ pub mod widgets;
 use druid::widget::{DynLabel, Flex, Scroll, WidgetExt};
 use druid::{AppLauncher, LocalizedString, Widget, WindowDesc};
 
-use data::{lenses, AppState};
+use data::{AppState, Workspace};
 
 use widgets::{Controller, GlyphGrid};
 
@@ -46,8 +46,8 @@ fn main() {
 
 fn make_ui() -> impl Widget<AppState> {
     let mut col = Flex::column();
-    let label = DynLabel::new(|data: &AppState, _| {
-        data.file
+    let label = DynLabel::new(|data: &Workspace, _| {
+        data.font
             .ufo
             .font_info
             .as_ref()
@@ -55,11 +55,8 @@ fn make_ui() -> impl Widget<AppState> {
             .unwrap_or_else(|| "Untitled".to_string())
     });
     col.add_child(label.padding(5.0).center().fix_height(40.), 0.);
-    col.add_child(
-        Scroll::new(GlyphGrid::new().lens(lenses::app_state::GlyphSet)).vertical(),
-        1.,
-    );
-    Controller::new(col)
+    col.add_child(Scroll::new(GlyphGrid::new()).vertical(), 1.);
+    Controller::new(col.lens(AppState::workspace))
 }
 
 /// If there was an argument passed at the command line, try to open it as a .ufo
@@ -80,9 +77,9 @@ fn get_initial_state() -> AppState {
         (create_blank_font(), None)
     };
 
-    let mut state = AppState::default();
-    state.set_file(font_file, path);
-    state
+    let mut workspace = Workspace::default();
+    workspace.set_file(font_file, path);
+    AppState { workspace }
 }
 
 /// temporary; creates a new blank  font with some placeholder glyphs.

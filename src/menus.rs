@@ -48,8 +48,14 @@ pub(crate) fn make_menu(data: &AppState) -> MenuDesc<AppState> {
         .append(tools_menu())
 }
 
+/// a work around for the fact that the first windows MenuDesc has to
+/// have the root data type. (:shrug:)
+//pub(crate) fn make_root_menu(data: &AppState) -> MenuDesc<AppState> {
+//make_menu(&data.workspace)
+//}
+
 fn file_menu(data: &AppState) -> MenuDesc<AppState> {
-    let has_path = data.file.path.is_some();
+    let has_path = data.workspace.font.path.is_some();
     let mut menu = MenuDesc::new(LocalizedString::new("common-menu-file-menu"))
         .append(platform_menus::mac::file::new_file().disabled())
         .append(

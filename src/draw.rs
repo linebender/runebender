@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use crate::component::Component;
-use crate::data::{FontMetrics, GlyphSet};
+use crate::data::{FontMetrics, Workspace};
 use crate::design_space::ViewPort;
 use crate::edit_session::EditSession;
 use crate::guides::{Guide, GuideLine};
@@ -294,7 +294,7 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         self.fill(arrow, &DIRECTION_ARROW_COLOR);
     }
 
-    fn draw_component(&mut self, component: &Component, font: &GlyphSet) {
+    fn draw_component(&mut self, component: &Component, font: &Workspace) {
         if let Some(bez) = font.get_bezier(&component.base) {
             let mut bez = Arc::try_unwrap(bez).expect("just created, guaranteed unique");
             bez.apply_affine(component.transform);
@@ -397,7 +397,7 @@ pub(crate) fn draw_session(
     visible_rect: Rect,
     metrics: &FontMetrics,
     session: &EditSession,
-    font: &GlyphSet,
+    font: &Workspace,
 ) {
     //ctx.clear(Color::WHITE);
 
