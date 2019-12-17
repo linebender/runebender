@@ -34,8 +34,14 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
         }
     }
 
-    /// Updates zoom based on a delta (generally from a scroll event)
-    fn zoom(&mut self, data: &mut EditorState, delta: Vec2, size: Size, fixed_point: Option<Vec2>) {
+    /// Updates zoom based on a delta from a scroll wheel
+    fn wheel_zoom(
+        &mut self,
+        data: &mut EditorState,
+        delta: Vec2,
+        size: Size,
+        fixed_point: Option<Vec2>,
+    ) {
         let last_zoom = data.session.viewport.zoom;
         let delta = most_significant_axis(delta);
         // we want to zoom in smaller units at smaller scales
@@ -48,6 +54,13 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
 
         let next_zoom = (last_zoom + delta).min(MAX_ZOOM).max(MIN_ZOOM);
         self.set_zoom(data, next_zoom, size, fixed_point)
+    }
+
+    fn pinch_zoom(&mut self, data: &mut EditorState, delta: f64, size: Size) {
+        let next_zoom = (data.session.viewport.zoom + delta)
+            .min(MAX_ZOOM)
+            .max(MIN_ZOOM);
+        self.set_zoom(data, next_zoom, size, None)
     }
 
     /// Set the zoom multiplier directly.
@@ -116,8 +129,12 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
         use crate::consts::cmd;
         let view_center = Rect::ZERO.with_size(view_size).center().to_vec2();
         match sel {
-            &cmd::ZOOM_IN => self.zoom(data, Vec2::new(50.0, 0.), view_size, Some(view_center)),
-            &cmd::ZOOM_OUT => self.zoom(data, Vec2::new(-50.0, 0.), view_size, Some(view_center)),
+            &cmd::ZOOM_IN => {
+                self.wheel_zoom(data, Vec2::new(50.0, 0.), view_size, Some(view_center))
+            }
+            &cmd::ZOOM_OUT => {
+                self.wheel_zoom(data, Vec2::new(-50.0, 0.), view_size, Some(view_center))
+            }
             &cmd::ZOOM_DEFAULT => {
                 self.set_zoom(data, 1.0, view_size, None);
                 self.needs_center_after_layout = true;
@@ -203,7 +220,14 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
                 self.mouse = mouse.pos;
             }
             Event::Wheel(wheel) if wheel.mods.meta => {
-                self.zoom(data, wheel.delta, ctx.size(), None);
+                self.wheel_zoom(data, wheel.delta, ctx.size(), None);
+                self.child.reset_scrollbar_fade(ctx, env);
+                ctx.set_handled();
+                ctx.invalidate();
+                return;
+            }
+            Event::Zoom(delta) => {
+                self.pinch_zoom(data, *delta, ctx.size());
                 self.child.reset_scrollbar_fade(ctx, env);
                 ctx.set_handled();
                 ctx.invalidate();
@@ -211,7 +235,6 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
             }
             _ => (),
         }
-
         self.child.event(ctx, event, data, env);
     }
 
