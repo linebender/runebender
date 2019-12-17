@@ -5,7 +5,7 @@ use std::sync::Arc;
 use druid::kurbo::{Point, Rect, Size};
 use druid::{
     Application, BaseState, BoxConstraints, Clipboard, ClipboardFormat, Command, ContextMenu, Data,
-    Env, Event, EventCtx, KeyCode, LayoutCtx, PaintCtx, UpdateCtx, Widget,
+    Env, Event, EventCtx, KeyCode, LayoutCtx, LifeCycle, PaintCtx, UpdateCtx, Widget,
 };
 
 use crate::consts::{self, CANVAS_SIZE};
@@ -136,14 +136,8 @@ impl Editor {
     /// handle a `Command`. Returns a bool indicating whether the command was
     /// handled at all, and an optional `EditType` if this command did work
     /// that should go on the undo stack.
-    fn handle_cmd(
-        &mut self,
-        cmd: &Command,
-        ctx: &mut EventCtx,
-        data: &mut EditorState,
-    ) -> (bool, Option<EditType>) {
+    fn handle_cmd(&mut self, cmd: &Command, data: &mut EditorState) -> (bool, Option<EditType>) {
         match cmd.selector {
-            consts::cmd::REQUEST_FOCUS => ctx.request_focus(),
             consts::cmd::SELECT_ALL => data.session_mut().select_all(),
             consts::cmd::DESELECT_ALL => data.session_mut().clear_selection(),
             consts::cmd::DELETE => data.session_mut().delete_selection(),
@@ -228,8 +222,12 @@ impl Widget<EditorState> for Editor {
         let pre_components = data.session.components.clone();
 
         let edit = match event {
+            Event::LifeCycle(LifeCycle::WindowConnected) => {
+                ctx.request_focus();
+                None
+            }
             Event::Command(c) => {
-                let (handled, edit) = self.handle_cmd(c, ctx, data);
+                let (handled, edit) = self.handle_cmd(c, data);
                 if handled {
                     ctx.is_handled();
                     ctx.invalidate();
