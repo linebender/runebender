@@ -23,8 +23,8 @@ mod tools;
 mod undo;
 pub mod widgets;
 
-use druid::widget::{DynLabel, Flex, Scroll, WidgetExt};
-use druid::{AppLauncher, LocalizedString, Widget, WindowDesc};
+use druid::widget::{Flex, Label, Scroll, WidgetExt};
+use druid::{AppLauncher, Env, LocalizedString, Widget, WindowDesc};
 
 use data::{AppState, Workspace};
 
@@ -46,7 +46,7 @@ fn main() {
 
 fn make_ui() -> impl Widget<AppState> {
     let mut col = Flex::column();
-    let label = DynLabel::new(|data: &Workspace, _| {
+    let label = Label::new(|data: &Workspace, _: &Env| {
         data.font
             .ufo
             .font_info

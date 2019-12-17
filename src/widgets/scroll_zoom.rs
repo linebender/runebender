@@ -7,7 +7,7 @@ use druid::{
     UpdateCtx, Widget,
 };
 
-use crate::consts::{cmd::REQUEST_FOCUS, CANVAS_SIZE};
+use crate::consts::CANVAS_SIZE;
 use crate::data::EditorState;
 
 const MIN_ZOOM: f64 = 0.02;
@@ -191,10 +191,7 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
                 return;
             }
             Event::Size(size) if self.needs_center_after_layout => {
-                self.set_initial_viewport(data, *size);
-                //HACK: because of how WidgetPod works this event isn't propogated,
-                //so we need to use a command to tell the Editor struct to request focus
-                ctx.submit_command(REQUEST_FOCUS, None);
+                self.set_initial_viewport(data, *size)
             }
             Event::KeyDown(k) if HotKey::new(None, "v").matches(k) => {
                 ctx.submit_command(cmd::SELECT_TOOL, None)
