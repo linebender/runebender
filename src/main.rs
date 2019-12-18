@@ -23,6 +23,7 @@ mod tools;
 mod undo;
 pub mod widgets;
 
+use druid::kurbo::Size;
 use druid::widget::{Flex, Label, Scroll, WidgetExt};
 use druid::{AppLauncher, Env, LocalizedString, Widget, WindowDesc};
 
@@ -35,7 +36,8 @@ fn main() {
 
     let main_window = WindowDesc::new(make_ui)
         .title(LocalizedString::new("Runebender"))
-        .menu(menus::make_menu(&state));
+        .menu(menus::make_menu(&state))
+        .window_size(Size::new(900.0, 800.0));
 
     AppLauncher::with_window(main_window)
         .delegate(app_delegate::Delegate::default())

@@ -7,6 +7,7 @@ use druid::{
     WindowDesc, WindowId,
 };
 
+use druid::kurbo::Size;
 use druid::lens::LensExt;
 use druid::widget::WidgetExt;
 use norad::{GlyphName, Ufo};
@@ -64,6 +65,7 @@ impl AppDelegate<AppState> for Delegate {
                         let session = get_or_create_session(&payload, data);
                         let new_win = WindowDesc::new(move || make_editor(&session))
                             .title(LocalizedString::new("").with_placeholder(payload.to_string()))
+                            .window_size(Size::new(900.0, 800.0))
                             .menu(crate::menus::make_menu(&data));
 
                         let id = new_win.id;
