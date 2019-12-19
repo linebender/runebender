@@ -13,15 +13,21 @@ use crate::data::EditorState;
 use crate::draw;
 use crate::edit_session::EditSession;
 use crate::mouse::{Mouse, TaggedEvent};
-use crate::tools::{EditType, Pen, Select, Tool};
+use crate::tools::{EditType, Pen, Preview, Select, Tool};
 use crate::undo::UndoState;
 
 /// The root widget of the glyph editor window.
 pub struct Editor {
     mouse: Mouse,
     tool: Box<dyn Tool>,
+    // in the case of the temporary preview (spacebar) this is the tool
+    // that will be restored when spacebar is released.
+    //prev_tool: Option<Box<dyn Tool>>,
     undo: UndoState<Arc<EditSession>>,
     last_edit: EditType,
+    /// If true, this session should be drawn with all glyphs filled and
+    /// with no non-glyph items visible.
+    draw_filled_outlines: bool,
 }
 
 impl Editor {
@@ -29,8 +35,10 @@ impl Editor {
         Editor {
             mouse: Mouse::default(),
             tool: Box::new(Select::default()),
+            //prev_tool: None,
             undo: UndoState::new(session),
             last_edit: EditType::Normal,
+            draw_filled_outlines: false,
         }
     }
 
@@ -142,12 +150,21 @@ impl Editor {
             consts::cmd::DESELECT_ALL => data.session_mut().clear_selection(),
             consts::cmd::DELETE => data.session_mut().delete_selection(),
             consts::cmd::SELECT_TOOL => {
-                self.tool = Box::new(Select::default());
-                data.session_mut().tool_desc = Arc::from("Select");
+                self.set_tool(data, Box::new(Select::default()));
             }
             consts::cmd::PEN_TOOL => {
-                self.tool = Box::new(Pen::default());
-                data.session_mut().tool_desc = Arc::from("Pen");
+                self.set_tool(data, Box::new(Pen::default()));
+            }
+            consts::cmd::PREVIEW_TOOL => {
+                self.set_tool(data, Box::new(Preview::default()));
+            }
+            consts::cmd::TOGGLE_PREVIEW_TOOL => {
+                let is_mouse_down: &bool = cmd.get_object().unwrap();
+                // we don't toggle preview if we're actually *in* preview
+                if self.tool.name() != "Preview" {
+                    self.draw_filled_outlines = *is_mouse_down;
+                    return (true, None);
+                }
             }
             consts::cmd::ADD_GUIDE => {
                 let point = cmd.get_object::<Point>().unwrap();
@@ -184,6 +201,12 @@ impl Editor {
         // the default: commands with an `EditType` return explicitly.
         (true, None)
     }
+
+    fn set_tool(&mut self, data: &mut EditorState, tool: Box<dyn Tool>) {
+        self.draw_filled_outlines = tool.name() == "Preview";
+        data.session_mut().tool_desc = tool.name().into();
+        self.tool = tool;
+    }
 }
 
 impl Widget<EditorState> for Editor {
@@ -200,6 +223,7 @@ impl Widget<EditorState> for Editor {
             &data.metrics,
             &data.session,
             &data.font,
+            self.draw_filled_outlines,
         );
 
         self.tool.paint(ctx, &data.session, env);

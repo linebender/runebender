@@ -1,9 +1,11 @@
 //! A tool accepts user input and modifies the canvas.
 
 mod pen;
+mod preview;
 mod select;
 
 pub use pen::Pen;
+pub use preview::Preview;
 pub use select::Select;
 
 use crate::edit_session::EditSession;
@@ -91,6 +93,8 @@ pub trait Tool {
     ) -> Option<EditType> {
         None
     }
+
+    fn name(&self) -> &str;
 }
 
 impl EditType {

@@ -97,6 +97,10 @@ impl Tool for Select {
         }
         self.this_edit_type.take()
     }
+
+    fn name(&self) -> &str {
+        "Select"
+    }
 }
 
 impl Select {

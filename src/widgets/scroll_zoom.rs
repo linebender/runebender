@@ -3,8 +3,8 @@ use druid::piet::{Color, FontBuilder, RenderContext, Text, TextLayout, TextLayou
 use druid::kurbo::{Point, Rect, RoundedRect, Size, Vec2};
 use druid::widget::Scroll;
 use druid::{
-    BaseState, BoxConstraints, Env, Event, EventCtx, HotKey, LayoutCtx, PaintCtx, Selector,
-    UpdateCtx, Widget,
+    BaseState, BoxConstraints, Command, Env, Event, EventCtx, HotKey, KeyCode, LayoutCtx, PaintCtx,
+    Selector, UpdateCtx, Widget,
 };
 
 use crate::consts::CANVAS_SIZE;
@@ -215,6 +215,17 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
             }
             Event::KeyDown(k) if HotKey::new(None, "p").matches(k) => {
                 ctx.submit_command(cmd::PEN_TOOL, None)
+            }
+            Event::KeyDown(k) if HotKey::new(None, "h").matches(k) => {
+                ctx.submit_command(cmd::PREVIEW_TOOL, None)
+            }
+            Event::KeyDown(k) if !k.is_repeat && k.key_code == KeyCode::Space => {
+                let cmd = Command::new(cmd::TOGGLE_PREVIEW_TOOL, true);
+                ctx.submit_command(cmd, None);
+            }
+            Event::KeyUp(k) if k.key_code == KeyCode::Space => {
+                let cmd = Command::new(cmd::TOGGLE_PREVIEW_TOOL, false);
+                ctx.submit_command(cmd, None);
             }
             Event::MouseMoved(mouse) => {
                 self.mouse = mouse.pos;
