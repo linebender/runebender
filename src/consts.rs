@@ -34,6 +34,17 @@ pub mod cmd {
     /// Sent when the 'pen' tool should be activated
     pub const PEN_TOOL: Selector = Selector::new("runebender.tool-pen");
 
+    /// Sent when the 'preview/hand' tool should be activated.
+    pub const PREVIEW_TOOL: Selector = Selector::new("runebender.tool-preview");
+
+    /// Sent when the preview tool is toggled  temporarily.
+    ///
+    /// This is normally bound to spacebar.
+    ///
+    /// The argument should be a bool indicating whether this is a keydown (true)
+    /// or a keyup (false).
+    pub const TOGGLE_PREVIEW_TOOL: Selector = Selector::new("runebender.tool-preview-toggle");
+
     /// Sent when the 'zoom in' menu item is selected
     pub const ZOOM_IN: Selector = Selector::new("runebender.zoom-in");
 

@@ -174,10 +174,12 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         self.stroke(bez, &path_brush, 1.0);
     }
 
-    fn draw_filled_paths(&mut self, paths: &[Path]) {
-        for p in paths {
-            let bez = self.space.affine() * p.bezier().clone();
-            self.fill(bez, &Color::BLACK);
+    fn draw_filled(&mut self, session: &EditSession, font: &Workspace) {
+        let bez = self.space.affine() * session.to_bezier();
+        self.fill(bez, &Color::BLACK);
+
+        for comp in session.components.iter() {
+            self.draw_component(comp, font, Color::BLACK);
         }
     }
 
@@ -294,12 +296,12 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         self.fill(arrow, &DIRECTION_ARROW_COLOR);
     }
 
-    fn draw_component(&mut self, component: &Component, font: &Workspace) {
+    fn draw_component(&mut self, component: &Component, font: &Workspace, color: Color) {
         if let Some(bez) = font.get_bezier(&component.base) {
             let mut bez = Arc::try_unwrap(bez).expect("just created, guaranteed unique");
             bez.apply_affine(component.transform);
             bez.apply_affine(self.space.affine());
-            self.fill(bez, &COMPONENT_FILL_COLOR);
+            self.fill(bez, &color);
         }
     }
 }
@@ -398,15 +400,15 @@ pub(crate) fn draw_session(
     metrics: &FontMetrics,
     session: &EditSession,
     font: &Workspace,
+    is_preview: bool,
 ) {
-    //ctx.clear(Color::WHITE);
-
-    //if tool.name() == "preview" {
-    //draw_ctx.draw_filled_paths(paths);
-    //return;
-    //}
-
     let mut draw_ctx = DrawCtx::new(&mut ctx.render_ctx, space, visible_rect);
+
+    if is_preview {
+        draw_ctx.draw_filled(session, font);
+        return;
+    }
+
     draw_ctx.draw_grid();
     draw_ctx.draw_metrics(&session.glyph, metrics);
     draw_ctx.draw_guides(&session.guides, &session.selection);
@@ -429,12 +431,8 @@ pub(crate) fn draw_session(
     }
 
     for component in session.components.iter() {
-        draw_ctx.draw_component(component, font);
+        draw_ctx.draw_component(component, font, COMPONENT_FILL_COLOR);
     }
-
-    //if let Some(rect) = tool.selection_rect() {
-    //draw_ctx.draw_selection_rect(rect);
-    //}
 }
 
 /// Return the tangent of the cubic bezier `cb`, at time `t`, as a vector

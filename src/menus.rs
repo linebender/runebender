@@ -181,4 +181,11 @@ fn tools_menu<T: Data>() -> MenuDesc<T> {
             )
             .hotkey(SysMods::None, "p"),
         )
+        .append(
+            MenuItem::new(
+                LocalizedString::new("menu-item-preview-tool").with_placeholder("Preview".into()),
+                consts::cmd::PREVIEW_TOOL,
+            )
+            .hotkey(SysMods::None, "h"),
+        )
 }

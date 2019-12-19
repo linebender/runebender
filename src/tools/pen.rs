@@ -87,6 +87,10 @@ impl Tool for Pen {
         mouse.mouse_event(event, data, self);
         self.this_edit_type.take()
     }
+
+    fn name(&self) -> &str {
+        "Pen"
+    }
 }
 
 /// Lock the smallest axis of `point` (from `prev`) to that axis on `prev`.
