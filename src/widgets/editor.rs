@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use druid::kurbo::{Point, Rect, Size};
 use druid::{
-    Application, BaseState, BoxConstraints, Clipboard, ClipboardFormat, Command, ContextMenu, Data,
-    Env, Event, EventCtx, KeyCode, LayoutCtx, LifeCycle, PaintCtx, UpdateCtx, Widget,
+    Application, BoxConstraints, Clipboard, ClipboardFormat, Command, ContextMenu, Data, Env,
+    Event, EventCtx, KeyCode, LayoutCtx, LifeCycle, PaintCtx, UpdateCtx, Widget,
 };
 
 use crate::consts::{self, CANVAS_SIZE};
@@ -210,7 +210,7 @@ impl Editor {
 }
 
 impl Widget<EditorState> for Editor {
-    fn paint(&mut self, ctx: &mut PaintCtx, _: &BaseState, data: &EditorState, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &EditorState, env: &Env) {
         use druid::piet::{Color, RenderContext};
         let rect =
             Rect::ZERO.with_size((CANVAS_SIZE.to_vec2() * data.session.viewport.zoom).to_size());
