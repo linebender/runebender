@@ -2,8 +2,7 @@
 
 use druid::kurbo::Size;
 use druid::{
-    BaseState, BoxConstraints, Command, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx,
-    Widget,
+    BoxConstraints, Command, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget,
 };
 
 use crate::consts;
@@ -16,8 +15,8 @@ pub struct Controller {
 }
 
 impl Widget<AppState> for Controller {
-    fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, d: &AppState, env: &Env) {
-        self.inner.paint(ctx, state, d, env)
+    fn paint(&mut self, ctx: &mut PaintCtx, d: &AppState, env: &Env) {
+        self.inner.paint(ctx, d, env)
     }
 
     fn layout(

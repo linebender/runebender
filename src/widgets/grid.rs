@@ -5,8 +5,8 @@ use druid::piet::{
     FontBuilder, PietText, PietTextLayout, RenderContext, Text, TextLayout, TextLayoutBuilder,
 };
 use druid::{
-    theme, BaseState, BoxConstraints, Command, Data, Env, Event, EventCtx, LayoutCtx, LensWrap,
-    PaintCtx, UpdateCtx, Widget, WidgetPod,
+    theme, BoxConstraints, Command, Data, Env, Event, EventCtx, LayoutCtx, LensWrap, PaintCtx,
+    UpdateCtx, Widget, WidgetPod,
 };
 
 use crate::app_delegate::EDIT_GLYPH;
@@ -19,9 +19,9 @@ pub struct GlyphGrid {
 const GLYPH_SIZE: f64 = 100.;
 
 impl Widget<Workspace> for GlyphGrid {
-    fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &Workspace, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &Workspace, env: &Env) {
         ctx.render_ctx.clear(env.get(theme::BACKGROUND_LIGHT));
-        let row_len = 1.0_f64.max(state.size().width / GLYPH_SIZE).floor() as usize;
+        let row_len = 1.0_f64.max(ctx.size().width / GLYPH_SIZE).floor() as usize;
         let row_count = if self.children.is_empty() {
             0
         } else {
@@ -30,7 +30,7 @@ impl Widget<Workspace> for GlyphGrid {
 
         for row in 0..row_count {
             let baseline = row as f64 * GLYPH_SIZE + GLYPH_SIZE * (1.0 - 0.16);
-            let line = Line::new((0., baseline), (state.size().width + GLYPH_SIZE, baseline));
+            let line = Line::new((0., baseline), (ctx.size().width + GLYPH_SIZE, baseline));
             ctx.render_ctx
                 .stroke(&line, &env.get(theme::FOREGROUND_DARK), 1.0);
         }
@@ -112,11 +112,11 @@ struct GridInner {
 }
 
 impl Widget<GlyphPlus> for GridInner {
-    fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &GlyphPlus, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &GlyphPlus, env: &Env) {
         //TODO: replacement for missing glyphs
         let path = data.get_bezier();
         let bb = path.bounding_box();
-        let geom = Rect::ZERO.with_size(state.size());
+        let geom = Rect::ZERO.with_size(ctx.size());
         let scale = geom.height() as f64 / self.units_per_em;
         let scale = scale * 0.85; // some margins around glyphs
         let scaled_width = bb.width() * scale as f64;
@@ -133,24 +133,20 @@ impl Widget<GlyphPlus> for GridInner {
 
         let hl_color = env.get(theme::SELECTION_COLOR);
         let glyph_color = env.get(theme::FOREGROUND_DARK);
-        let glyph_body_color = if state.is_active() {
+        let glyph_body_color = if ctx.is_active() {
             &hl_color
         } else {
             &glyph_color
         };
         ctx.render_ctx.fill(affine * &*path, glyph_body_color);
 
-        if state.is_hot() {
+        if ctx.is_hot() {
             ctx.render_ctx.stroke(affine * &*path, &hl_color, 1.0);
             ctx.render_ctx.stroke(geom, &hl_color, 1.0);
         }
 
         let font_size = env.get(theme::TEXT_SIZE_NORMAL);
-        let name_color = if state.is_hot() {
-            hl_color
-        } else {
-            glyph_color
-        };
+        let name_color = if ctx.is_hot() { hl_color } else { glyph_color };
         let text = get_text_layout(&mut ctx.text(), &data.glyph.name, env);
         let xpos = geom.x0 + (geom.width() - text.width()) * 0.5;
         let ypos = geom.y0 + geom.height() - font_size * 0.25;

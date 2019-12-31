@@ -3,8 +3,8 @@ use druid::piet::{Color, FontBuilder, RenderContext, Text, TextLayout, TextLayou
 use druid::kurbo::{Point, Rect, RoundedRect, Size, Vec2};
 use druid::widget::Scroll;
 use druid::{
-    BaseState, BoxConstraints, Command, Env, Event, EventCtx, HotKey, KeyCode, LayoutCtx, PaintCtx,
-    Selector, UpdateCtx, Widget,
+    BoxConstraints, Command, Env, Event, EventCtx, HotKey, KeyCode, LayoutCtx, PaintCtx, Selector,
+    UpdateCtx, Widget,
 };
 
 use crate::consts::CANVAS_SIZE;
@@ -171,10 +171,10 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
 }
 
 impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
-    fn paint(&mut self, ctx: &mut PaintCtx, state: &BaseState, data: &EditorState, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &EditorState, env: &Env) {
         //TODO: paint grid here?
         ctx.clear(Color::rgb8(100, 100, 20));
-        self.child.paint(ctx, state, data, env);
+        self.child.paint(ctx, data, env);
         self.paint_label(ctx, data, env);
     }
 
