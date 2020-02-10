@@ -65,8 +65,8 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
     fn draw_metrics(&mut self, glyph: &Glyph, metrics: &FontMetrics) {
         let upm = metrics.units_per_em;
         //let cap_height = metrics.cap_height.unwrap_or((upm * 0.7).round());
-        let ascender = metrics.ascender.unwrap_or((upm * 0.8).round());
-        let descender = metrics.descender.unwrap_or(-(upm * 0.2).round());
+        let ascender = metrics.ascender.unwrap_or_else(|| (upm * 0.8).round());
+        let descender = metrics.descender.unwrap_or_else(|| -(upm * 0.2).round());
         let hadvance = glyph
             .advance
             .as_ref()
@@ -89,7 +89,7 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
             let grid_fade = ((self.space.zoom - MIN_SCALE_FOR_GRID) / 10.)
                 .min(1.0)
                 .max(0.05);
-            let gray_val = 0xFF - (0x44 as f64 * grid_fade) as u8;
+            let gray_val = 0xFF - (68. * grid_fade) as u8;
             let brush = Color::rgb8(gray_val, gray_val, gray_val);
 
             let visible_pixels =

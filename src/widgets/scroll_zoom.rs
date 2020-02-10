@@ -71,7 +71,7 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
         size: Size,
         fixed_point: Option<Vec2>,
     ) {
-        let fixed_point = fixed_point.unwrap_or(self.mouse.to_vec2());
+        let fixed_point = fixed_point.unwrap_or_else(|| self.mouse.to_vec2());
         let delta_zoom = new_zoom / data.session.viewport.zoom;
         // prevents jitter when we're near our max or min zoom levels
         if (delta_zoom).abs() < 0.001 {
@@ -128,14 +128,14 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
     fn handle_zoom_cmd(&mut self, sel: &Selector, view_size: Size, data: &mut EditorState) {
         use crate::consts::cmd;
         let view_center = Rect::ZERO.with_size(view_size).center().to_vec2();
-        match sel {
-            &cmd::ZOOM_IN => {
+        match *sel {
+            cmd::ZOOM_IN => {
                 self.wheel_zoom(data, Vec2::new(50.0, 0.), view_size, Some(view_center))
             }
-            &cmd::ZOOM_OUT => {
+            cmd::ZOOM_OUT => {
                 self.wheel_zoom(data, Vec2::new(-50.0, 0.), view_size, Some(view_center))
             }
-            &cmd::ZOOM_DEFAULT => {
+            cmd::ZOOM_DEFAULT => {
                 self.set_zoom(data, 1.0, view_size, None);
                 self.needs_center_after_layout = true;
             }

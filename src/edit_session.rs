@@ -67,7 +67,7 @@ impl EditSession {
             guides: Arc::new(guides),
             viewport: ViewPort::default(),
             tool_desc: Arc::from("Select"),
-            work_bounds: work_bounds,
+            work_bounds,
         }
     }
 
@@ -406,7 +406,7 @@ impl<'a> Iterator for PathSelectionIter<'a> {
             .iter()
             .position(|p| p.parent != path_id)
             .map(|idx| idx + self.idx)
-            .unwrap_or(self.inner.len());
+            .unwrap_or_else(|| self.inner.len());
         let range = self.idx..end_idx;
         self.idx = end_idx;
         // probably unnecessary, but we don't expect empty slices
