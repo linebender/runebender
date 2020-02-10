@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use druid::kurbo::{Point, Rect, Vec2};
 use druid::piet::{Color, RenderContext};
-use druid::{Env, EventCtx, HotKey, KeyCode, KeyEvent, MouseEvent, PaintCtx, RawMods};
+use druid::{Data, Env, EventCtx, HotKey, KeyCode, KeyEvent, MouseEvent, PaintCtx, RawMods};
 
 use crate::design_space::{DPoint, DVec2};
 use crate::edit_session::EditSession;
@@ -92,7 +92,7 @@ impl Tool for Select {
         assert!(self.this_edit_type.is_none());
         let pre_rect = self.drag.drag_rect();
         mouse.mouse_event(event, data, self);
-        if !rect_equality(pre_rect, self.drag.drag_rect()) {
+        if !pre_rect.same(&self.drag.drag_rect()) {
             ctx.request_paint();
         }
         self.this_edit_type.take()
@@ -153,7 +153,7 @@ impl MouseDelegate<EditSession> for Select {
                 data.selection_mut().clear();
             }
         } else if event.count == 2 {
-            let sel = data.iter_items_near_point(event.pos, None).next().clone();
+            let sel = data.iter_items_near_point(event.pos, None).next();
             match sel {
                 Some(id)
                     if data
@@ -257,16 +257,6 @@ fn update_selection_for_drag(
         prev_sel.union(&in_select_rect).copied().collect()
     };
     *data.selection_mut() = new_sel;
-}
-
-fn rect_equality(one: Option<Rect>, two: Option<Rect>) -> bool {
-    match (one, two) {
-        (None, None) => true,
-        (Some(one), Some(two)) => {
-            one.x0 == two.x0 && one.x1 == two.x1 && one.y0 == two.y0 && one.y1 == two.y1
-        }
-        _ => false,
-    }
 }
 
 impl Default for DragState {

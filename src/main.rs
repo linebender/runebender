@@ -64,7 +64,7 @@ fn make_ui() -> impl Widget<AppState> {
 /// If there was an argument passed at the command line, try to open it as a .ufo
 /// file, otherwise return blank state.
 fn get_initial_state() -> AppState {
-    let (font_file, path) = if let Some(arg) = std::env::args().skip(1).next() {
+    let (font_file, path) = if let Some(arg) = std::env::args().nth(1) {
         match norad::Ufo::load(&arg) {
             Ok(ufo) => (ufo, Some(std::path::PathBuf::from(arg))),
             Err(e) => {
