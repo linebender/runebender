@@ -41,7 +41,9 @@ impl Widget<AppState> for Controller {
         }
     }
 
-    fn lifecycle(&mut self, _: &mut LifeCycleCtx, _: &LifeCycle, _: &AppState, _: &Env) {}
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &AppState, env: &Env) {
+        self.inner.lifecycle(ctx, event, data, env)
+    }
 
     fn update(&mut self, ctx: &mut UpdateCtx, old: &AppState, new: &AppState, env: &Env) {
         self.inner.update(ctx, old, new, env)
