@@ -3,8 +3,8 @@ use druid::piet::{Color, FontBuilder, RenderContext, Text, TextLayout, TextLayou
 use druid::kurbo::{Point, Rect, RoundedRect, Size, Vec2};
 use druid::widget::Scroll;
 use druid::{
-    BoxConstraints, Command, Env, Event, EventCtx, HotKey, KeyCode, LayoutCtx, PaintCtx, Selector,
-    UpdateCtx, Widget,
+    BoxConstraints, Command, Env, Event, EventCtx, HotKey, KeyCode, LayoutCtx, LifeCycle,
+    LifeCycleCtx, PaintCtx, Selector, UpdateCtx, Widget,
 };
 
 use crate::consts::CANVAS_SIZE;
@@ -203,7 +203,7 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
             {
                 self.handle_zoom_cmd(&c.selector, ctx.size(), data);
                 self.child.reset_scrollbar_fade(ctx, env);
-                ctx.invalidate();
+                ctx.request_paint();
                 ctx.set_handled();
                 return;
             }
@@ -234,14 +234,14 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
                 self.wheel_zoom(data, wheel.delta, ctx.size(), None);
                 self.child.reset_scrollbar_fade(ctx, env);
                 ctx.set_handled();
-                ctx.invalidate();
+                ctx.request_paint();
                 return;
             }
             Event::Zoom(delta) => {
                 self.pinch_zoom(data, *delta, ctx.size());
                 self.child.reset_scrollbar_fade(ctx, env);
                 ctx.set_handled();
-                ctx.invalidate();
+                ctx.request_paint();
                 return;
             }
             _ => (),
@@ -249,13 +249,9 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
         self.child.event(ctx, event, data, env);
     }
 
-    fn update(
-        &mut self,
-        ctx: &mut UpdateCtx,
-        old: Option<&EditorState>,
-        new: &EditorState,
-        env: &Env,
-    ) {
+    fn lifecycle(&mut self, _: &mut LifeCycleCtx, _: &LifeCycle, _: &EditorState, _: &Env) {}
+
+    fn update(&mut self, ctx: &mut UpdateCtx, old: &EditorState, new: &EditorState, env: &Env) {
         self.child.update(ctx, old, new, env);
     }
 }

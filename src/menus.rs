@@ -16,7 +16,7 @@ pub const UFO_FILE_TYPE: FileSpec = FileSpec::new("Font Object", &["ufo"]);
 /// Context menu's inner menu must have type T == the root app state.
 pub fn make_context_menu(data: &EditorState, pos: Point) -> MenuDesc<AppState> {
     let mut menu = MenuDesc::empty().append(MenuItem::new(
-        LocalizedString::new("menu-item-add-guide").with_placeholder("Add Guide".into()),
+        LocalizedString::new("menu-item-add-guide").with_placeholder("Add Guide"),
         Command::new(consts::cmd::ADD_GUIDE, pos),
     ));
 
@@ -26,7 +26,7 @@ pub fn make_context_menu(data: &EditorState, pos: Point) -> MenuDesc<AppState> {
         let args = consts::cmd::ToggleGuideCmdArgs { id, pos };
         menu = menu.append(MenuItem::new(
             LocalizedString::new("menu-item-toggle-guide")
-                .with_placeholder("Toggle Guide Orientation".into()),
+                .with_placeholder("Toggle Guide Orientation"),
             Command::new(consts::cmd::TOGGLE_GUIDE, args),
         ));
     }
@@ -107,21 +107,20 @@ fn edit_menu<T: Data>() -> MenuDesc<T> {
         .append(platform_menus::common::copy())
         .append(platform_menus::common::paste())
         .append(MenuItem::new(
-            LocalizedString::new("menu-item-delete").with_placeholder("Delete".into()),
+            LocalizedString::new("menu-item-delete").with_placeholder("Delete"),
             consts::cmd::DELETE,
         ))
         .append_separator()
         .append(
             MenuItem::new(
-                LocalizedString::new("menu-item-select-all").with_placeholder("Select All".into()),
+                LocalizedString::new("menu-item-select-all").with_placeholder("Select All"),
                 consts::cmd::SELECT_ALL,
             )
             .hotkey(SysMods::Cmd, "a"),
         )
         .append(
             MenuItem::new(
-                LocalizedString::new("menu-item-deselect-all")
-                    .with_placeholder("Deselect All".into()),
+                LocalizedString::new("menu-item-deselect-all").with_placeholder("Deselect All"),
                 consts::cmd::DESELECT_ALL,
             )
             .hotkey(SysMods::CmdShift, "a"),
@@ -129,24 +128,24 @@ fn edit_menu<T: Data>() -> MenuDesc<T> {
 }
 
 fn view_menu<T: Data>() -> MenuDesc<T> {
-    MenuDesc::new(LocalizedString::new("menu-view-menu").with_placeholder("View".into()))
+    MenuDesc::new(LocalizedString::new("menu-view-menu").with_placeholder("View"))
         .append(
             MenuItem::new(
-                LocalizedString::new("menu-item-increase-zoom").with_placeholder("Zoom In".into()),
+                LocalizedString::new("menu-item-increase-zoom").with_placeholder("Zoom In"),
                 consts::cmd::ZOOM_IN,
             )
             .hotkey(SysMods::Cmd, "+"),
         )
         .append(
             MenuItem::new(
-                LocalizedString::new("menu-item-decrease-zoom").with_placeholder("Zoom Out".into()),
+                LocalizedString::new("menu-item-decrease-zoom").with_placeholder("Zoom Out"),
                 consts::cmd::ZOOM_OUT,
             )
             .hotkey(SysMods::Cmd, "-"),
         )
         .append(
             MenuItem::new(
-                LocalizedString::new("menu-item-reset-zoom").with_placeholder("Reset Zoom".into()),
+                LocalizedString::new("menu-item-reset-zoom").with_placeholder("Reset Zoom"),
                 consts::cmd::ZOOM_DEFAULT,
             )
             .hotkey(SysMods::Cmd, "0"),
@@ -154,10 +153,9 @@ fn view_menu<T: Data>() -> MenuDesc<T> {
 }
 
 fn glyph_menu<T: Data>() -> MenuDesc<T> {
-    MenuDesc::new(LocalizedString::new("menu-glyph-menu").with_placeholder("Glyph".into())).append(
+    MenuDesc::new(LocalizedString::new("menu-glyph-menu").with_placeholder("Glyph")).append(
         MenuItem::new(
-            LocalizedString::new("menu-item-add-component")
-                .with_placeholder("Add Component".into()),
+            LocalizedString::new("menu-item-add-component").with_placeholder("Add Component"),
             consts::cmd::ADD_COMPONENT,
         )
         .hotkey(SysMods::CmdShift, "c")
@@ -166,24 +164,24 @@ fn glyph_menu<T: Data>() -> MenuDesc<T> {
 }
 
 fn tools_menu<T: Data>() -> MenuDesc<T> {
-    MenuDesc::new(LocalizedString::new("menu-tools-menu").with_placeholder("Tools".into()))
+    MenuDesc::new(LocalizedString::new("menu-tools-menu").with_placeholder("Tools"))
         .append(
             MenuItem::new(
-                LocalizedString::new("menu-item-select-tool").with_placeholder("Select".into()),
+                LocalizedString::new("menu-item-select-tool").with_placeholder("Select"),
                 consts::cmd::SELECT_TOOL,
             )
             .hotkey(SysMods::None, "v"),
         )
         .append(
             MenuItem::new(
-                LocalizedString::new("menu-item-pen-tool").with_placeholder("Pen".into()),
+                LocalizedString::new("menu-item-pen-tool").with_placeholder("Pen"),
                 consts::cmd::PEN_TOOL,
             )
             .hotkey(SysMods::None, "p"),
         )
         .append(
             MenuItem::new(
-                LocalizedString::new("menu-item-preview-tool").with_placeholder("Preview".into()),
+                LocalizedString::new("menu-item-preview-tool").with_placeholder("Preview"),
                 consts::cmd::PREVIEW_TOOL,
             )
             .hotkey(SysMods::None, "h"),

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use druid::kurbo::{Point, Rect, Size};
 use druid::{
     Application, BoxConstraints, Clipboard, ClipboardFormat, Command, ContextMenu, Data, Env,
-    Event, EventCtx, KeyCode, LayoutCtx, LifeCycle, PaintCtx, UpdateCtx, Widget,
+    Event, EventCtx, KeyCode, LayoutCtx, LifeCycle, LifeCycleCtx, PaintCtx, UpdateCtx, Widget,
 };
 
 use crate::consts::{self, CANVAS_SIZE};
@@ -240,13 +240,13 @@ impl Widget<EditorState> for Editor {
     }
 
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut EditorState, env: &Env) {
-        // we invalidate if selection changes after this event;
+        // we request_paint if selection changes after this event;
         let pre_selection = data.session.selection.clone();
         let pre_paths = data.session.paths.clone();
         let pre_components = data.session.components.clone();
 
         let edit = match event {
-            Event::LifeCycle(LifeCycle::WindowConnected) => {
+            Event::WindowConnected => {
                 ctx.request_focus();
                 None
             }
@@ -254,7 +254,7 @@ impl Widget<EditorState> for Editor {
                 let (handled, edit) = self.handle_cmd(c, data);
                 if handled {
                     ctx.is_handled();
-                    ctx.invalidate();
+                    ctx.request_paint();
                 }
                 edit
             }
@@ -272,7 +272,7 @@ impl Widget<EditorState> for Editor {
 
         self.update_undo(edit, &data.session);
         if edit.is_some() || !pre_selection.same(&data.session.selection) {
-            ctx.invalidate();
+            ctx.request_paint();
         }
 
         if !pre_paths.same(&data.session.paths) || !pre_components.same(&data.session.components) {
@@ -280,15 +280,11 @@ impl Widget<EditorState> for Editor {
         }
     }
 
-    fn update(
-        &mut self,
-        ctx: &mut UpdateCtx,
-        old: Option<&EditorState>,
-        new: &EditorState,
-        _env: &Env,
-    ) {
-        if !Some(new).same(&old) {
-            ctx.invalidate();
+    fn lifecycle(&mut self, _: &mut LifeCycleCtx, _: &LifeCycle, _: &EditorState, _: &Env) {}
+
+    fn update(&mut self, ctx: &mut UpdateCtx, old: &EditorState, new: &EditorState, _env: &Env) {
+        if !old.same(new) {
+            ctx.request_paint();
         }
     }
 }
