@@ -37,13 +37,13 @@ impl AppDelegate<AppState> for Delegate {
                     Ok(ufo) => data.workspace.set_file(ufo, info.path().to_owned()),
                     Err(e) => log::error!("failed to open file {:?}: '{:?}'", info.path(), e),
                 };
-                ctx.submit_command(consts::cmd::REBUILD_MENUS.into(), None);
+                ctx.submit_command(consts::cmd::REBUILD_MENUS, None);
                 None
             }
             Event::Command(cmd) if cmd.selector == druid::commands::SAVE_FILE => {
-                if let Some(info) = cmd.get_object::<FileInfo>() {
+                if let Ok(info) = cmd.get_object::<FileInfo>() {
                     Arc::make_mut(&mut data.workspace.font).path = Some(info.path().into());
-                    ctx.submit_command(consts::cmd::REBUILD_MENUS.into(), None);
+                    ctx.submit_command(consts::cmd::REBUILD_MENUS, None);
                 }
                 if let Err(e) = data.workspace.save() {
                     log::error!("saving failed: '{}'", e);

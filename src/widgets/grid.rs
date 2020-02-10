@@ -5,13 +5,14 @@ use druid::piet::{
     FontBuilder, PietText, PietTextLayout, RenderContext, Text, TextLayout, TextLayoutBuilder,
 };
 use druid::{
-    theme, BoxConstraints, Command, Data, Env, Event, EventCtx, LayoutCtx, LensWrap, PaintCtx,
-    UpdateCtx, Widget, WidgetPod,
+    theme, BoxConstraints, Command, Data, Env, Event, EventCtx, LayoutCtx, LensWrap, LifeCycle,
+    LifeCycleCtx, PaintCtx, UpdateCtx, Widget, WidgetPod,
 };
 
 use crate::app_delegate::EDIT_GLYPH;
 use crate::data::{lenses, GlyphPlus, Workspace};
 
+#[derive(Default)]
 pub struct GlyphGrid {
     children: Vec<WidgetPod<Workspace, LensWrap<GlyphPlus, lenses::app_state::Glyph, GridInner>>>,
 }
@@ -70,20 +71,16 @@ impl Widget<Workspace> for GlyphGrid {
         }
     }
 
-    fn update(
-        &mut self,
-        ctx: &mut UpdateCtx,
-        _old: Option<&Workspace>,
-        new: &Workspace,
-        _env: &Env,
-    ) {
+    fn lifecycle(&mut self, _: &mut LifeCycleCtx, _: &LifeCycle, _: &Workspace, _: &Env) {}
+
+    fn update(&mut self, ctx: &mut UpdateCtx, _old: &Workspace, new: &Workspace, _env: &Env) {
         if new.font.ufo.glyph_count() != self.children.len() {
             let units_per_em = new
                 .font
                 .ufo
                 .font_info
                 .as_ref()
-                .and_then(|info| info.units_per_em.clone())
+                .and_then(|info| info.units_per_em)
                 .unwrap_or(1000.);
             let widget = GridInner { units_per_em };
             self.children.clear();
@@ -94,7 +91,7 @@ impl Widget<Workspace> for GlyphGrid {
                 )));
             }
         }
-        ctx.invalidate();
+        ctx.request_paint();
     }
 }
 
@@ -180,33 +177,30 @@ impl Widget<GlyphPlus> for GridInner {
         match event {
             Event::MouseDown(_) => {
                 ctx.set_active(true);
-                ctx.invalidate();
+                ctx.request_paint();
             }
             Event::MouseUp(_) => {
                 if ctx.is_active() {
                     ctx.set_active(false);
-                    ctx.invalidate();
+                    ctx.request_paint();
                     if ctx.is_hot() {
                         ctx.submit_command(Command::new(EDIT_GLYPH, data.glyph.name.clone()), None);
                     }
                 }
             }
-            Event::HotChanged(_) => {
-                ctx.invalidate();
-            }
             _ => (),
         }
     }
 
-    fn update(
-        &mut self,
-        ctx: &mut UpdateCtx,
-        old: Option<&GlyphPlus>,
-        new: &GlyphPlus,
-        _env: &Env,
-    ) {
-        if old.map(|old| !old.same(new)).unwrap_or(true) {
-            ctx.invalidate();
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, _: &GlyphPlus, _: &Env) {
+        if let LifeCycle::HotChanged(_) = event {
+            ctx.request_paint();
+        }
+    }
+
+    fn update(&mut self, ctx: &mut UpdateCtx, old: &GlyphPlus, new: &GlyphPlus, _env: &Env) {
+        if !old.same(new) {
+            ctx.request_paint();
         }
     }
 }

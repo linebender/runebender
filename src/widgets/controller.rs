@@ -2,7 +2,8 @@
 
 use druid::kurbo::Size;
 use druid::{
-    BoxConstraints, Command, Env, Event, EventCtx, LayoutCtx, PaintCtx, UpdateCtx, Widget,
+    BoxConstraints, Command, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx, PaintCtx,
+    UpdateCtx, Widget,
 };
 
 use crate::consts;
@@ -40,7 +41,9 @@ impl Widget<AppState> for Controller {
         }
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, old: Option<&AppState>, new: &AppState, env: &Env) {
+    fn lifecycle(&mut self, _: &mut LifeCycleCtx, _: &LifeCycle, _: &AppState, _: &Env) {}
+
+    fn update(&mut self, ctx: &mut UpdateCtx, old: &AppState, new: &AppState, env: &Env) {
         self.inner.update(ctx, old, new, env)
     }
 }

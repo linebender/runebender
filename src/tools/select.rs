@@ -93,7 +93,7 @@ impl Tool for Select {
         let pre_rect = self.drag.drag_rect();
         mouse.mouse_event(event, data, self);
         if !rect_equality(pre_rect, self.drag.drag_rect()) {
-            ctx.invalidate();
+            ctx.request_paint();
         }
         self.this_edit_type.take()
     }
