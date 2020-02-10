@@ -249,7 +249,15 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
         self.child.event(ctx, event, data, env);
     }
 
-    fn lifecycle(&mut self, _: &mut LifeCycleCtx, _: &LifeCycle, _: &EditorState, _: &Env) {}
+    fn lifecycle(
+        &mut self,
+        ctx: &mut LifeCycleCtx,
+        event: &LifeCycle,
+        data: &EditorState,
+        env: &Env,
+    ) {
+        self.child.lifecycle(ctx, event, data, env)
+    }
 
     fn update(&mut self, ctx: &mut UpdateCtx, old: &EditorState, new: &EditorState, env: &Env) {
         self.child.update(ctx, old, new, env);

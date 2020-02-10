@@ -31,7 +31,7 @@ impl AppDelegate<AppState> for Delegate {
         ctx: &mut DelegateCtx,
     ) -> Option<Event> {
         match event {
-            Event::Command(cmd) if cmd.selector == druid::commands::OPEN_FILE => {
+            Event::TargetedCommand(_, ref cmd) if cmd.selector == druid::commands::OPEN_FILE => {
                 let info = cmd.get_object::<FileInfo>().expect("api violation");
                 match Ufo::load(info.path()) {
                     Ok(ufo) => data.workspace.set_file(ufo, info.path().to_owned()),
@@ -40,7 +40,7 @@ impl AppDelegate<AppState> for Delegate {
                 ctx.submit_command(consts::cmd::REBUILD_MENUS, None);
                 None
             }
-            Event::Command(cmd) if cmd.selector == druid::commands::SAVE_FILE => {
+            Event::TargetedCommand(_, ref cmd) if cmd.selector == druid::commands::SAVE_FILE => {
                 if let Ok(info) = cmd.get_object::<FileInfo>() {
                     Arc::make_mut(&mut data.workspace.font).path = Some(info.path().into());
                     ctx.submit_command(consts::cmd::REBUILD_MENUS, None);
@@ -50,7 +50,7 @@ impl AppDelegate<AppState> for Delegate {
                 }
                 None
             }
-            Event::Command(ref cmd) if cmd.selector == EDIT_GLYPH => {
+            Event::TargetedCommand(_, ref cmd) if cmd.selector == EDIT_GLYPH => {
                 let payload = cmd
                     .get_object::<GlyphName>()
                     .map(GlyphName::clone)
@@ -69,7 +69,7 @@ impl AppDelegate<AppState> for Delegate {
                             .menu(crate::menus::make_menu(&data));
 
                         let id = new_win.id;
-                        let command = Command::new(druid::commands::NEW_WINDOW, new_win);
+                        let command = Command::one_shot(druid::commands::NEW_WINDOW, new_win);
                         ctx.submit_command(command, None);
 
                         Arc::make_mut(&mut data.workspace.open_glyphs).insert(payload.clone(), id);

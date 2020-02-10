@@ -19,6 +19,26 @@ pub struct GlyphGrid {
 
 const GLYPH_SIZE: f64 = 100.;
 
+impl GlyphGrid {
+    fn update_children(&mut self, data: &Workspace) {
+        let units_per_em = data
+            .font
+            .ufo
+            .font_info
+            .as_ref()
+            .and_then(|info| info.units_per_em)
+            .unwrap_or(1000.);
+        let widget = GridInner { units_per_em };
+        self.children.clear();
+        for key in data.font.ufo.iter_names() {
+            self.children.push(WidgetPod::new(LensWrap::new(
+                widget,
+                lenses::app_state::Glyph(key),
+            )));
+        }
+    }
+}
+
 impl Widget<Workspace> for GlyphGrid {
     fn paint(&mut self, ctx: &mut PaintCtx, data: &Workspace, env: &Env) {
         ctx.render_ctx.clear(env.get(theme::BACKGROUND_LIGHT));
@@ -71,25 +91,28 @@ impl Widget<Workspace> for GlyphGrid {
         }
     }
 
-    fn lifecycle(&mut self, _: &mut LifeCycleCtx, _: &LifeCycle, _: &Workspace, _: &Env) {}
+    fn lifecycle(
+        &mut self,
+        ctx: &mut LifeCycleCtx,
+        event: &LifeCycle,
+        data: &Workspace,
+        env: &Env,
+    ) {
+        if let LifeCycle::WidgetAdded = event {
+            if self.children.is_empty() {
+                self.update_children(data);
+            }
+        }
+
+        for child in &mut self.children {
+            child.lifecycle(ctx, event, data, env);
+        }
+    }
 
     fn update(&mut self, ctx: &mut UpdateCtx, _old: &Workspace, new: &Workspace, _env: &Env) {
         if new.font.ufo.glyph_count() != self.children.len() {
-            let units_per_em = new
-                .font
-                .ufo
-                .font_info
-                .as_ref()
-                .and_then(|info| info.units_per_em)
-                .unwrap_or(1000.);
-            let widget = GridInner { units_per_em };
-            self.children.clear();
-            for key in new.font.ufo.iter_names() {
-                self.children.push(WidgetPod::new(LensWrap::new(
-                    widget,
-                    lenses::app_state::Glyph(key),
-                )));
-            }
+            self.update_children(new);
+            ctx.children_changed();
         }
         ctx.request_paint();
     }
