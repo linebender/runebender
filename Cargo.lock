@@ -352,10 +352,10 @@ dependencies = [
 [[package]]
 name = "druid"
 version = "0.5.0"
-source = "git+https://github.com/xi-editor/druid.git?rev=366b55b#366b55b57eae0c4b8608c26398daf66fea1f4bf0"
+source = "git+https://github.com/xi-editor/druid.git?rev=4b54110#4b54110e294165a58d3aad0cb880991f4c1c893c"
 dependencies = [
- "druid-derive 0.2.0 (git+https://github.com/xi-editor/druid.git?rev=366b55b)",
- "druid-shell 0.5.0 (git+https://github.com/xi-editor/druid.git?rev=366b55b)",
+ "druid-derive 0.2.0 (git+https://github.com/xi-editor/druid.git?rev=4b54110)",
+ "druid-shell 0.5.0 (git+https://github.com/xi-editor/druid.git?rev=4b54110)",
  "fluent-bundle 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "fluent-langneg 0.11.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "fluent-syntax 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -380,7 +380,7 @@ dependencies = [
 [[package]]
 name = "druid-derive"
 version = "0.2.0"
-source = "git+https://github.com/xi-editor/druid.git?rev=366b55b#366b55b57eae0c4b8608c26398daf66fea1f4bf0"
+source = "git+https://github.com/xi-editor/druid.git?rev=4b54110#4b54110e294165a58d3aad0cb880991f4c1c893c"
 dependencies = [
  "proc-macro2 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -415,7 +415,7 @@ dependencies = [
 [[package]]
 name = "druid-shell"
 version = "0.5.0"
-source = "git+https://github.com/xi-editor/druid.git?rev=366b55b#366b55b57eae0c4b8608c26398daf66fea1f4bf0"
+source = "git+https://github.com/xi-editor/druid.git?rev=4b54110#4b54110e294165a58d3aad0cb880991f4c1c893c"
 dependencies = [
  "cairo-rs 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cfg-if 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1535,7 +1535,7 @@ dependencies = [
 name = "runebender"
 version = "0.2.0"
 dependencies = [
- "druid 0.5.0 (git+https://github.com/xi-editor/druid.git?rev=366b55b)",
+ "druid 0.5.0 (git+https://github.com/xi-editor/druid.git?rev=4b54110)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "lopdf 0.23.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "norad 0.1.0 (git+https://github.com/linebender/norad.git?rev=da3c755)",
@@ -1941,11 +1941,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum direct3d11 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "315aa929e68ba066cb6fb86f1b22af24f517e02fd9b5734c4d07e42cb9f4aefa"
 "checksum directwrite 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "8cdcd739e9351c411b8caf5cab32a27c818cfe06260595da121382ecdd22083d"
 "checksum druid 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "0dfc2c5a80baa05c7e949e6f32c02846cca5f0e390b9deb43d24d9171ec730a0"
-"checksum druid 0.5.0 (git+https://github.com/xi-editor/druid.git?rev=366b55b)" = "<none>"
+"checksum druid 0.5.0 (git+https://github.com/xi-editor/druid.git?rev=4b54110)" = "<none>"
 "checksum druid-derive 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e1feb48857874c6b6e08657ea8def78ae32573aab6f94bf93ea0e85a749882d0"
-"checksum druid-derive 0.2.0 (git+https://github.com/xi-editor/druid.git?rev=366b55b)" = "<none>"
+"checksum druid-derive 0.2.0 (git+https://github.com/xi-editor/druid.git?rev=4b54110)" = "<none>"
 "checksum druid-shell 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "109f49c75b4ce4956d1936243921e68007c1229b58ae7187c128b8ec6702f126"
-"checksum druid-shell 0.5.0 (git+https://github.com/xi-editor/druid.git?rev=366b55b)" = "<none>"
+"checksum druid-shell 0.5.0 (git+https://github.com/xi-editor/druid.git?rev=4b54110)" = "<none>"
 "checksum dtoa 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "ea57b42383d091c85abcc2706240b94ab2a8fa1fc81c10ff23c4de06e2a90b5e"
 "checksum dxgi 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "1639bbfd6765e92a40267d217a7acbac5b49320b68013f39a8e4376aa8c1e091"
 "checksum either 1.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"

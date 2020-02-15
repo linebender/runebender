@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use druid::{
-    AppDelegate, Command, DelegateCtx, Env, Event, FileInfo, LocalizedString, Selector, Widget,
+    AppDelegate, Command, DelegateCtx, Env, FileInfo, LocalizedString, Selector, Target, Widget,
     WindowDesc, WindowId,
 };
 
@@ -23,24 +23,25 @@ pub const EDIT_GLYPH: Selector = Selector::new("runebender.open-editor-with-glyp
 pub struct Delegate;
 
 impl AppDelegate<AppState> for Delegate {
-    fn event(
+    fn command(
         &mut self,
-        event: Event,
+        ctx: &mut DelegateCtx,
+        _target: &Target,
+        cmd: &Command,
         data: &mut AppState,
         _env: &Env,
-        ctx: &mut DelegateCtx,
-    ) -> Option<Event> {
-        match event {
-            Event::TargetedCommand(_, ref cmd) if cmd.selector == druid::commands::OPEN_FILE => {
+    ) -> bool {
+        match cmd.selector {
+            druid::commands::OPEN_FILE => {
                 let info = cmd.get_object::<FileInfo>().expect("api violation");
                 match Ufo::load(info.path()) {
                     Ok(ufo) => data.workspace.set_file(ufo, info.path().to_owned()),
                     Err(e) => log::error!("failed to open file {:?}: '{:?}'", info.path(), e),
                 };
                 ctx.submit_command(consts::cmd::REBUILD_MENUS, None);
-                None
+                false
             }
-            Event::TargetedCommand(_, ref cmd) if cmd.selector == druid::commands::SAVE_FILE => {
+            druid::commands::SAVE_FILE => {
                 if let Ok(info) = cmd.get_object::<FileInfo>() {
                     Arc::make_mut(&mut data.workspace.font).path = Some(info.path().into());
                     ctx.submit_command(consts::cmd::REBUILD_MENUS, None);
@@ -48,9 +49,9 @@ impl AppDelegate<AppState> for Delegate {
                 if let Err(e) = data.workspace.save() {
                     log::error!("saving failed: '{}'", e);
                 }
-                None
+                false
             }
-            Event::TargetedCommand(_, ref cmd) if cmd.selector == EDIT_GLYPH => {
+            EDIT_GLYPH => {
                 let payload = cmd
                     .get_object::<GlyphName>()
                     .map(GlyphName::clone)
@@ -75,9 +76,9 @@ impl AppDelegate<AppState> for Delegate {
                         Arc::make_mut(&mut data.workspace.open_glyphs).insert(payload.clone(), id);
                     }
                 }
-                None
+                false
             }
-            other => Some(other),
+            _ => true,
         }
     }
 
