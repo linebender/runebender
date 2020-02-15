@@ -19,6 +19,7 @@ mod menus;
 mod mouse;
 mod path;
 mod plist;
+mod theme;
 mod tools;
 mod undo;
 pub mod widgets;
@@ -41,6 +42,7 @@ fn main() {
 
     AppLauncher::with_window(main_window)
         .delegate(app_delegate::Delegate::default())
+        .configure_env(|env, _| theme::configure_env(env))
         .use_simple_logger()
         .launch(state)
         .expect("launch failed");

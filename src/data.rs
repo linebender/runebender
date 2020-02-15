@@ -48,6 +48,7 @@ pub struct FontObject {
 pub struct GlyphPlus {
     pub glyph: Arc<Glyph>,
     outline: Arc<BezPath>,
+    is_placeholder: bool,
 }
 
 /// Things in `FontInfo` that are relevant while editing or drawing.
@@ -160,6 +161,11 @@ impl GlyphPlus {
     /// Returns the placeholder glyph if this glyph has no outline.
     pub fn get_bezier(&self) -> Arc<BezPath> {
         self.outline.clone()
+    }
+
+    /// Returns `true` if this glyph uses a placeholder path.
+    pub fn is_placeholder(&self) -> bool {
+        self.is_placeholder
     }
 }
 
@@ -318,12 +324,12 @@ pub mod lenses {
                     .ufo
                     .get_glyph(&self.0)
                     .expect("missing glyph in lens");
-                let outline = data
-                    .get_bezier(&glyph.name)
-                    .unwrap_or_else(|| data.font.placeholder.clone());
+                let outline = data.get_bezier(&glyph.name);
+                let is_placeholder = outline.is_none();
                 let glyph = GlyphPlus {
                     glyph: Arc::clone(glyph),
-                    outline,
+                    outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
+                    is_placeholder,
                 };
                 f(&glyph)
             }
@@ -337,12 +343,12 @@ pub mod lenses {
                     .ufo
                     .get_glyph(&self.0)
                     .expect("missing glyph in lens");
-                let outline = data
-                    .get_bezier(&glyph.name)
-                    .unwrap_or_else(|| data.font.placeholder.clone());
+                let outline = data.get_bezier(&glyph.name);
+                let is_placeholder = outline.is_none();
                 let mut glyph = GlyphPlus {
                     glyph: Arc::clone(glyph),
-                    outline,
+                    outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
+                    is_placeholder,
                 };
                 f(&mut glyph)
             }

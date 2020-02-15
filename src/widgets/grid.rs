@@ -5,12 +5,13 @@ use druid::piet::{
     FontBuilder, PietText, PietTextLayout, RenderContext, Text, TextLayout, TextLayoutBuilder,
 };
 use druid::{
-    theme, BoxConstraints, Command, Data, Env, Event, EventCtx, LayoutCtx, LensWrap, LifeCycle,
+    BoxConstraints, Command, Data, Env, Event, EventCtx, LayoutCtx, LensWrap, LifeCycle,
     LifeCycleCtx, PaintCtx, UpdateCtx, Widget, WidgetPod,
 };
 
 use crate::app_delegate::EDIT_GLYPH;
 use crate::data::{lenses, GlyphPlus, Workspace};
+use crate::theme;
 
 #[derive(Default)]
 pub struct GlyphGrid {
@@ -41,7 +42,7 @@ impl GlyphGrid {
 
 impl Widget<Workspace> for GlyphGrid {
     fn paint(&mut self, ctx: &mut PaintCtx, data: &Workspace, env: &Env) {
-        ctx.render_ctx.clear(env.get(theme::BACKGROUND_LIGHT));
+        ctx.render_ctx.clear(env.get(theme::GLYPH_LIST_BACKGROUND));
         let row_len = 1.0_f64.max(ctx.size().width / GLYPH_SIZE).floor() as usize;
         let row_count = if self.children.is_empty() {
             0
@@ -50,10 +51,11 @@ impl Widget<Workspace> for GlyphGrid {
         };
 
         for row in 0..row_count {
-            let baseline = row as f64 * GLYPH_SIZE + GLYPH_SIZE * (1.0 - 0.16);
+            let baseline = row as f64 * GLYPH_SIZE + GLYPH_SIZE * (1.0 - 0.16) + 0.5;
+
             let line = Line::new((0., baseline), (ctx.size().width + GLYPH_SIZE, baseline));
             ctx.render_ctx
-                .stroke(&line, &env.get(theme::FOREGROUND_DARK), 1.0);
+                .stroke(&line, &env.get(theme::GLYPH_LIST_STROKE), 1.0);
         }
         for child in &mut self.children {
             child.paint_with_offset(ctx, data, env);
@@ -151,8 +153,12 @@ impl Widget<GlyphPlus> for GridInner {
             geom.height() - baseline,
         ]);
 
-        let hl_color = env.get(theme::SELECTION_COLOR);
-        let glyph_color = env.get(theme::FOREGROUND_DARK);
+        let hl_color = env.get(druid::theme::SELECTION_COLOR);
+        let glyph_color = if data.is_placeholder() {
+            env.get(theme::PLACEHOLDER_GLYPH_COLOR)
+        } else {
+            env.get(theme::GLYPH_COLOR)
+        };
         let glyph_body_color = if ctx.is_active() {
             &hl_color
         } else {
@@ -165,23 +171,14 @@ impl Widget<GlyphPlus> for GridInner {
             ctx.render_ctx.stroke(geom, &hl_color, 1.0);
         }
 
-        let font_size = env.get(theme::TEXT_SIZE_NORMAL);
-        let name_color = if ctx.is_hot() { hl_color } else { glyph_color };
+        let font_size = env.get(theme::GLYPH_LIST_LABEL_TEXT_SIZE);
+        let text_color = env.get(theme::GLYPH_COLOR);
+        let name_color = if ctx.is_hot() { hl_color } else { text_color };
         let text = get_text_layout(&mut ctx.text(), &data.glyph.name, env);
         let xpos = geom.x0 + (geom.width() - text.width()) * 0.5;
         let ypos = geom.y0 + geom.height() - font_size * 0.25;
         let pos = (xpos, ypos);
 
-        //draw a semi-translucent background
-        let text_bg_rect = Rect::from_origin_size(
-            (pos.0 as f64, (pos.1 - font_size * 0.75) as f64),
-            (text.width() as f64, font_size as f64),
-        );
-
-        ctx.render_ctx.fill(
-            &text_bg_rect,
-            &env.get(theme::BACKGROUND_DARK).with_alpha(0.5),
-        );
         // draw the text
         ctx.render_ctx.draw_text(&text, pos, &name_color)
     }
@@ -230,7 +227,7 @@ impl Widget<GlyphPlus> for GridInner {
 
 fn get_text_layout(text_ctx: &mut PietText, text: &str, env: &Env) -> PietTextLayout {
     let font_name = env.get(theme::FONT_NAME);
-    let font_size = env.get(theme::TEXT_SIZE_NORMAL);
+    let font_size = env.get(theme::GLYPH_LIST_LABEL_TEXT_SIZE);
     // TODO: caching of both the format and the layout
     let font = text_ctx
         .new_font_by_name(font_name, font_size)
