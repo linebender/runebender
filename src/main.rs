@@ -30,7 +30,7 @@ use druid::{AppLauncher, Env, LocalizedString, Widget, WindowDesc};
 
 use data::{AppState, Workspace};
 
-use widgets::{Controller, GlyphGrid};
+use widgets::{Controller, GlyphGrid, Sidebar};
 
 fn main() {
     let state = get_initial_state();
@@ -49,7 +49,6 @@ fn main() {
 }
 
 fn make_ui() -> impl Widget<AppState> {
-    let mut col = Flex::column();
     let label = Label::new(|data: &Workspace, _: &Env| {
         data.font
             .ufo
@@ -58,8 +57,14 @@ fn make_ui() -> impl Widget<AppState> {
             .and_then(|info| info.family_name.clone())
             .unwrap_or_else(|| "Untitled".to_string())
     });
-    col.add_child(label.padding(5.0).center().fix_height(40.), 0.);
-    col.add_child(Scroll::new(GlyphGrid::new()).vertical(), 1.);
+    let col = Flex::column()
+        .with_child(label.padding(5.0).center().fix_height(40.), 0.)
+        .with_child(
+            Flex::row()
+                .with_child(Sidebar.fix_width(180.), 0.)
+                .with_child(Scroll::new(GlyphGrid::new()).vertical(), 1.0),
+            1.,
+        );
     Controller::new(col.lens(AppState::workspace))
 }
 

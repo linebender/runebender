@@ -1,9 +1,7 @@
 //! The root widget.
-
-use druid::kurbo::Size;
 use druid::{
     BoxConstraints, Command, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx, PaintCtx,
-    UpdateCtx, Widget,
+    UpdateCtx, Widget, Size,
 };
 
 use crate::consts;
