@@ -29,6 +29,9 @@ pub struct AppState {
 #[derive(Clone, Data, Default)]
 pub struct Workspace {
     pub font: Arc<FontObject>,
+    /// The currently selected glyph (in the main glyph list) if any.
+    //TODO: allow multiple selections
+    pub selected: Option<GlyphName>,
     /// glyphs that are already open in an editor window
     pub open_glyphs: Arc<HashMap<GlyphName, WindowId>>,
     pub sessions: Arc<HashMap<GlyphName, Arc<EditSession>>>,
@@ -49,6 +52,7 @@ pub struct GlyphPlus {
     pub glyph: Arc<Glyph>,
     outline: Arc<BezPath>,
     is_placeholder: bool,
+    pub is_selected: bool,
 }
 
 /// Things in `FontInfo` that are relevant while editing or drawing.
@@ -326,10 +330,12 @@ pub mod lenses {
                     .expect("missing glyph in lens");
                 let outline = data.get_bezier(&glyph.name);
                 let is_placeholder = outline.is_none();
+                let is_selected = data.selected.as_ref() == Some(&self.0);
                 let glyph = GlyphPlus {
                     glyph: Arc::clone(glyph),
                     outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
                     is_placeholder,
+                    is_selected,
                 };
                 f(&glyph)
             }
@@ -345,12 +351,20 @@ pub mod lenses {
                     .expect("missing glyph in lens");
                 let outline = data.get_bezier(&glyph.name);
                 let is_placeholder = outline.is_none();
+                let is_selected = data.selected.as_ref() == Some(&self.0);
                 let mut glyph = GlyphPlus {
                     glyph: Arc::clone(glyph),
                     outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
                     is_placeholder,
+                    is_selected,
                 };
-                f(&mut glyph)
+                let r = f(&mut glyph);
+                // we track selections by having the grid item set this flag,
+                // and then we propogate that up to the workspace here.
+                if glyph.is_selected {
+                    data.selected = Some(self.0.clone());
+                }
+                r
             }
         }
     }

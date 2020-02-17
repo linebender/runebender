@@ -18,7 +18,7 @@ pub mod colors {
 
     pub const LIGHT_GREY: Color = Color::rgb8(0xe7, 0xe7, 0xe7);
     pub const SIDEBAR_EDGE: Color = Color::rgb8(0xc7, 0xc7, 0xc7);
-    pub const HIGHLIGHT_COLOR: Color = Color::rgb8(0x3B, 0x3A, 0xFF);
+    pub const HIGHLIGHT_COLOR: Color = Color::rgb8(0xA6, 0xCC, 0xFF);
 }
 
 pub fn configure_env(env: &mut Env) {

@@ -1,7 +1,7 @@
 //! The root widget.
 use druid::{
     BoxConstraints, Command, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx, PaintCtx,
-    UpdateCtx, Widget, Size,
+    Size, UpdateCtx, Widget,
 };
 
 use crate::consts;
