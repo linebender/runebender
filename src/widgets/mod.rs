@@ -3,8 +3,8 @@
 mod controller;
 mod editor;
 mod grid;
-mod sidebar;
 mod scroll_zoom;
+mod sidebar;
 
 pub use controller::Controller;
 pub use editor::Editor;

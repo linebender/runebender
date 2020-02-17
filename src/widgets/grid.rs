@@ -5,7 +5,7 @@ use druid::piet::{
     FontBuilder, PietText, PietTextLayout, RenderContext, Text, TextLayout, TextLayoutBuilder,
 };
 use druid::{
-    BoxConstraints, Command, Data, Env, Event, EventCtx, LayoutCtx, LensWrap, LifeCycle,
+    BoxConstraints, Command, Data, Env, Event, EventCtx, Insets, LayoutCtx, LensWrap, LifeCycle,
     LifeCycleCtx, PaintCtx, UpdateCtx, Widget, WidgetPod,
 };
 
@@ -13,12 +13,12 @@ use crate::app_delegate::EDIT_GLYPH;
 use crate::data::{lenses, GlyphPlus, Workspace};
 use crate::theme;
 
+const GLYPH_SIZE: f64 = 100.;
+
 #[derive(Default)]
 pub struct GlyphGrid {
     children: Vec<WidgetPod<Workspace, LensWrap<GlyphPlus, lenses::app_state::Glyph, GridInner>>>,
 }
-
-const GLYPH_SIZE: f64 = 100.;
 
 impl GlyphGrid {
     fn update_children(&mut self, data: &Workspace) {
@@ -29,9 +29,9 @@ impl GlyphGrid {
             .as_ref()
             .and_then(|info| info.units_per_em)
             .unwrap_or(1000.);
-        let widget = GridInner { units_per_em };
         self.children.clear();
-        for key in data.font.ufo.iter_names() {
+        for (idx, key) in data.font.ufo.iter_names().enumerate() {
+            let widget = GridInner { units_per_em, idx };
             self.children.push(WidgetPod::new(LensWrap::new(
                 widget,
                 lenses::app_state::Glyph(key),
@@ -57,6 +57,7 @@ impl Widget<Workspace> for GlyphGrid {
             ctx.render_ctx
                 .stroke(&line, &env.get(theme::GLYPH_LIST_STROKE), 1.0);
         }
+
         for child in &mut self.children {
             child.paint_with_offset(ctx, data, env);
         }
@@ -89,7 +90,7 @@ impl Widget<Workspace> for GlyphGrid {
 
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut Workspace, env: &Env) {
         for child in &mut self.children {
-            child.event(ctx, event, data, env)
+            child.event(ctx, event, data, env);
         }
     }
 
@@ -122,15 +123,14 @@ impl Widget<Workspace> for GlyphGrid {
 
 impl GlyphGrid {
     pub fn new() -> GlyphGrid {
-        GlyphGrid {
-            children: Vec::new(),
-        }
+        Default::default()
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 struct GridInner {
     units_per_em: f64,
+    idx: usize,
 }
 
 impl Widget<GlyphPlus> for GridInner {
@@ -153,33 +153,29 @@ impl Widget<GlyphPlus> for GridInner {
         ]);
 
         let hl_color = env.get(druid::theme::SELECTION_COLOR);
+        if ctx.is_active() || data.is_selected {
+            let selection_rect: Rect = geom - Insets::uniform(5.0);
+            let rounded = selection_rect.to_rounded_rect(5.0);
+            ctx.fill(rounded, &hl_color);
+        }
         let glyph_color = if data.is_placeholder() {
             env.get(theme::PLACEHOLDER_GLYPH_COLOR)
         } else {
             env.get(theme::GLYPH_COLOR)
         };
-        let glyph_body_color = if ctx.is_active() {
-            &hl_color
-        } else {
-            &glyph_color
-        };
-        ctx.render_ctx.fill(affine * &*path, glyph_body_color);
 
-        if ctx.is_hot() {
-            ctx.render_ctx.stroke(affine * &*path, &hl_color, 1.0);
-            ctx.render_ctx.stroke(geom, &hl_color, 1.0);
-        }
+        ctx.render_ctx.fill(affine * &*path, &glyph_color);
 
         let font_size = env.get(theme::GLYPH_LIST_LABEL_TEXT_SIZE);
         let text_color = env.get(theme::GLYPH_COLOR);
-        let name_color = if ctx.is_hot() { hl_color } else { text_color };
+
         let text = get_text_layout(&mut ctx.text(), &data.glyph.name, env);
         let xpos = geom.x0 + (geom.width() - text.width()) * 0.5;
         let ypos = geom.y0 + geom.height() - font_size * 0.25;
         let pos = (xpos, ypos);
 
         // draw the text
-        ctx.render_ctx.draw_text(&text, pos, &name_color)
+        ctx.render_ctx.draw_text(&text, pos, &text_color)
     }
 
     fn layout(
@@ -194,17 +190,19 @@ impl Widget<GlyphPlus> for GridInner {
 
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut GlyphPlus, _env: &Env) {
         match event {
-            Event::MouseDown(_) => {
+            Event::MouseDown(m) => {
                 ctx.set_active(true);
                 ctx.request_paint();
+                if m.count == 1 {
+                    data.is_selected = true;
+                } else if m.count == 2 {
+                    ctx.submit_command(Command::new(EDIT_GLYPH, data.glyph.name.clone()), None);
+                }
             }
             Event::MouseUp(_) => {
                 if ctx.is_active() {
                     ctx.set_active(false);
                     ctx.request_paint();
-                    if ctx.is_hot() {
-                        ctx.submit_command(Command::new(EDIT_GLYPH, data.glyph.name.clone()), None);
-                    }
                 }
             }
             _ => (),
