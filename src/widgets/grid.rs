@@ -22,16 +22,9 @@ pub struct GlyphGrid {
 
 impl GlyphGrid {
     fn update_children(&mut self, data: &Workspace) {
-        let units_per_em = data
-            .font
-            .ufo
-            .font_info
-            .as_ref()
-            .and_then(|info| info.units_per_em)
-            .unwrap_or(1000.);
         self.children.clear();
-        for (idx, key) in data.font.ufo.iter_names().enumerate() {
-            let widget = GridInner { units_per_em, idx };
+        for key in data.font.ufo.iter_names() {
+            let widget = GridInner;
             self.children.push(WidgetPod::new(LensWrap::new(
                 widget,
                 lenses::app_state::Glyph(key),
@@ -128,17 +121,14 @@ impl GlyphGrid {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct GridInner {
-    units_per_em: f64,
-    idx: usize,
-}
+struct GridInner;
 
 impl Widget<GlyphPlus> for GridInner {
     fn paint(&mut self, ctx: &mut PaintCtx, data: &GlyphPlus, env: &Env) {
         let path = data.get_bezier();
         let bb = path.bounding_box();
         let geom = Rect::ZERO.with_size(ctx.size());
-        let scale = geom.height() as f64 / self.units_per_em;
+        let scale = geom.height() as f64 / data.upm();
         let scale = scale * 0.85; // some margins around glyphs
         let scaled_width = bb.width() * scale as f64;
         let l_pad = ((geom.width() as f64 - scaled_width) / 2.).round();
@@ -158,7 +148,7 @@ impl Widget<GlyphPlus> for GridInner {
             let rounded = selection_rect.to_rounded_rect(5.0);
             ctx.fill(rounded, &hl_color);
         }
-        let glyph_color = if data.is_placeholder() {
+        let glyph_color = if data.is_placeholder_glyph() {
             env.get(theme::PLACEHOLDER_GLYPH_COLOR)
         } else {
             env.get(theme::GLYPH_COLOR)

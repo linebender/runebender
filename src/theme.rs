@@ -30,4 +30,5 @@ pub fn configure_env(env: &mut Env) {
     env.set(GLYPH_LIST_LABEL_TEXT_SIZE, 12.0);
     env.set(GLYPH_COLOR, Color::BLACK);
     env.set(druid::theme::SELECTION_COLOR, colors::HIGHLIGHT_COLOR);
+    env.set(druid::theme::LABEL_COLOR, Color::BLACK);
 }
