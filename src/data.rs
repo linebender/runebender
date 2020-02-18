@@ -9,7 +9,7 @@ use std::sync::Arc;
 use druid::kurbo::{Affine, BezPath, Point, Rect, Size};
 use druid::{Data, Lens, WindowId};
 use norad::glyph::{Contour, ContourPoint, Glyph, GlyphName, PointType};
-use norad::{FontInfo, MetaInfo, Ufo};
+use norad::{FontInfo, Ufo};
 
 use crate::edit_session::EditSession;
 
@@ -47,12 +47,13 @@ pub struct FontObject {
 
 /// A glyph, plus access to the main UFO in order to resolve components in that
 /// glyph.
-#[derive(Clone, Data)]
+#[derive(Clone, Data, Lens)]
 pub struct GlyphPlus {
     pub glyph: Arc<Glyph>,
     outline: Arc<BezPath>,
     is_placeholder: bool,
     pub is_selected: bool,
+    units_per_em: f64,
 }
 
 /// Things in `FontInfo` that are relevant while editing or drawing.
@@ -157,6 +158,18 @@ impl Workspace {
 
         Arc::new(bez)
     }
+
+    /// Returns the upm for this font.
+    ///
+    /// This is needed to correctly scale the points in the glyph.
+    pub fn units_per_em(&self) -> f64 {
+        self.font
+            .ufo
+            .font_info
+            .as_ref()
+            .and_then(|info| info.units_per_em)
+            .unwrap_or(DEFAULT_UNITS_PER_EM)
+    }
 }
 
 impl GlyphPlus {
@@ -168,8 +181,22 @@ impl GlyphPlus {
     }
 
     /// Returns `true` if this glyph uses a placeholder path.
-    pub fn is_placeholder(&self) -> bool {
+    pub fn is_placeholder_glyph(&self) -> bool {
         self.is_placeholder
+    }
+
+    /// Returns the first `char` in this glyph's codepoint list.
+    pub fn codepoint(&self) -> Option<char> {
+        self.glyph
+            .codepoints
+            .as_ref()
+            .and_then(|v| v.first())
+            .cloned()
+    }
+
+    /// The upm for the font this glyph belongs to.
+    pub fn upm(&self) -> f64 {
+        self.units_per_em
     }
 }
 
@@ -218,7 +245,7 @@ impl Default for FontObject {
             ..Default::default()
         };
 
-        let mut ufo = Ufo::new(MetaInfo::default());
+        let mut ufo = Ufo::new();
         ufo.font_info = Some(font_info);
 
         FontObject {
@@ -269,6 +296,8 @@ pub mod lenses {
 
         /// GlyphSet_ -> GlyphPlus
         pub struct Glyph(pub GlyphName);
+
+        pub struct SelectedGlyph;
 
         impl Lens<Workspace, EditorState_> for EditorState {
             fn with<V, F: FnOnce(&EditorState_) -> V>(&self, data: &Workspace, f: F) -> V {
@@ -329,12 +358,12 @@ pub mod lenses {
                     .get_glyph(&self.0)
                     .expect("missing glyph in lens");
                 let outline = data.get_bezier(&glyph.name);
-                let is_placeholder = outline.is_none();
                 let is_selected = data.selected.as_ref() == Some(&self.0);
                 let glyph = GlyphPlus {
                     glyph: Arc::clone(glyph),
+                    is_placeholder: outline.is_none(),
                     outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
-                    is_placeholder,
+                    units_per_em: data.units_per_em(),
                     is_selected,
                 };
                 f(&glyph)
@@ -355,6 +384,7 @@ pub mod lenses {
                 let mut glyph = GlyphPlus {
                     glyph: Arc::clone(glyph),
                     outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
+                    units_per_em: data.units_per_em(),
                     is_placeholder,
                     is_selected,
                 };
@@ -365,6 +395,54 @@ pub mod lenses {
                     data.selected = Some(self.0.clone());
                 }
                 r
+            }
+        }
+
+        impl Lens<Workspace, Option<GlyphPlus>> for SelectedGlyph {
+            fn with<V, F: FnOnce(&Option<GlyphPlus>) -> V>(&self, data: &Workspace, f: F) -> V {
+                let selected = data.selected.as_ref().map(|name| {
+                    let glyph = data
+                        .font
+                        .ufo
+                        .get_glyph(name)
+                        .expect("missing glyph in lens");
+                    let outline = data.get_bezier(&glyph.name);
+                    let is_placeholder = outline.is_none();
+                    let is_selected = data.selected.as_ref() == Some(&name);
+                    GlyphPlus {
+                        glyph: Arc::clone(glyph),
+                        outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
+                        units_per_em: data.units_per_em(),
+                        is_placeholder,
+                        is_selected,
+                    }
+                });
+                f(&selected)
+            }
+
+            fn with_mut<V, F: FnOnce(&mut Option<GlyphPlus>) -> V>(
+                &self,
+                data: &mut Workspace,
+                f: F,
+            ) -> V {
+                let mut selected = data.selected.as_ref().map(|name| {
+                    let glyph = data
+                        .font
+                        .ufo
+                        .get_glyph(name)
+                        .expect("missing glyph in lens");
+                    let outline = data.get_bezier(&glyph.name);
+                    let is_placeholder = outline.is_none();
+                    let is_selected = data.selected.as_ref() == Some(&name);
+                    GlyphPlus {
+                        glyph: Arc::clone(glyph),
+                        outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
+                        units_per_em: data.units_per_em(),
+                        is_placeholder,
+                        is_selected,
+                    }
+                });
+                f(&mut selected)
             }
         }
     }

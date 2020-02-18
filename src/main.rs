@@ -61,7 +61,7 @@ fn make_ui() -> impl Widget<AppState> {
         .with_child(label.padding(5.0).center().fix_height(40.), 0.)
         .with_child(
             Flex::row()
-                .with_child(Sidebar.fix_width(180.), 0.)
+                .with_child(Sidebar::new().fix_width(180.), 0.)
                 .with_child(Scroll::new(GlyphGrid::new()).vertical(), 1.0),
             1.,
         );
@@ -93,7 +93,7 @@ fn get_initial_state() -> AppState {
 
 /// temporary; creates a new blank  font with some placeholder glyphs.
 fn create_blank_font() -> norad::Ufo {
-    let mut ufo = norad::Ufo::new(norad::MetaInfo::default());
+    let mut ufo = norad::Ufo::new();
     let a_ = 'a' as u32;
     #[allow(non_snake_case)]
     let A_ = 'A' as u32;
