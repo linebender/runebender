@@ -58,11 +58,11 @@ fn make_ui() -> impl Widget<AppState> {
             .unwrap_or_else(|| "Untitled".to_string())
     });
     let col = Flex::column()
-        .with_child(label.padding(5.0).center().fix_height(40.), 0.)
-        .with_child(
+        .with_child(label.padding(5.0).fix_height(40.))
+        .with_flex_child(
             Flex::row()
-                .with_child(Sidebar::new().fix_width(180.), 0.)
-                .with_child(Scroll::new(GlyphGrid::new()).vertical(), 1.0),
+                .with_child(Sidebar::new().fix_width(180.))
+                .with_flex_child(Scroll::new(GlyphGrid::new()).vertical(), 1.0),
             1.,
         );
     Controller::new(col.lens(AppState::workspace))
