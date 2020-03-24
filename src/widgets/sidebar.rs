@@ -13,6 +13,8 @@ use crate::theme;
 
 const SELECTED_GLYPH_BOTTOM_PADDING: f64 = 10.0;
 const SELECTED_GLYPH_HEIGHT: f64 = 220.0;
+const SECONDARY_LABEL_COLOR: Color = Color::grey8(0x88);
+const SECONDARY_TEXT_SIZE: f64 = 12.0;
 
 pub struct Sidebar {
     selected_glyph: WidgetPod<Workspace, Box<dyn Widget<Workspace>>>,
@@ -23,15 +25,11 @@ impl Sidebar {
         Sidebar {
             selected_glyph: WidgetPod::new(
                 Flex::column()
-                    .with_child(
-                        Label::new(|d: &Option<GlyphPlus>, _: &Env| {
-                            d.as_ref()
-                                .map(|d| d.glyph.name.to_string())
-                                .unwrap_or("_____".into())
-                        })
-                        .center(),
-                        0.0,
-                    )
+                    .with_child(Label::new(|d: &Option<GlyphPlus>, _: &Env| {
+                        d.as_ref()
+                            .map(|d| d.glyph.name.to_string())
+                            .unwrap_or("_____".into())
+                    }))
                     .with_child(
                         Label::new(|d: &Option<GlyphPlus>, _: &Env| {
                             d.as_ref()
@@ -39,33 +37,34 @@ impl Sidebar {
                                 .map(|c| format!("(U+{:04X})", c as u32))
                                 .unwrap_or("______".into())
                         })
-                        .center()
-                        .env_scope(|env, _| {
-                            env.set(druid::theme::LABEL_COLOR, Color::grey8(140));
-                            env.set(druid::theme::TEXT_SIZE_NORMAL, 12.0);
-                        }),
-                        0.0,
+                        .with_text_color(SECONDARY_LABEL_COLOR)
+                        .with_text_size(SECONDARY_TEXT_SIZE),
                     )
-                    .with_child(SelectedGlyph::new().fix_height(100.0).center(), 0.0)
-                    .with_child(
-                        Label::new(|d: &Option<GlyphPlus>, _: &Env| {
-                            d.as_ref()
-                                .and_then(|g| {
-                                    g.glyph
-                                        .advance
-                                        .as_ref()
-                                        .map(|a| format!("{}", a.width as usize))
-                                })
-                                .unwrap_or("___".into())
-                        })
-                        .center(),
-                        0.0,
-                    )
+                    .with_flex_child(SelectedGlyph::new(), 1.0)
+                    .with_child(Label::new(|d: &Option<GlyphPlus>, _: &Env| {
+                        d.as_ref()
+                            .and_then(|g| {
+                                g.glyph
+                                    .advance
+                                    .as_ref()
+                                    .map(|a| format!("{}", a.width as usize))
+                            })
+                            .unwrap_or("___".into())
+                    }))
                     .with_child(
                         Flex::row()
-                            .with_child(Label::new("kern group"), 1.0)
-                            .with_child(Label::new("kern group"), 1.0),
-                        0.0,
+                            .with_child(
+                                Label::new("kern group")
+                                    .with_text_color(SECONDARY_LABEL_COLOR)
+                                    .with_text_size(SECONDARY_TEXT_SIZE),
+                            )
+                            .with_flex_spacer(1.0)
+                            .with_child(
+                                Label::new("kern group")
+                                    .with_text_color(SECONDARY_LABEL_COLOR)
+                                    .with_text_size(SECONDARY_TEXT_SIZE),
+                            )
+                            .padding((8.0, 0.0)),
                     )
                     .lens(lenses::app_state::SelectedGlyph)
                     .fix_height(SELECTED_GLYPH_HEIGHT)
@@ -168,7 +167,7 @@ impl Widget<Option<GlyphPlus>> for SelectedGlyph {
         _env: &Env,
     ) -> Size {
         let width = bc.max().width;
-        Size::new(width, SELECTED_GLYPH_HEIGHT)
+        bc.constrain(Size::new(width, SELECTED_GLYPH_HEIGHT))
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &Option<GlyphPlus>, env: &Env) {
