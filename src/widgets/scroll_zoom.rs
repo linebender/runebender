@@ -168,6 +168,12 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
         ctx.stroke(text_box, &text_color, 0.5);
         ctx.draw_text(&layout, text_draw_origin, &text_color);
     }
+
+    fn after_zoom_changed(&mut self, ctx: &mut EventCtx, env: &Env) {
+        self.child.reset_scrollbar_fade(ctx, env);
+        ctx.request_layout();
+        ctx.set_handled();
+    }
 }
 
 impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
@@ -202,13 +208,12 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
                     || c.selector == cmd::ZOOM_DEFAULT =>
             {
                 self.handle_zoom_cmd(&c.selector, ctx.size(), data);
-                self.child.reset_scrollbar_fade(ctx, env);
-                ctx.request_paint();
-                ctx.set_handled();
+                self.after_zoom_changed(ctx, env);
                 return;
             }
             Event::Size(size) if self.needs_center_after_layout => {
-                self.set_initial_viewport(data, *size)
+                self.set_initial_viewport(data, *size);
+                ctx.request_layout();
             }
             Event::KeyDown(k) if HotKey::new(None, "v").matches(k) => {
                 ctx.submit_command(cmd::SELECT_TOOL, None)
@@ -232,16 +237,12 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
             }
             Event::Wheel(wheel) if wheel.mods.meta => {
                 self.wheel_zoom(data, wheel.delta, ctx.size(), None);
-                self.child.reset_scrollbar_fade(ctx, env);
-                ctx.set_handled();
-                ctx.request_paint();
+                self.after_zoom_changed(ctx, env);
                 return;
             }
             Event::Zoom(delta) => {
                 self.pinch_zoom(data, *delta, ctx.size());
-                self.child.reset_scrollbar_fade(ctx, env);
-                ctx.set_handled();
-                ctx.request_paint();
+                self.after_zoom_changed(ctx, env);
                 return;
             }
             _ => (),
