@@ -9,7 +9,7 @@ use crate::path::EntityId;
 #[derive(Debug, Data, Clone)]
 pub struct Component {
     pub base: GlyphName,
-    #[druid(same_fn = "affine_eq")]
+    #[data(same_fn = "affine_eq")]
     pub transform: Affine,
     pub id: EntityId,
 }

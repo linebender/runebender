@@ -40,7 +40,7 @@ pub struct Workspace {
 #[derive(Clone, Data)]
 pub struct FontObject {
     pub path: Option<Arc<Path>>,
-    #[druid(ignore)]
+    #[data(ignore)]
     pub ufo: Ufo,
     placeholder: Arc<BezPath>,
 }

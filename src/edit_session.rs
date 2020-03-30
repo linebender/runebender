@@ -27,7 +27,7 @@ pub struct EditSession {
     pub components: Arc<Vec<Component>>,
     pub guides: Arc<Vec<Guide>>,
     pub viewport: ViewPort,
-    #[druid(same_fn = "rect_same")]
+    #[data(same_fn = "rect_same")]
     work_bounds: Rect,
     /// A string describing the current tool
     pub tool_desc: Arc<str>,
