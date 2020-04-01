@@ -264,7 +264,7 @@ impl Widget<EditorState> for Editor {
             }
             Event::KeyDown(k) => self.tool.key_down(k, ctx, data.session_mut(), env),
             Event::MouseUp(m) => self.send_mouse(ctx, TaggedEvent::Up(m.clone()), data, env),
-            Event::MouseMoved(m) => self.send_mouse(ctx, TaggedEvent::Moved(m.clone()), data, env),
+            Event::MouseMove(m) => self.send_mouse(ctx, TaggedEvent::Moved(m.clone()), data, env),
             Event::MouseDown(m) => self.send_mouse(ctx, TaggedEvent::Down(m.clone()), data, env),
             Event::Paste(clipboard) => self.do_paste(data.session_mut(), clipboard),
             _ => None,
