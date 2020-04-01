@@ -232,7 +232,7 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
                 let cmd = Command::new(cmd::TOGGLE_PREVIEW_TOOL, false);
                 ctx.submit_command(cmd, None);
             }
-            Event::MouseMoved(mouse) => {
+            Event::MouseMove(mouse) => {
                 self.mouse = mouse.pos;
             }
             Event::Wheel(wheel) if wheel.mods.meta => {
