@@ -6,10 +6,11 @@ use druid::{
     PaintCtx, Rect, RenderContext, Size, UpdateCtx, Widget, WidgetPod,
 };
 
-use druid::widget::{Flex, Label, WidgetExt};
+use druid::widget::{Flex, Label, SizedBox, WidgetExt};
 
 use crate::data::{lenses, GlyphPlus, Workspace};
 use crate::theme;
+use crate::widgets::Maybe;
 
 const SELECTED_GLYPH_BOTTOM_PADDING: f64 = 10.0;
 const SELECTED_GLYPH_HEIGHT: f64 = 220.0;
@@ -20,56 +21,57 @@ pub struct Sidebar {
     selected_glyph: WidgetPod<Workspace, Box<dyn Widget<Workspace>>>,
 }
 
+fn selected_glyph_widget() -> impl Widget<GlyphPlus> {
+    Flex::column()
+        .with_child(Label::new(|d: &GlyphPlus, _: &Env| {
+            d.glyph.name.to_string()
+        }))
+        .with_child(
+            Label::new(|d: &GlyphPlus, _: &Env| {
+                d.codepoint()
+                    .map(|c| format!("(U+{:04X})", c as u32))
+                    .unwrap_or("______".into())
+            })
+            .with_text_color(SECONDARY_LABEL_COLOR)
+            .with_text_size(SECONDARY_TEXT_SIZE),
+        )
+        .with_flex_child(SelectedGlyph::new(), 1.0)
+        .with_child(Label::new(|d: &GlyphPlus, _: &Env| {
+            d.glyph
+                .advance
+                .as_ref()
+                .map(|a| a.width.to_string())
+                .unwrap_or("___".into())
+        }))
+        .with_child(
+            Flex::row()
+                .with_child(
+                    Label::new("kern group")
+                        .with_text_color(SECONDARY_LABEL_COLOR)
+                        .with_text_size(SECONDARY_TEXT_SIZE),
+                )
+                .with_flex_spacer(1.0)
+                .with_child(
+                    Label::new("kern group")
+                        .with_text_color(SECONDARY_LABEL_COLOR)
+                        .with_text_size(SECONDARY_TEXT_SIZE),
+                )
+                .padding((8.0, 0.0)),
+        )
+}
+
 impl Sidebar {
     pub fn new() -> Sidebar {
         Sidebar {
             selected_glyph: WidgetPod::new(
-                Flex::column()
-                    .with_child(Label::new(|d: &Option<GlyphPlus>, _: &Env| {
-                        d.as_ref()
-                            .map(|d| d.glyph.name.to_string())
-                            .unwrap_or("_____".into())
-                    }))
-                    .with_child(
-                        Label::new(|d: &Option<GlyphPlus>, _: &Env| {
-                            d.as_ref()
-                                .and_then(|d| d.codepoint())
-                                .map(|c| format!("(U+{:04X})", c as u32))
-                                .unwrap_or("______".into())
-                        })
-                        .with_text_color(SECONDARY_LABEL_COLOR)
-                        .with_text_size(SECONDARY_TEXT_SIZE),
-                    )
-                    .with_flex_child(SelectedGlyph::new(), 1.0)
-                    .with_child(Label::new(|d: &Option<GlyphPlus>, _: &Env| {
-                        d.as_ref()
-                            .and_then(|g| {
-                                g.glyph
-                                    .advance
-                                    .as_ref()
-                                    .map(|a| format!("{}", a.width as usize))
-                            })
-                            .unwrap_or("___".into())
-                    }))
-                    .with_child(
-                        Flex::row()
-                            .with_child(
-                                Label::new("kern group")
-                                    .with_text_color(SECONDARY_LABEL_COLOR)
-                                    .with_text_size(SECONDARY_TEXT_SIZE),
-                            )
-                            .with_flex_spacer(1.0)
-                            .with_child(
-                                Label::new("kern group")
-                                    .with_text_color(SECONDARY_LABEL_COLOR)
-                                    .with_text_size(SECONDARY_TEXT_SIZE),
-                            )
-                            .padding((8.0, 0.0)),
-                    )
-                    .lens(lenses::app_state::SelectedGlyph)
-                    .fix_height(SELECTED_GLYPH_HEIGHT)
-                    .background(Color::grey8(0xCC))
-                    .boxed(),
+                Maybe::new(
+                    || selected_glyph_widget().boxed(),
+                    || SizedBox::empty().expand_width().boxed(),
+                )
+                .lens(lenses::app_state::SelectedGlyph)
+                .fix_height(SELECTED_GLYPH_HEIGHT)
+                .background(Color::grey8(0xCC))
+                .boxed(),
             ),
         }
     }
@@ -134,28 +136,21 @@ impl SelectedGlyph {
     }
 }
 
-impl Widget<Option<GlyphPlus>> for SelectedGlyph {
-    fn event(
-        &mut self,
-        _ctx: &mut EventCtx,
-        _event: &Event,
-        _data: &mut Option<GlyphPlus>,
-        _env: &Env,
-    ) {
-    }
+impl Widget<GlyphPlus> for SelectedGlyph {
+    fn event(&mut self, _ctx: &mut EventCtx, _event: &Event, _data: &mut GlyphPlus, _env: &Env) {}
     fn lifecycle(
         &mut self,
         _ctx: &mut LifeCycleCtx,
         _event: &LifeCycle,
-        _data: &Option<GlyphPlus>,
+        _data: &GlyphPlus,
         _env: &Env,
     ) {
     }
     fn update(
         &mut self,
         _ctx: &mut UpdateCtx,
-        _old_data: &Option<GlyphPlus>,
-        _data: &Option<GlyphPlus>,
+        _old_data: &GlyphPlus,
+        _data: &GlyphPlus,
         _env: &Env,
     ) {
     }
@@ -163,37 +158,35 @@ impl Widget<Option<GlyphPlus>> for SelectedGlyph {
         &mut self,
         _ctx: &mut LayoutCtx,
         bc: &BoxConstraints,
-        _data: &Option<GlyphPlus>,
+        _data: &GlyphPlus,
         _env: &Env,
     ) -> Size {
         let width = bc.max().width;
         bc.constrain(Size::new(width, SELECTED_GLYPH_HEIGHT))
     }
 
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &Option<GlyphPlus>, env: &Env) {
-        if let Some(data) = data {
-            let advance = data
-                .glyph
-                .advance
-                .as_ref()
-                .map(|a| a.width as f64)
-                .unwrap_or(data.upm() * 0.5);
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &GlyphPlus, env: &Env) {
+        let advance = data
+            .glyph
+            .advance
+            .as_ref()
+            .map(|a| a.width as f64)
+            .unwrap_or(data.upm() * 0.5);
 
-            let path = data.get_bezier();
-            let geom = Rect::ZERO.with_size(ctx.size());
-            let scale = geom.height() as f64 / data.upm();
-            let scaled_width = advance * scale as f64;
-            let l_pad = ((geom.width() as f64 - scaled_width) / 2.).round();
-            let baseline = geom.height() - (geom.height() * 0.16) as f64;
-            let affine = Affine::new([scale as f64, 0.0, 0.0, -scale as f64, l_pad, baseline]);
+        let path = data.get_bezier();
+        let geom = Rect::ZERO.with_size(ctx.size());
+        let scale = geom.height() as f64 / data.upm();
+        let scaled_width = advance * scale as f64;
+        let l_pad = ((geom.width() as f64 - scaled_width) / 2.).round();
+        let baseline = geom.height() - (geom.height() * 0.16) as f64;
+        let affine = Affine::new([scale as f64, 0.0, 0.0, -scale as f64, l_pad, baseline]);
 
-            let glyph_color = if data.is_placeholder_glyph() {
-                env.get(theme::PLACEHOLDER_GLYPH_COLOR)
-            } else {
-                env.get(theme::GLYPH_COLOR)
-            };
+        let glyph_color = if data.is_placeholder_glyph() {
+            env.get(theme::PLACEHOLDER_GLYPH_COLOR)
+        } else {
+            env.get(theme::GLYPH_COLOR)
+        };
 
-            ctx.fill(affine * &*path, &glyph_color);
-        }
+        ctx.fill(affine * &*path, &glyph_color);
     }
 }
