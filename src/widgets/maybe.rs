@@ -84,12 +84,12 @@ impl<T: Data> Widget<Option<T>> for Maybe<T> {
         data: &Option<T>,
         env: &Env,
     ) {
-        if let LifeCycle::WidgetAdded = event {
-            if data.is_some() != self.widget.is_some() {
-                // only possible at launch, because we default to `Some`
-                self.rebuild_widget(data.is_some());
-            }
+        if data.is_some() != self.widget.is_some() {
+            // possible if getting lifecycle after an event that changed the data,
+            // or on WidgetAdded
+            self.rebuild_widget(data.is_some());
         }
+        assert_eq!(data.is_some(), self.widget.is_some(), "{:?}", event);
         match data.as_ref() {
             Some(d) => self.widget.unwrap_some().lifecycle(ctx, event, d, env),
             None => self
