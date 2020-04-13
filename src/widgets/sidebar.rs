@@ -27,13 +27,19 @@ fn selected_glyph_widget() -> impl Widget<GlyphPlus> {
             d.glyph.name.to_string()
         }))
         .with_child(
-            Label::new(|d: &GlyphPlus, _: &Env| {
-                d.codepoint()
-                    .map(|c| format!("(U+{:04X})", c as u32))
-                    .unwrap_or("______".into())
-            })
-            .with_text_color(SECONDARY_LABEL_COLOR)
-            .with_text_size(SECONDARY_TEXT_SIZE),
+            Maybe::new(
+                || {
+                    Label::dynamic(|d: &char, _| format!("(U+{:04X})", *d as u32))
+                        .with_text_color(SECONDARY_LABEL_COLOR)
+                        .with_text_size(SECONDARY_TEXT_SIZE)
+                },
+                || {
+                    Label::new("____")
+                        .with_text_color(SECONDARY_LABEL_COLOR)
+                        .with_text_size(SECONDARY_TEXT_SIZE)
+                },
+            )
+            .lens(lenses::app_state::Codepoint),
         )
         .with_flex_child(SelectedGlyph::new(), 1.0)
         .with_child(Label::new(|d: &GlyphPlus, _: &Env| {

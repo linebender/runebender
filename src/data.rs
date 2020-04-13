@@ -297,6 +297,9 @@ pub mod lenses {
         /// GlyphSet_ -> GlyphPlus
         pub struct Glyph(pub GlyphName);
 
+        /// GlyphPlus -> char
+        pub struct Codepoint;
+
         pub struct SelectedGlyph;
 
         impl Lens<Workspace, EditorState_> for EditorState {
@@ -393,6 +396,31 @@ pub mod lenses {
                 // and then we propogate that up to the workspace here.
                 if glyph.is_selected {
                     data.selected = Some(self.0.clone());
+                }
+                r
+            }
+        }
+
+        impl Lens<GlyphPlus, Option<char>> for Codepoint {
+            fn with<V, F: FnOnce(&Option<char>) -> V>(&self, data: &GlyphPlus, f: F) -> V {
+                let c = data.codepoint();
+                f(&c)
+            }
+
+            fn with_mut<V, F: FnOnce(&mut Option<char>) -> V>(
+                &self,
+                data: &mut GlyphPlus,
+                f: F,
+            ) -> V {
+                let mut c = data.codepoint();
+                let r = f(&mut c);
+                let old = data.codepoint();
+                if c != old {
+                    let glyph = Arc::make_mut(&mut data.glyph);
+                    match c {
+                        Some(c) => glyph.codepoints = Some(vec![c]),
+                        None => glyph.codepoints = None,
+                    }
                 }
                 r
             }
