@@ -33,4 +33,5 @@ pub fn configure_env(env: &mut Env) {
     env.set(druid::theme::LABEL_COLOR, Color::BLACK);
     env.set(druid::theme::WINDOW_BACKGROUND_COLOR, Color::WHITE);
     env.set(druid::theme::BACKGROUND_LIGHT, colors::LIGHT_GREY);
+    env.set(druid::theme::CURSOR_COLOR, Color::BLACK);
 }

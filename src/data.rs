@@ -170,6 +170,21 @@ impl Workspace {
             .and_then(|info| info.units_per_em)
             .unwrap_or(DEFAULT_UNITS_PER_EM)
     }
+
+    pub fn update_glyph_metadata(&mut self, changed: &Arc<Glyph>) {
+        // update the active session, if one exists
+        if self.sessions.contains_key(&changed.name) {
+            let sessions = Arc::make_mut(&mut self.sessions);
+            let session = sessions.get_mut(&changed.name).unwrap();
+            let session = Arc::make_mut(session);
+            session.update_glyph_metadata(changed);
+        }
+        // update the UFO;
+        let font = Arc::make_mut(&mut self.font);
+        if let Some(glyph) = font.ufo.get_glyph_mut(&changed.name) {
+            Arc::make_mut(glyph).advance = changed.advance.clone();
+        }
+    }
 }
 
 impl GlyphPlus {
@@ -301,6 +316,8 @@ pub mod lenses {
         pub struct Codepoint;
 
         pub struct SelectedGlyph;
+
+        pub struct Advance;
 
         impl Lens<Workspace, EditorState_> for EditorState {
             fn with<V, F: FnOnce(&EditorState_) -> V>(&self, data: &Workspace, f: F) -> V {
@@ -470,7 +487,43 @@ pub mod lenses {
                         is_selected,
                     }
                 });
-                f(&mut selected)
+                let r = f(&mut selected);
+                if let Some(selected) = selected {
+                    let is_same = data
+                        .font
+                        .ufo
+                        .get_glyph(&selected.glyph.name)
+                        .map(|g| g.same(&selected.glyph))
+                        .unwrap_or(true);
+                    if !is_same {
+                        data.update_glyph_metadata(&selected.glyph);
+                    }
+                }
+                r
+            }
+        }
+
+        impl Lens<GlyphPlus, f32> for Advance {
+            fn with<V, F: FnOnce(&f32) -> V>(&self, data: &GlyphPlus, f: F) -> V {
+                let advance = data.glyph.advance.as_ref().map(|a| a.width).unwrap_or(0.);
+                f(&advance)
+            }
+
+            fn with_mut<V, F: FnOnce(&mut f32) -> V>(&self, data: &mut GlyphPlus, f: F) -> V {
+                let advance = data.glyph.advance.as_ref().map(|a| a.width).unwrap_or(0.);
+                let mut advance2 = advance.clone();
+                let result = f(&mut advance2);
+                if advance2 != advance {
+                    let glyph = Arc::make_mut(&mut data.glyph);
+                    if advance2 == 0. {
+                        glyph.advance = None;
+                    } else {
+                        let mut advance = glyph.advance.clone().unwrap_or_default();
+                        advance.width = advance2;
+                        glyph.advance = Some(advance);
+                    }
+                }
+                result
             }
         }
     }

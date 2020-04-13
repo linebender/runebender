@@ -10,7 +10,7 @@ use druid::widget::{Flex, Label, SizedBox, WidgetExt};
 
 use crate::data::{lenses, GlyphPlus, Workspace};
 use crate::theme;
-use crate::widgets::Maybe;
+use crate::widgets::{EditableLabel, Maybe};
 
 const SELECTED_GLYPH_BOTTOM_PADDING: f64 = 10.0;
 const SELECTED_GLYPH_HEIGHT: f64 = 220.0;
@@ -42,13 +42,11 @@ fn selected_glyph_widget() -> impl Widget<GlyphPlus> {
             .lens(lenses::app_state::Codepoint),
         )
         .with_flex_child(SelectedGlyph::new(), 1.0)
-        .with_child(Label::new(|d: &GlyphPlus, _: &Env| {
-            d.glyph
-                .advance
-                .as_ref()
-                .map(|a| a.width.to_string())
-                .unwrap_or("___".into())
-        }))
+        .with_child(
+            EditableLabel::parse()
+                .fix_width(45.)
+                .lens(lenses::app_state::Advance),
+        )
         .with_child(
             Flex::row()
                 .with_child(

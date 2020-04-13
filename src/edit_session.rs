@@ -85,6 +85,12 @@ impl EditSession {
         *Arc::make_mut(&mut self.glyph) = new_glyph;
     }
 
+    /// called if metadata changes elsewhere, such as in the main view.
+    pub fn update_glyph_metadata(&mut self, changed: &Arc<Glyph>) {
+        let glyph = Arc::make_mut(&mut self.glyph);
+        glyph.advance = changed.advance.clone();
+    }
+
     /// Returns the current layout bounds of the 'work', that is, all the things
     /// that are 'part of the glyph'.
     pub fn work_bounds(&self) -> Rect {
