@@ -31,4 +31,6 @@ pub fn configure_env(env: &mut Env) {
     env.set(GLYPH_COLOR, Color::BLACK);
     env.set(druid::theme::SELECTION_COLOR, colors::HIGHLIGHT_COLOR);
     env.set(druid::theme::LABEL_COLOR, Color::BLACK);
+    env.set(druid::theme::WINDOW_BACKGROUND_COLOR, Color::WHITE);
+    env.set(druid::theme::BACKGROUND_LIGHT, colors::LIGHT_GREY);
 }

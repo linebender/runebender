@@ -24,9 +24,9 @@ mod tools;
 mod undo;
 pub mod widgets;
 
-use druid::kurbo::Size;
-use druid::widget::{Flex, Label, Scroll, WidgetExt};
-use druid::{AppLauncher, Env, LocalizedString, Widget, WindowDesc};
+use druid::kurbo::Line;
+use druid::widget::{Flex, Label, Painter, Scroll, WidgetExt};
+use druid::{AppLauncher, Env, LocalizedString, RenderContext, Size, Widget, WindowDesc};
 
 use data::{AppState, Workspace};
 
@@ -49,6 +49,13 @@ fn main() {
 }
 
 fn make_ui() -> impl Widget<AppState> {
+    // paint a line under the top title bar
+    let hline_painter = Painter::new(|ctx, _: &Workspace, env| {
+        let max_y = ctx.size().height - 0.5;
+        let line = Line::new((0.0, max_y), (ctx.size().width, max_y));
+        ctx.stroke(line, &env.get(theme::SIDEBAR_EDGE_STROKE), 1.0);
+    });
+
     let label = Label::new(|data: &Workspace, _: &Env| {
         data.font
             .ufo
@@ -58,7 +65,14 @@ fn make_ui() -> impl Widget<AppState> {
             .unwrap_or_else(|| "Untitled".to_string())
     });
     let col = Flex::column()
-        .with_child(label.padding(5.0).fix_height(40.))
+        .with_child(
+            label
+                .padding(5.0)
+                .center()
+                .fix_height(40.)
+                .expand_width()
+                .background(hline_painter),
+        )
         .with_flex_child(
             Flex::row()
                 .with_child(Sidebar::new().fix_width(180.))
