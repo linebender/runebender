@@ -198,6 +198,7 @@ impl TaggedEvent {
 
 impl Mouse {
     /// The current position of  the mouse.
+    #[allow(dead_code)]
     pub fn pos(&self) -> Point {
         match &self.state {
             MouseState::Up(e) => e.pos,
@@ -357,6 +358,7 @@ impl Mouse {
         };
     }
 
+    #[allow(dead_code)]
     fn cancel<T>(&mut self, data: &mut T, delegate: &mut dyn MouseDelegate<T>) {
         let prev_state = mem::replace(&mut self.state, MouseState::Transition);
         let last_event = match prev_state {
