@@ -77,7 +77,7 @@ fn make_ui() -> impl Widget<AppState> {
         .with_flex_child(
             Flex::row()
                 .with_child(Sidebar::new().fix_width(180.))
-                .with_flex_child(Scroll::new(GlyphGrid::new()).vertical(), 1.0),
+                .with_flex_child(Scroll::new(GlyphGrid::new()).vertical().expand_width(), 1.0),
             1.,
         )
         .lens(AppState::workspace)
