@@ -8,7 +8,7 @@ mod maybe;
 mod scroll_zoom;
 mod sidebar;
 
-pub use controller::Controller;
+pub use controller::RootWindowController;
 pub use editable_label::EditableLabel;
 pub use editor::Editor;
 pub use grid::GlyphGrid;

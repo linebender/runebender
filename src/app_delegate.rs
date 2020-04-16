@@ -15,7 +15,7 @@ use norad::{GlyphName, Ufo};
 use crate::consts;
 use crate::data::{lenses, AppState};
 use crate::edit_session::EditSession;
-use crate::widgets::{Controller, Editor, ScrollZoom};
+use crate::widgets::{Editor, RootWindowController, ScrollZoom};
 
 pub const EDIT_GLYPH: Selector = Selector::new("runebender.open-editor-with-glyph");
 
@@ -120,8 +120,7 @@ fn get_or_create_session(name: &GlyphName, data: &mut AppState) -> Arc<EditSessi
 }
 
 fn make_editor(session: &Arc<EditSession>) -> impl Widget<AppState> {
-    Controller::new(
-        ScrollZoom::new(Editor::new(session.clone()))
-            .lens(AppState::workspace.then(lenses::app_state::EditorState(session.name.clone()))),
-    )
+    ScrollZoom::new(Editor::new(session.clone()))
+        .lens(AppState::workspace.then(lenses::app_state::EditorState(session.name.clone())))
+        .controller(RootWindowController::default())
 }
