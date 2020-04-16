@@ -2,8 +2,7 @@
 
 A font editor written in Rust, currently in very early stages.
 
-This repo currently contains a crate that itself contains a number of different
-experimental binaries. These are in `src/bin`.
+**This software is very raw, and is not yet suitable for use**.
 
 ## Building
 
