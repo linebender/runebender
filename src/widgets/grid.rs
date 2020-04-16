@@ -75,7 +75,8 @@ impl Widget<Workspace> for GlyphGrid {
                 x = 0.;
             }
             child.layout(ctx, &child_bc, data, env);
-            child.set_layout_rect(Rect::from_origin_size((x, y), (GLYPH_SIZE, GLYPH_SIZE)));
+            let rect = Rect::from_origin_size((x, y), (GLYPH_SIZE, GLYPH_SIZE));
+            child.set_layout_rect(ctx, data, env, rect);
             x += GLYPH_SIZE;
         }
         Size::new(width, y + GLYPH_SIZE)
@@ -220,5 +221,8 @@ fn get_text_layout(text_ctx: &mut PietText, text: &str, env: &Env) -> PietTextLa
         .new_font_by_name(font_name, font_size)
         .build()
         .unwrap();
-    text_ctx.new_text_layout(&font, text).build().unwrap()
+    text_ctx
+        .new_text_layout(&font, text, std::f64::INFINITY)
+        .build()
+        .unwrap()
 }

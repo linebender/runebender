@@ -155,7 +155,7 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
             .unwrap();
         let layout = ctx
             .text()
-            .new_text_layout(&font, &data.session.tool_desc)
+            .new_text_layout(&font, &data.session.tool_desc, std::f64::INFINITY)
             .build()
             .unwrap();
         let text_size = Size::new(layout.width(), TOOL_LABEL_SIZE);
@@ -211,7 +211,7 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
                 self.after_zoom_changed(ctx, env);
                 return;
             }
-            Event::Size(size) if self.needs_center_after_layout => {
+            Event::WindowSize(size) if self.needs_center_after_layout => {
                 self.set_initial_viewport(data, *size);
                 ctx.request_layout();
             }

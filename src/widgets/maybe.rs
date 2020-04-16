@@ -118,12 +118,16 @@ impl<T: Data> Widget<Option<T>> for Maybe<T> {
         match data.as_ref() {
             Some(d) => {
                 let size = self.widget.unwrap_some().layout(ctx, bc, d, env);
-                self.widget.unwrap_some().set_layout_rect(size.to_rect());
+                self.widget
+                    .unwrap_some()
+                    .set_layout_rect(ctx, d, env, size.to_rect());
                 size
             }
             None => {
                 let size = self.widget.unwrap_none().layout(ctx, bc, &(), env);
-                self.widget.unwrap_none().set_layout_rect(size.to_rect());
+                self.widget
+                    .unwrap_none()
+                    .set_layout_rect(ctx, &(), env, size.to_rect());
                 size
             }
         }
