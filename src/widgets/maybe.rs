@@ -57,7 +57,7 @@ impl<T: Data> Maybe<T> {
     /// Create a new `Maybe` widget where the `None` branch is an empty widget.
     #[allow(dead_code)]
     pub fn or_empty<W1: Widget<T> + 'static>(some_maker: impl Fn() -> W1 + 'static) -> Maybe<T> {
-        Self::new(some_maker, || SizedBox::empty())
+        Self::new(some_maker, SizedBox::empty)
     }
 
     fn rebuild_widget(&mut self, is_some: bool) {
@@ -92,10 +92,7 @@ impl<T: Data> Widget<Option<T>> for Maybe<T> {
         assert_eq!(data.is_some(), self.widget.is_some(), "{:?}", event);
         match data.as_ref() {
             Some(d) => self.widget.unwrap_some().lifecycle(ctx, event, d, env),
-            None => self
-                .widget
-                .unwrap_none()
-                .lifecycle(ctx, event, &mut (), env),
+            None => self.widget.unwrap_none().lifecycle(ctx, event, &(), env),
         }
     }
 

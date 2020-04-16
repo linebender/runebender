@@ -194,3 +194,9 @@ impl Widget<GlyphPlus> for SelectedGlyph {
         ctx.fill(affine * &*path, &glyph_color);
     }
 }
+
+impl Default for Sidebar {
+    fn default() -> Self {
+        Self::new()
+    }
+}

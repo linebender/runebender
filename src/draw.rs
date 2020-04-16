@@ -71,7 +71,7 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
             .advance
             .as_ref()
             .map(|a| a.width as f64)
-            .unwrap_or((upm * 0.5).round());
+            .unwrap_or_else(|| (upm * 0.5).round());
         let bounds = Rect::from_points((0., descender), (hadvance, ascender));
         let bounds = self.space.rect_to_screen(bounds);
 
