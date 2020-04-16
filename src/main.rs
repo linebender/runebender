@@ -30,7 +30,7 @@ use druid::{AppLauncher, Env, LocalizedString, RenderContext, Size, Widget, Wind
 
 use data::{AppState, Workspace};
 
-use widgets::{Controller, GlyphGrid, Sidebar};
+use widgets::{GlyphGrid, RootWindowController, Sidebar};
 
 fn main() {
     let state = get_initial_state();
@@ -64,7 +64,8 @@ fn make_ui() -> impl Widget<AppState> {
             .and_then(|info| info.family_name.clone())
             .unwrap_or_else(|| "Untitled".to_string())
     });
-    let col = Flex::column()
+
+    Flex::column()
         .with_child(
             label
                 .padding(5.0)
@@ -78,8 +79,9 @@ fn make_ui() -> impl Widget<AppState> {
                 .with_child(Sidebar::new().fix_width(180.))
                 .with_flex_child(Scroll::new(GlyphGrid::new()).vertical(), 1.0),
             1.,
-        );
-    Controller::new(col.lens(AppState::workspace))
+        )
+        .lens(AppState::workspace)
+        .controller(RootWindowController::default())
 }
 
 /// If there was an argument passed at the command line, try to open it as a .ufo
