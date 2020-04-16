@@ -113,8 +113,8 @@ impl Widget<Workspace> for Sidebar {
         let extra_x = my_size.width - child_size.width;
         let child_y = (extra_y - SELECTED_GLYPH_BOTTOM_PADDING).max(0.0);
         let child_origin = (extra_x / 2.0, child_y);
-        self.selected_glyph
-            .set_layout_rect(Rect::from_origin_size(child_origin, child_size));
+        let rect = Rect::from_origin_size(child_origin, child_size);
+        self.selected_glyph.set_layout_rect(ctx, data, env, rect);
         my_size
     }
 
