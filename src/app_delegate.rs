@@ -60,7 +60,7 @@ impl AppDelegate<AppState> for Delegate {
                 match data.workspace.open_glyphs.get(&payload).to_owned() {
                     Some(id) => {
                         let command = Command::new(druid::commands::SHOW_WINDOW, *id);
-                        ctx.submit_command(command, None);
+                        ctx.submit_command(command, *id);
                     }
                     None => {
                         let session = get_or_create_session(&payload, data);
