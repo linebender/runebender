@@ -34,6 +34,7 @@ pub fn make_context_menu(data: &EditorState, pos: Point) -> MenuDesc<AppState> {
 }
 
 /// The main window/app menu.
+#[allow(unused_mut)]
 pub(crate) fn make_menu(data: &AppState) -> MenuDesc<AppState> {
     let mut menu = MenuDesc::empty();
     #[cfg(target_os = "macos")]

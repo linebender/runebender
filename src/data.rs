@@ -509,9 +509,10 @@ pub mod lenses {
                 f(&advance)
             }
 
+            #[allow(clippy::float_cmp)]
             fn with_mut<V, F: FnOnce(&mut f32) -> V>(&self, data: &mut GlyphPlus, f: F) -> V {
                 let advance = data.glyph.advance.as_ref().map(|a| a.width).unwrap_or(0.);
-                let mut advance2 = advance.clone();
+                let mut advance2 = advance;
                 let result = f(&mut advance2);
                 if advance2 != advance {
                     let glyph = Arc::make_mut(&mut data.glyph);
