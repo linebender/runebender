@@ -171,6 +171,35 @@ impl Workspace {
             .unwrap_or(DEFAULT_UNITS_PER_EM)
     }
 
+    pub fn add_new_glyph(&mut self) -> GlyphName {
+        let mut name = String::from("newGlyph");
+        let mut counter = 0;
+
+        while self.font.ufo.get_glyph(name.as_str()).is_some() {
+            counter += 1;
+            name = format!("newGlyph.{}", counter);
+        }
+
+        let name: GlyphName = name.into();
+        let glyph = norad::Glyph::new_named(name.clone());
+        self.font_mut()
+            .ufo
+            .get_default_layer_mut()
+            .unwrap()
+            .insert_glyph(glyph);
+        name
+    }
+
+    pub fn delete_selected_glyph(&mut self) {
+        if let Some(name) = self.selected.take() {
+            self.font_mut()
+                .ufo
+                .get_default_layer_mut()
+                .unwrap()
+                .delete_glyph(&name);
+        }
+    }
+
     pub fn update_glyph_metadata(&mut self, changed: &Arc<Glyph>) {
         // update the active session, if one exists
         if self.sessions.contains_key(&changed.name) {
@@ -180,10 +209,14 @@ impl Workspace {
             session.update_glyph_metadata(changed);
         }
         // update the UFO;
-        let font = Arc::make_mut(&mut self.font);
-        if let Some(glyph) = font.ufo.get_glyph_mut(&changed.name) {
+        //let font = Arc::make_mut(&mut self.font);
+        if let Some(glyph) = self.font_mut().ufo.get_glyph_mut(&changed.name) {
             Arc::make_mut(glyph).advance = changed.advance.clone();
         }
+    }
+
+    pub fn font_mut(&mut self) -> &mut FontObject {
+        Arc::make_mut(&mut self.font)
     }
 }
 

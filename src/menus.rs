@@ -5,7 +5,8 @@ use druid::kurbo::Point;
 use druid::commands;
 use druid::platform_menus;
 use druid::{
-    Command, Data, FileDialogOptions, FileSpec, LocalizedString, MenuDesc, MenuItem, SysMods,
+    Command, Data, FileDialogOptions, FileSpec, KeyCode, LocalizedString, MenuDesc, MenuItem,
+    SysMods,
 };
 
 use crate::consts;
@@ -45,7 +46,7 @@ pub(crate) fn make_menu(data: &AppState) -> MenuDesc<AppState> {
     menu.append(file_menu(data))
         .append(edit_menu())
         .append(view_menu())
-        .append(glyph_menu())
+        .append(glyph_menu(data))
         .append(tools_menu())
 }
 
@@ -153,15 +154,31 @@ fn view_menu<T: Data>() -> MenuDesc<T> {
         )
 }
 
-fn glyph_menu<T: Data>() -> MenuDesc<T> {
-    MenuDesc::new(LocalizedString::new("menu-glyph-menu").with_placeholder("Glyph")).append(
-        MenuItem::new(
-            LocalizedString::new("menu-item-add-component").with_placeholder("Add Component"),
-            consts::cmd::ADD_COMPONENT,
+fn glyph_menu(data: &AppState) -> MenuDesc<AppState> {
+    MenuDesc::new(LocalizedString::new("menu-glyph-menu").with_placeholder("Glyph"))
+        .append(
+            MenuItem::new(
+                LocalizedString::new("menu-item-new-glyph").with_placeholder("New Glyph"),
+                consts::cmd::NEW_GLYPH,
+            )
+            .hotkey(SysMods::CmdShift, "n"),
         )
-        .hotkey(SysMods::CmdShift, "c")
-        .disabled(),
-    )
+        .append(
+            MenuItem::new(
+                LocalizedString::new("menu-item-delete-glyph").with_placeholder("Delete Glyph"),
+                consts::cmd::DELETE_SELECTED_GLYPH,
+            )
+            .hotkey(SysMods::Cmd, KeyCode::Backspace)
+            .disabled_if(|| data.workspace.selected.is_none()),
+        )
+        .append(
+            MenuItem::new(
+                LocalizedString::new("menu-item-add-component").with_placeholder("Add Component"),
+                consts::cmd::ADD_COMPONENT,
+            )
+            .hotkey(SysMods::CmdShift, "c")
+            .disabled(),
+        )
 }
 
 fn tools_menu<T: Data>() -> MenuDesc<T> {

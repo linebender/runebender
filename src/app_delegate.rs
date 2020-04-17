@@ -51,6 +51,18 @@ impl AppDelegate<AppState> for Delegate {
                 }
                 false
             }
+
+            consts::cmd::NEW_GLYPH => {
+                let new_glyph_name = data.workspace.add_new_glyph();
+                data.workspace.selected = Some(new_glyph_name);
+                false
+            }
+
+            consts::cmd::DELETE_SELECTED_GLYPH => {
+                data.workspace.delete_selected_glyph();
+                false
+            }
+
             EDIT_GLYPH => {
                 let payload = cmd
                     .get_object::<GlyphName>()
