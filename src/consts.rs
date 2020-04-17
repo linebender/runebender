@@ -25,6 +25,12 @@ pub mod cmd {
     /// sent by the 'deselect' menu item
     pub const DESELECT_ALL: Selector = Selector::new("runebender.deselect-all");
 
+    /// sent by the 'new glyph' menu item
+    pub const NEW_GLYPH: Selector = Selector::new("runebender.new-glyph");
+
+    /// sent by the 'delete glyph' menu item
+    pub const DELETE_SELECTED_GLYPH: Selector = Selector::new("runebender.delete-selected-glyph");
+
     /// sent by the 'add component' menu item
     pub const ADD_COMPONENT: Selector = Selector::new("runebender.add-component");
 
