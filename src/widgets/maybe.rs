@@ -71,9 +71,11 @@ impl<T: Data> Maybe<T> {
 
 impl<T: Data> Widget<Option<T>> for Maybe<T> {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut Option<T>, env: &Env) {
-        match data.as_mut() {
-            Some(d) => self.widget.unwrap_some().event(ctx, event, d, env),
-            None => self.widget.unwrap_none().event(ctx, event, &mut (), env),
+        if data.is_some() == self.widget.is_some() {
+            match data.as_mut() {
+                Some(d) => self.widget.with_some(|w| w.event(ctx, event, d, env)),
+                None => self.widget.with_none(|w| w.event(ctx, event, &mut (), env)),
+            };
         }
     }
 
@@ -91,9 +93,9 @@ impl<T: Data> Widget<Option<T>> for Maybe<T> {
         }
         assert_eq!(data.is_some(), self.widget.is_some(), "{:?}", event);
         match data.as_ref() {
-            Some(d) => self.widget.unwrap_some().lifecycle(ctx, event, d, env),
-            None => self.widget.unwrap_none().lifecycle(ctx, event, &(), env),
-        }
+            Some(d) => self.widget.with_some(|w| w.lifecycle(ctx, event, d, env)),
+            None => self.widget.with_none(|w| w.lifecycle(ctx, event, &(), env)),
+        };
     }
 
     fn update(&mut self, ctx: &mut UpdateCtx, old_data: &Option<T>, data: &Option<T>, env: &Env) {
@@ -102,9 +104,9 @@ impl<T: Data> Widget<Option<T>> for Maybe<T> {
             ctx.children_changed();
         } else {
             match data {
-                Some(new) => self.widget.unwrap_some().update(ctx, new, env),
-                None => self.widget.unwrap_none().update(ctx, &(), env),
-            }
+                Some(new) => self.widget.with_some(|w| w.update(ctx, new, env)),
+                None => self.widget.with_none(|w| w.update(ctx, &(), env)),
+            };
         }
     }
 
@@ -116,28 +118,25 @@ impl<T: Data> Widget<Option<T>> for Maybe<T> {
         env: &Env,
     ) -> Size {
         match data.as_ref() {
-            Some(d) => {
-                let size = self.widget.unwrap_some().layout(ctx, bc, d, env);
-                self.widget
-                    .unwrap_some()
-                    .set_layout_rect(ctx, d, env, size.to_rect());
+            Some(d) => self.widget.with_some(|w| {
+                let size = w.layout(ctx, bc, d, env);
+                w.set_layout_rect(ctx, d, env, size.to_rect());
                 size
-            }
-            None => {
-                let size = self.widget.unwrap_none().layout(ctx, bc, &(), env);
-                self.widget
-                    .unwrap_none()
-                    .set_layout_rect(ctx, &(), env, size.to_rect());
+            }),
+            None => self.widget.with_none(|w| {
+                let size = w.layout(ctx, bc, &(), env);
+                w.set_layout_rect(ctx, &(), env, size.to_rect());
                 size
-            }
+            }),
         }
+        .unwrap_or_default()
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &Option<T>, env: &Env) {
         match data.as_ref() {
-            Some(d) => self.widget.unwrap_some().paint(ctx, d, env),
-            None => self.widget.unwrap_none().paint(ctx, &(), env),
-        }
+            Some(d) => self.widget.with_some(|w| w.paint(ctx, d, env)),
+            None => self.widget.with_none(|w| w.paint(ctx, &(), env)),
+        };
     }
 }
 
@@ -149,17 +148,29 @@ impl<T> MaybeWidget<T> {
         }
     }
 
-    fn unwrap_some(&mut self) -> &mut WidgetPod<T, Box<dyn Widget<T>>> {
+    fn with_some<R, F: FnOnce(&mut WidgetPod<T, Box<dyn Widget<T>>>) -> R>(
+        &mut self,
+        f: F,
+    ) -> Option<R> {
         match self {
-            Self::Some(widget) => widget,
-            Self::None(_) => panic!("Called MaybeWidget::unwrap_some on a `None` value."),
+            Self::Some(widget) => Some(f(widget)),
+            Self::None(_) => {
+                log::warn!("Maybe::with_some called on none value");
+                None
+            }
         }
     }
 
-    fn unwrap_none(&mut self) -> &mut WidgetPod<(), Box<dyn Widget<()>>> {
+    fn with_none<R, F: FnOnce(&mut WidgetPod<(), Box<dyn Widget<()>>>) -> R>(
+        &mut self,
+        f: F,
+    ) -> Option<R> {
         match self {
-            Self::None(widget) => widget,
-            Self::Some(_) => panic!("Called MaybeWidget::unwrap_none on a `Some` value."),
+            Self::None(widget) => Some(f(widget)),
+            Self::Some(_) => {
+                log::warn!("Maybe::with_none called on none value");
+                None
+            }
         }
     }
 }
