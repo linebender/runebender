@@ -17,9 +17,24 @@ use crate::path::{EntityId, Path, PathPoint};
 //TODO: this doesn't feel very robust; items themselves should have hitzones?
 pub const MIN_CLICK_DISTANCE: f64 = 10.0;
 
+/// A unique identifier for a session. A session keeps the same identifier
+/// even if the name of the glyph changes.
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub struct SessionId(usize);
+
+impl SessionId {
+    fn next() -> SessionId {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
+        SessionId(NEXT_ID.fetch_add(1, Ordering::Relaxed))
+    }
+}
+
 /// The editing state of a particular glyph.
 #[derive(Debug, Clone, Data)]
 pub struct EditSession {
+    #[data(ignore)]
+    pub id: SessionId,
     pub name: GlyphName,
     pub glyph: Arc<Glyph>,
     pub paths: Arc<Vec<Path>>,
@@ -59,6 +74,7 @@ impl EditSession {
             .unwrap_or_default();
 
         EditSession {
+            id: SessionId::next(),
             name,
             glyph,
             paths: Arc::new(paths),
