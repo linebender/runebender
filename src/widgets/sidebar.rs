@@ -8,6 +8,8 @@ use druid::{
 
 use druid::widget::{Flex, Label, SizedBox, WidgetExt};
 
+use norad::GlyphName;
+
 use crate::data::{lenses, GlyphPlus, Workspace};
 use crate::theme;
 use crate::widgets::{EditableLabel, Maybe};
@@ -23,9 +25,17 @@ pub struct Sidebar {
 
 fn selected_glyph_widget() -> impl Widget<GlyphPlus> {
     Flex::column()
-        .with_child(Label::new(|d: &GlyphPlus, _: &Env| {
-            d.glyph.name.to_string()
-        }))
+        .with_child(
+            EditableLabel::new(
+                |s: &GlyphName, _: &_| s.to_string(),
+                |s| {
+                    crate::glyph_names::validate_and_standardize_name(s)
+                        .ok()
+                        .map(Into::into)
+                },
+            )
+            .lens(lenses::app_state::GlyphName),
+        )
         .with_child(
             Maybe::new(
                 || {

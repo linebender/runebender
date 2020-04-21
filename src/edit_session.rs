@@ -106,6 +106,11 @@ impl EditSession {
         glyph.advance = changed.advance.clone();
     }
 
+    pub fn rename(&mut self, name: GlyphName) {
+        self.name = name.clone();
+        Arc::make_mut(&mut self.glyph).name = name;
+    }
+
     /// Returns the current layout bounds of the 'work', that is, all the things
     /// that are 'part of the glyph'.
     pub fn work_bounds(&self) -> Rect {

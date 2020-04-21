@@ -205,13 +205,50 @@ impl Workspace {
         name
     }
 
-    pub fn delete_selected_glyph(&mut self) {
-        if let Some(name) = self.selected.take() {
+    pub fn delete_selected_glyph(&mut self) -> Option<Arc<Glyph>> {
+        self.selected.take().and_then(|name| {
             self.font_mut()
                 .ufo
                 .get_default_layer_mut()
                 .unwrap()
-                .delete_glyph(&name);
+                .remove_glyph(&name)
+        })
+    }
+
+    pub fn rename_selected(&mut self, new_name: GlyphName) {
+        let name = match self.selected.take() {
+            Some(s) => s,
+            None => return,
+        };
+
+        let font = self.font_mut();
+        let mut selected = font
+            .ufo
+            .get_default_layer_mut()
+            .unwrap()
+            .remove_glyph(&name)
+            .unwrap();
+
+        let sel = Arc::make_mut(&mut selected);
+        let old_name = std::mem::replace(&mut sel.name, new_name.clone());
+        font.ufo
+            .get_default_layer_mut()
+            .unwrap()
+            .insert_glyph(selected);
+        if self.session_map.contains_key(&old_name) {
+            let session_map = Arc::make_mut(&mut self.session_map);
+            let session_id = session_map.remove(&old_name).unwrap();
+            session_map.insert(new_name.clone(), session_id);
+
+            let sessions = Arc::make_mut(&mut self.sessions);
+            let mut session = sessions.get_mut(&session_id).unwrap();
+            Arc::make_mut(&mut session).rename(new_name.clone());
+        }
+
+        if self.open_glyphs.contains_key(&old_name) {
+            let open = Arc::make_mut(&mut self.open_glyphs);
+            let window = open.remove(&old_name).unwrap();
+            open.insert(new_name, window);
         }
     }
 
@@ -349,7 +386,7 @@ pub mod lenses {
         use std::sync::Arc;
 
         use druid::{Data, Lens};
-        use norad::GlyphName;
+        use norad::GlyphName as GlyphName_;
 
         use super::super::{EditorState as EditorState_, GlyphPlus, SessionId, Workspace};
 
@@ -357,7 +394,10 @@ pub mod lenses {
         pub struct EditorState(pub SessionId);
 
         /// GlyphSet_ -> GlyphPlus
-        pub struct Glyph(pub GlyphName);
+        pub struct Glyph(pub GlyphName_);
+
+        /// GlyphPlus => GlyphName_
+        pub struct GlyphName;
 
         /// GlyphPlus -> char
         pub struct Codepoint;
@@ -534,6 +574,10 @@ pub mod lenses {
                 });
                 let r = f(&mut selected);
                 if let Some(selected) = selected {
+                    if &selected.glyph.name != data.selected.as_ref().unwrap() {
+                        data.rename_selected(selected.glyph.name.clone());
+                    }
+
                     let is_same = data
                         .font
                         .ufo
@@ -542,6 +586,7 @@ pub mod lenses {
                         .unwrap_or(true);
                     if !is_same {
                         data.update_glyph_metadata(&selected.glyph);
+                        data.selected = Some(selected.glyph.name.clone());
                     }
                 }
                 r
@@ -570,6 +615,25 @@ pub mod lenses {
                     }
                 }
                 result
+            }
+        }
+
+        impl Lens<GlyphPlus, GlyphName_> for GlyphName {
+            fn with<V, F: FnOnce(&GlyphName_) -> V>(&self, data: &GlyphPlus, f: F) -> V {
+                f(&data.glyph.name)
+            }
+
+            fn with_mut<V, F: FnOnce(&mut GlyphName_) -> V>(
+                &self,
+                data: &mut GlyphPlus,
+                f: F,
+            ) -> V {
+                let mut s = data.glyph.name.clone();
+                let r = f(&mut s);
+                if s != data.glyph.name {
+                    Arc::make_mut(&mut data.glyph).name = s;
+                }
+                r
             }
         }
     }
