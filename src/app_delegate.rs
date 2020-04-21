@@ -75,7 +75,7 @@ impl AppDelegate<AppState> for Delegate {
                         ctx.submit_command(command, *id);
                     }
                     None => {
-                        let session = get_or_create_session(&payload, data);
+                        let session = data.workspace.get_or_create_session(&payload);
                         let new_win = WindowDesc::new(move || make_editor(&session))
                             .title(LocalizedString::new("").with_placeholder(payload.to_string()))
                             .window_size(Size::new(900.0, 800.0))
@@ -119,20 +119,8 @@ impl AppDelegate<AppState> for Delegate {
     }
 }
 
-fn get_or_create_session(name: &GlyphName, data: &mut AppState) -> Arc<EditSession> {
-    data.workspace
-        .sessions
-        .get(name)
-        .cloned()
-        .unwrap_or_else(|| {
-            let session = Arc::new(EditSession::new(name, &data.workspace));
-            Arc::make_mut(&mut data.workspace.sessions).insert(name.clone(), session.clone());
-            session
-        })
-}
-
 fn make_editor(session: &Arc<EditSession>) -> impl Widget<AppState> {
     ScrollZoom::new(Editor::new(session.clone()))
-        .lens(AppState::workspace.then(lenses::app_state::EditorState(session.name.clone())))
+        .lens(AppState::workspace.then(lenses::app_state::EditorState(session.id)))
         .controller(RootWindowController::default())
 }

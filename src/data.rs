@@ -11,7 +11,7 @@ use druid::{Data, Lens, WindowId};
 use norad::glyph::{Contour, ContourPoint, Glyph, GlyphName, PointType};
 use norad::{FontInfo, Ufo};
 
-use crate::edit_session::EditSession;
+use crate::edit_session::{EditSession, SessionId};
 
 /// This is by convention.
 const DEFAULT_UNITS_PER_EM: f64 = 1000.;
@@ -34,7 +34,8 @@ pub struct Workspace {
     pub selected: Option<GlyphName>,
     /// glyphs that are already open in an editor window
     pub open_glyphs: Arc<HashMap<GlyphName, WindowId>>,
-    pub sessions: Arc<HashMap<GlyphName, Arc<EditSession>>>,
+    pub sessions: Arc<HashMap<SessionId, Arc<EditSession>>>,
+    session_map: Arc<HashMap<GlyphName, SessionId>>,
 }
 
 #[derive(Clone, Data)]
@@ -124,13 +125,27 @@ impl Workspace {
         Ok(())
     }
 
+    pub fn get_or_create_session(&mut self, glyph_name: &GlyphName) -> Arc<EditSession> {
+        self.session_map
+            .get(glyph_name)
+            .and_then(|id| self.sessions.get(id))
+            .cloned()
+            .unwrap_or_else(|| {
+                let session = Arc::new(EditSession::new(glyph_name, self));
+                let session_id = session.id;
+                Arc::make_mut(&mut self.sessions).insert(session_id, session.clone());
+                Arc::make_mut(&mut self.session_map).insert(glyph_name.clone(), session_id);
+                session
+            })
+    }
+
     /// Given a glyph name, a `Ufo`, and an optional cache, returns the fully resolved
     /// (including all sub components) `BezPath` for this glyph.
     pub fn get_bezier(&self, name: &GlyphName) -> Option<Arc<BezPath>> {
         let glyph = self
-            .sessions
+            .session_map
             .get(name)
-            .map(|s| &s.glyph)
+            .and_then(|name| self.sessions.get(name).map(|s| &s.glyph))
             .or_else(|| self.font.ufo.get_glyph(name))?;
         let path = path_for_glyph(glyph)?;
         Some(self.resolve_components(glyph, path))
@@ -202,14 +217,13 @@ impl Workspace {
 
     pub fn update_glyph_metadata(&mut self, changed: &Arc<Glyph>) {
         // update the active session, if one exists
-        if self.sessions.contains_key(&changed.name) {
+        if let Some(session_id) = self.session_map.get(&changed.name) {
             let sessions = Arc::make_mut(&mut self.sessions);
-            let session = sessions.get_mut(&changed.name).unwrap();
+            let session = sessions.get_mut(&session_id).unwrap();
             let session = Arc::make_mut(session);
             session.update_glyph_metadata(changed);
         }
         // update the UFO;
-        //let font = Arc::make_mut(&mut self.font);
         if let Some(glyph) = self.font_mut().ufo.get_glyph_mut(&changed.name) {
             Arc::make_mut(glyph).advance = changed.advance.clone();
         }
@@ -337,10 +351,10 @@ pub mod lenses {
         use druid::{Data, Lens};
         use norad::GlyphName;
 
-        use super::super::{EditorState as EditorState_, GlyphPlus, Workspace};
+        use super::super::{EditorState as EditorState_, GlyphPlus, SessionId, Workspace};
 
         /// Workspace -> EditorState
-        pub struct EditorState(pub GlyphName);
+        pub struct EditorState(pub SessionId);
 
         /// GlyphSet_ -> GlyphPlus
         pub struct Glyph(pub GlyphName);
