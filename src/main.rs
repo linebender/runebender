@@ -14,6 +14,7 @@ mod data;
 mod design_space;
 mod draw;
 mod edit_session;
+mod glyph_names;
 mod guides;
 mod menus;
 mod mouse;
