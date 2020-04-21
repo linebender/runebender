@@ -106,12 +106,16 @@ impl Widget<Workspace> for GlyphGrid {
         }
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, _old: &Workspace, new: &Workspace, _env: &Env) {
-        if new.font.ufo.glyph_count() != self.children.len() {
+    fn update(&mut self, ctx: &mut UpdateCtx, old: &Workspace, new: &Workspace, env: &Env) {
+        if !old.font.same(&new.font) {
             self.update_children(new);
             ctx.children_changed();
+            ctx.request_paint();
+        } else {
+            for child in &mut self.children {
+                child.update(ctx, new, env);
+            }
         }
-        ctx.request_paint();
     }
 }
 
