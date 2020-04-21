@@ -27,7 +27,6 @@ pub struct EditSession {
     pub components: Arc<Vec<Component>>,
     pub guides: Arc<Vec<Guide>>,
     pub viewport: ViewPort,
-    #[data(same_fn = "rect_same")]
     work_bounds: Rect,
     /// A string describing the current tool
     pub tool_desc: Arc<str>,
@@ -370,10 +369,6 @@ impl EditSession {
         // codepoints
         glyph
     }
-}
-
-fn rect_same(one: &Rect, two: &Rect) -> bool {
-    one.x0.same(&two.x0) && one.x1.same(&two.x1) && one.y0.same(&two.y0) && one.y1.same(&two.y1)
 }
 
 /// A helper for iterating through a selection in per-path chunks.
