@@ -403,48 +403,46 @@ pub mod lenses {
             }
         }
 
-        impl Lens<Workspace, GlyphPlus> for Glyph {
-            fn with<V, F: FnOnce(&GlyphPlus) -> V>(&self, data: &Workspace, f: F) -> V {
-                let glyph = data
-                    .font
-                    .ufo
-                    .get_glyph(&self.0)
-                    .expect("missing glyph in lens");
-                let outline = data.get_bezier(&glyph.name);
-                let is_selected = data.selected.as_ref() == Some(&self.0);
-                let glyph = GlyphPlus {
-                    glyph: Arc::clone(glyph),
-                    is_placeholder: outline.is_none(),
-                    outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
-                    units_per_em: data.units_per_em(),
-                    is_selected,
-                };
+        impl Lens<Workspace, Option<GlyphPlus>> for Glyph {
+            fn with<V, F: FnOnce(&Option<GlyphPlus>) -> V>(&self, data: &Workspace, f: F) -> V {
+                let glyph = data.font.ufo.get_glyph(&self.0).map(|g| {
+                    let outline = data.get_bezier(&g.name);
+                    let is_selected = data.selected.as_ref() == Some(&self.0);
+                    GlyphPlus {
+                        glyph: Arc::clone(g),
+                        is_placeholder: outline.is_none(),
+                        outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
+                        units_per_em: data.units_per_em(),
+                        is_selected,
+                    }
+                });
                 f(&glyph)
             }
 
-            fn with_mut<V, F: FnOnce(&mut GlyphPlus) -> V>(&self, data: &mut Workspace, f: F) -> V {
+            fn with_mut<V, F: FnOnce(&mut Option<GlyphPlus>) -> V>(
+                &self,
+                data: &mut Workspace,
+                f: F,
+            ) -> V {
                 //FIXME: this is creating a new copy and then throwing it away
                 //this is just so that the signatures work for now, we aren't actually doing any
                 //mutating
-                let glyph = data
-                    .font
-                    .ufo
-                    .get_glyph(&self.0)
-                    .expect("missing glyph in lens");
-                let outline = data.get_bezier(&glyph.name);
-                let is_placeholder = outline.is_none();
-                let is_selected = data.selected.as_ref() == Some(&self.0);
-                let mut glyph = GlyphPlus {
-                    glyph: Arc::clone(glyph),
-                    outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
-                    units_per_em: data.units_per_em(),
-                    is_placeholder,
-                    is_selected,
-                };
+                let mut glyph = data.font.ufo.get_glyph(&self.0).map(|glyph| {
+                    let outline = data.get_bezier(&glyph.name);
+                    let is_placeholder = outline.is_none();
+                    let is_selected = data.selected.as_ref() == Some(&self.0);
+                    GlyphPlus {
+                        glyph: Arc::clone(glyph),
+                        outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
+                        units_per_em: data.units_per_em(),
+                        is_placeholder,
+                        is_selected,
+                    }
+                });
                 let r = f(&mut glyph);
                 // we track selections by having the grid item set this flag,
                 // and then we propogate that up to the workspace here.
-                if glyph.is_selected {
+                if glyph.as_ref().map(|g| g.is_selected).unwrap_or(false) {
                     data.selected = Some(self.0.clone());
                 }
                 r

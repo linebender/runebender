@@ -6,29 +6,29 @@ use druid::piet::{
 };
 use druid::{
     BoxConstraints, Command, Data, Env, Event, EventCtx, Insets, LayoutCtx, LensWrap, LifeCycle,
-    LifeCycleCtx, PaintCtx, UpdateCtx, Widget, WidgetPod,
+    LifeCycleCtx, PaintCtx, UpdateCtx, Widget, WidgetExt, WidgetPod,
 };
 
 use crate::app_delegate::EDIT_GLYPH;
 use crate::data::{lenses, GlyphPlus, Workspace};
 use crate::theme;
+use crate::widgets::Maybe;
 
 const GLYPH_SIZE: f64 = 100.;
 
 #[derive(Default)]
 pub struct GlyphGrid {
-    children: Vec<WidgetPod<Workspace, LensWrap<GlyphPlus, lenses::app_state::Glyph, GridInner>>>,
+    children: Vec<WidgetPod<Workspace, Box<dyn Widget<Workspace>>>>,
 }
 
 impl GlyphGrid {
     fn update_children(&mut self, data: &Workspace) {
         self.children.clear();
         for key in data.font.ufo.iter_names() {
-            let widget = GridInner;
-            self.children.push(WidgetPod::new(LensWrap::new(
-                widget,
-                lenses::app_state::Glyph(key),
-            )));
+            let widget = Maybe::or_empty(|| GridInner);
+            self.children.push(WidgetPod::new(
+                LensWrap::new(widget, lenses::app_state::Glyph(key)).boxed(),
+            ));
         }
     }
 }
