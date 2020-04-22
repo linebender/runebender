@@ -2,11 +2,11 @@
 
 use druid::kurbo::Line;
 use druid::{
-    Affine, BoxConstraints, Color, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx,
-    PaintCtx, Rect, RenderContext, Size, UpdateCtx, Widget, WidgetPod,
+    Affine, BoxConstraints, Color, Command, Data, Env, Event, EventCtx, LayoutCtx, LifeCycle,
+    LifeCycleCtx, PaintCtx, Rect, RenderContext, Size, UpdateCtx, Widget, WidgetPod,
 };
 
-use druid::widget::{Flex, Label, SizedBox, WidgetExt};
+use druid::widget::{Controller, Flex, Label, SizedBox, WidgetExt};
 
 use norad::GlyphName;
 
@@ -34,12 +34,13 @@ fn selected_glyph_widget() -> impl Widget<GlyphPlus> {
                         .map(Into::into)
                 },
             )
+            .controller(RenameController)
             .lens(lenses::app_state::GlyphName),
         )
         .with_child(
             Maybe::new(
                 || {
-                    Label::dynamic(|d: &char, _| format!("(U+{:04X})", *d as u32))
+                    Label::dynamic(|d: &char, _| format!("{} (U+{:04X})", d, *d as u32))
                         .with_text_color(SECONDARY_LABEL_COLOR)
                         .with_text_size(SECONDARY_TEXT_SIZE)
                 },
@@ -208,5 +209,31 @@ impl Widget<GlyphPlus> for SelectedGlyph {
 impl Default for Sidebar {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// A simple controller that checks for when our name changes, and then sends
+/// a command to rename this glyph everywhere.
+struct RenameController;
+
+impl<W: Widget<GlyphName>> Controller<GlyphName, W> for RenameController {
+    fn event(
+        &mut self,
+        child: &mut W,
+        ctx: &mut EventCtx,
+        event: &Event,
+        data: &mut GlyphName,
+        env: &Env,
+    ) {
+        let pre_data = data.clone();
+        child.event(ctx, event, data, env);
+        if !pre_data.same(&data) {
+            let args = crate::consts::cmd::RenameGlyphArgs {
+                old: pre_data,
+                new: data.clone(),
+            };
+            let cmd = Command::new(crate::consts::cmd::RENAME_GLYPH, args);
+            ctx.submit_command(cmd, None);
+        }
     }
 }

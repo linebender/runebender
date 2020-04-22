@@ -10,6 +10,7 @@ pub const GLYPHS_APP_PASTEBOARD_TYPE: FormatId = "Glyphs elements pasteboard typ
 pub mod cmd {
     use druid::kurbo::Point;
     use druid::Selector;
+    use norad::GlyphName;
 
     use crate::path::EntityId;
 
@@ -30,6 +31,17 @@ pub mod cmd {
 
     /// sent by the 'delete glyph' menu item
     pub const DELETE_SELECTED_GLYPH: Selector = Selector::new("runebender.delete-selected-glyph");
+
+    /// Sent to the root to rename a glyph.
+    ///
+    /// The arguments **must** be a `RenameGlyphArgs`
+    pub const RENAME_GLYPH: Selector = Selector::new("runebender.rename-glyph");
+
+    /// Arguments passed with the RENAME_GLYPH command.
+    pub struct RenameGlyphArgs {
+        pub old: GlyphName,
+        pub new: GlyphName,
+    }
 
     /// sent by the 'add component' menu item
     pub const ADD_COMPONENT: Selector = Selector::new("runebender.add-component");

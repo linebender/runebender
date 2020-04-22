@@ -44,6 +44,17 @@ pub fn validate_and_standardize_name(name: &str) -> Result<String, IllegalName> 
     }
 }
 
+/// Given a glyph name, guess what the unicode value is?
+///
+/// Works fine for known glyph names, otherwise just uses the first character :shrug:
+pub fn codepoints_for_glyph(name: &str) -> Option<Vec<char>> {
+    if let Some(chr) = GLYPH_NAMES.iter().find(|(_, n)| *n == name).map(|(c, _)| c) {
+        Some(vec![*chr])
+    } else {
+        name.chars().next().map(|c| vec![c])
+    }
+}
+
 /// An error indicating a name included illegal characters.
 #[derive(Clone)]
 pub struct IllegalName;
