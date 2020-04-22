@@ -116,10 +116,14 @@ fn create_blank_font() -> norad::Ufo {
     let A_ = 'A' as u32;
 
     let layer = ufo.get_default_layer_mut().unwrap();
-    (0..25)
+    (0..26)
         .map(|i| std::char::from_u32(a_ + i).unwrap())
-        .chain((0..25).map(|i| std::char::from_u32(A_ + i).unwrap()))
-        .map(|chr| norad::Glyph::new_named(chr.to_string()))
+        .chain((0..26).map(|i| std::char::from_u32(A_ + i).unwrap()))
+        .map(|chr| {
+            let mut glyph = norad::Glyph::new_named(chr.to_string());
+            glyph.codepoints = Some(vec![chr]);
+            glyph
+        })
         .for_each(|glyph| layer.insert_glyph(glyph));
     ufo
 }

@@ -108,7 +108,9 @@ impl EditSession {
 
     pub fn rename(&mut self, name: GlyphName) {
         self.name = name.clone();
-        Arc::make_mut(&mut self.glyph).name = name;
+        let glyph = Arc::make_mut(&mut self.glyph);
+        glyph.codepoints = crate::glyph_names::codepoints_for_glyph(&name);
+        glyph.name = name;
     }
 
     /// Returns the current layout bounds of the 'work', that is, all the things

@@ -215,26 +215,39 @@ impl Workspace {
         })
     }
 
-    pub fn rename_selected(&mut self, new_name: GlyphName) {
-        let name = match self.selected.take() {
-            Some(s) => s,
-            None => return,
-        };
-
+    /// Rename a glyph everywhere it might be.
+    pub fn rename_glyph(&mut self, old_name: GlyphName, new_name: GlyphName) {
         let font = self.font_mut();
-        let mut selected = font
+        let mut glyph = match font
             .ufo
             .get_default_layer_mut()
             .unwrap()
-            .remove_glyph(&name)
-            .unwrap();
+            .remove_glyph(&old_name)
+        {
+            Some(g) => g,
+            None => {
+                log::warn!("attempted to rename missing glyph '{}'", old_name);
+                return;
+            }
+        };
 
-        let sel = Arc::make_mut(&mut selected);
-        let old_name = std::mem::replace(&mut sel.name, new_name.clone());
+        {
+            let glyph = Arc::make_mut(&mut glyph);
+            glyph.codepoints = crate::glyph_names::codepoints_for_glyph(&new_name);
+            glyph.name = new_name.clone();
+        }
+
         font.ufo
             .get_default_layer_mut()
             .unwrap()
-            .insert_glyph(selected);
+            .insert_glyph(glyph);
+
+        // and if this is the selected glyph, change that too;
+        if self.selected.as_ref() == Some(&old_name) {
+            self.selected = Some(new_name.clone())
+        }
+
+        // if this glyph is open, rename that too;
         if self.session_map.contains_key(&old_name) {
             let session_map = Arc::make_mut(&mut self.session_map);
             let session_id = session_map.remove(&old_name).unwrap();
@@ -574,10 +587,6 @@ pub mod lenses {
                 });
                 let r = f(&mut selected);
                 if let Some(selected) = selected {
-                    if &selected.glyph.name != data.selected.as_ref().unwrap() {
-                        data.rename_selected(selected.glyph.name.clone());
-                    }
-
                     let is_same = data
                         .font
                         .ufo
@@ -628,12 +637,10 @@ pub mod lenses {
                 data: &mut GlyphPlus,
                 f: F,
             ) -> V {
+                // THIS DOESN'T DO ANYTHING! all the mutation happens
+                // as a result of the RENAME_GLYPH command.
                 let mut s = data.glyph.name.clone();
-                let r = f(&mut s);
-                if s != data.glyph.name {
-                    Arc::make_mut(&mut data.glyph).name = s;
-                }
-                r
+                f(&mut s)
             }
         }
     }

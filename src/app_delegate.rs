@@ -63,6 +63,14 @@ impl AppDelegate<AppState> for Delegate {
                 false
             }
 
+            consts::cmd::RENAME_GLYPH => {
+                let consts::cmd::RenameGlyphArgs { old, new } = cmd
+                    .get_object()
+                    .expect("RENAME_GLYPH has incorrect payload");
+                data.workspace.rename_glyph(old.clone(), new.clone());
+                false
+            }
+
             EDIT_GLYPH => {
                 let payload = cmd
                     .get_object::<GlyphName>()
