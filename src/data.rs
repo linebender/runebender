@@ -26,7 +26,7 @@ pub struct AppState {
 }
 
 /// A workspace is a single font, corresponding to a UFO file on disk.
-#[derive(Clone, Data, Default)]
+#[derive(Clone, Lens, Data, Default)]
 pub struct Workspace {
     pub font: Arc<FontObject>,
     /// The currently selected glyph (in the main glyph list) if any.
@@ -36,6 +36,7 @@ pub struct Workspace {
     pub open_glyphs: Arc<HashMap<GlyphName, WindowId>>,
     pub sessions: Arc<HashMap<SessionId, Arc<EditSession>>>,
     session_map: Arc<HashMap<GlyphName, SessionId>>,
+    pub info: SimpleFontInfo,
 }
 
 #[derive(Clone, Data)]
@@ -57,8 +58,17 @@ pub struct GlyphPlus {
     units_per_em: f64,
 }
 
+//TODO: this is currently just used for editing font attributes, and isn't propogated
+//FIXME: use this as source of truth, synch back to UFO
+#[derive(Clone, Default, Data, Lens)]
+pub struct SimpleFontInfo {
+    metrics: FontMetrics,
+    pub family_name: String,
+    pub style_name: String,
+}
+
 /// Things in `FontInfo` that are relevant while editing or drawing.
-#[derive(Clone, Data)]
+#[derive(Clone, Data, Lens)]
 pub struct FontMetrics {
     pub units_per_em: f64,
     pub descender: Option<f64>,
@@ -84,6 +94,7 @@ impl Workspace {
             placeholder: Arc::new(placeholder_outline()),
         };
         self.font = obj.into();
+        self.info = SimpleFontInfo::from_font(&self.font);
     }
 
     pub fn save(&mut self) -> Result<(), Box<dyn Error>> {
@@ -368,6 +379,31 @@ impl Default for FontObject {
     }
 }
 
+impl SimpleFontInfo {
+    fn from_font(font: &FontObject) -> Self {
+        SimpleFontInfo {
+            family_name: font
+                .ufo
+                .font_info
+                .as_ref()
+                .and_then(|f| f.family_name.clone())
+                .unwrap_or_else(|| "Untitled".to_string()),
+            style_name: font
+                .ufo
+                .font_info
+                .as_ref()
+                .and_then(|f| f.style_name.clone())
+                .unwrap_or_else(|| "Regular".to_string()),
+            metrics: font
+                .ufo
+                .font_info
+                .as_ref()
+                .map(FontMetrics::from)
+                .unwrap_or_default(),
+        }
+    }
+}
+
 impl<'a> From<&'a FontInfo> for FontMetrics {
     fn from(src: &'a FontInfo) -> FontMetrics {
         FontMetrics {
@@ -424,13 +460,7 @@ pub mod lenses {
 
         impl Lens<Workspace, EditorState_> for EditorState {
             fn with<V, F: FnOnce(&EditorState_) -> V>(&self, data: &Workspace, f: F) -> V {
-                let metrics = data
-                    .font
-                    .ufo
-                    .font_info
-                    .as_ref()
-                    .map(Into::into)
-                    .unwrap_or_default();
+                let metrics = data.info.metrics.clone();
                 let session = data.sessions.get(&self.0).cloned().unwrap();
                 let glyph = EditorState_ {
                     font: data.clone(),
@@ -447,13 +477,7 @@ pub mod lenses {
             ) -> V {
                 //FIXME: this is creating a new copy and then throwing it away
                 //this is just so that the signatures work for now, we aren't actually doing any
-                let metrics = data
-                    .font
-                    .ufo
-                    .font_info
-                    .as_ref()
-                    .map(Into::into)
-                    .unwrap_or_default();
+                let metrics = data.info.metrics.clone();
                 let session = data.sessions.get(&self.0).unwrap().to_owned();
                 let mut glyph = EditorState_ {
                     font: data.clone(),
