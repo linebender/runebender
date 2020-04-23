@@ -86,7 +86,9 @@ impl<T: Data> EditableLabel<T> {
             *data = new;
             self.editing = false;
             ctx.request_layout();
-            ctx.resign_focus();
+            if ctx.has_focus() {
+                ctx.resign_focus();
+            }
         } else {
             // don't tab away from here if we're editing
             if !ctx.has_focus() {
@@ -149,7 +151,7 @@ impl<T: Data> Widget<T> for EditableLabel<T> {
         if let LifeCycle::FocusChanged(focus) = event {
             // if the user focuses elsewhere, we need to reset ourselves
             if !focus {
-                ctx.submit_command(COMPLETE_EDITING, None);
+                ctx.submit_command(COMPLETE_EDITING, ctx.widget_id());
             } else if !self.editing {
                 self.editing = true;
                 self.buffer = self.label.text().to_string();

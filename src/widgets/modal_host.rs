@@ -75,6 +75,7 @@ impl<T: Data, W: Widget<T>> Widget<T> for ModalHost<T, W> {
             Event::Command(cmd) if cmd.selector == ModalHost::DISMISS_MODAL => {
                 if self.modal.is_some() {
                     self.modal = None;
+                    ctx.children_changed();
                 } else {
                     log::warn!("cannot dismiss modal; no modal shown");
                 }
