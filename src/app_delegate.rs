@@ -3,8 +3,8 @@
 use std::sync::Arc;
 
 use druid::{
-    AppDelegate, Command, DelegateCtx, Env, FileInfo, LocalizedString, Selector, Target, Widget,
-    WindowDesc, WindowId,
+    AppDelegate, Command, DelegateCtx, Env, FileInfo, Selector, Target, Widget, WindowDesc,
+    WindowId,
 };
 
 use druid::kurbo::Size;
@@ -76,8 +76,15 @@ impl AppDelegate<AppState> for Delegate {
                     }
                     None => {
                         let session = data.workspace.get_or_create_session(&payload);
+                        let session_id = session.id;
                         let new_win = WindowDesc::new(move || make_editor(&session))
-                            .title(LocalizedString::new("").with_placeholder(payload.to_string()))
+                            .title(move |d: &AppState, _: &_| {
+                                d.workspace
+                                    .sessions
+                                    .get(&session_id)
+                                    .map(|s| s.name.to_string())
+                                    .unwrap_or_else(|| "Unknown".to_string())
+                            })
                             .window_size(Size::new(900.0, 800.0))
                             .menu(crate::menus::make_menu(&data));
 

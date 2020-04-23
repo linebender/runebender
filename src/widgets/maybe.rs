@@ -29,6 +29,7 @@ pub struct Maybe<T> {
     widget: MaybeWidget<T>,
 }
 
+#[allow(clippy::large_enum_variant)]
 enum MaybeWidget<T> {
     Some(WidgetPod<T, Box<dyn Widget<T>>>),
     None(WidgetPod<(), Box<dyn Widget<()>>>),
