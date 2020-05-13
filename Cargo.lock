@@ -71,6 +71,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "base64"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53d1ccbaf7d9ec9537465a97bf19edc1a4e158ecb49fc16178202238c569cc42"
+
+[[package]]
 name = "bitflags"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -202,6 +208,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-text"
+version = "15.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "131b3fd1f8bd5db9f2b398fa4fdb6008c64afc04d447c306ac2c7e98fba2a61d"
+dependencies = [
+ "core-foundation",
+ "core-graphics",
+ "foreign-types",
+ "libc",
+]
+
+[[package]]
 name = "crc32fast"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -299,31 +317,12 @@ checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
 
 [[package]]
 name = "druid"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "697e9211092dbed8aafc178550e3376dd63e1c96ec98619b59a3fd77c87a3ade"
-dependencies = [
- "druid-derive 0.3.0",
- "druid-shell 0.5.0",
- "fluent-bundle",
- "fluent-langneg",
- "fluent-syntax",
- "fnv",
- "log",
- "simple_logger",
- "unic-langid",
- "unicode-segmentation",
- "xi-unicode",
-]
-
-[[package]]
-name = "druid"
 version = "0.6.0"
-source = "git+https://github.com/xi-editor/druid.git?rev=7445345#7445345f90e8338bd04aa21f5193f2231f9a9f9a"
+source = "git+https://github.com/xi-editor/druid.git?rev=7fab0485#7fab0485cc523a0b6922c4240b47260c60388509"
 dependencies = [
  "console_log",
- "druid-derive 0.4.0",
- "druid-shell 0.6.0",
+ "druid-derive",
+ "druid-shell",
  "fluent-bundle",
  "fluent-langneg",
  "fluent-syntax",
@@ -338,59 +337,24 @@ dependencies = [
 
 [[package]]
 name = "druid-derive"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "054fdd987a62ffca856b095dd6d663aa49d055933832c360f1f80f2f46ea4d20"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "druid-derive"
 version = "0.4.0"
-source = "git+https://github.com/xi-editor/druid.git?rev=7445345#7445345f90e8338bd04aa21f5193f2231f9a9f9a"
+source = "git+https://github.com/xi-editor/druid.git?rev=7fab0485#7fab0485cc523a0b6922c4240b47260c60388509"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "druid-shell"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4044a6dad2d5586cb75ac595d3c455d7b58c08f97ad8d69c8b06271882673f4"
-dependencies = [
- "cairo-rs",
- "cfg-if",
- "cocoa",
- "gdk",
- "gdk-sys",
- "gio",
- "glib",
- "glib-sys",
- "gtk",
- "gtk-sys",
- "kurbo",
- "lazy_static",
- "log",
- "objc",
- "piet-common 0.0.11",
- "time 0.2.9",
- "winapi",
- "wio",
 ]
 
 [[package]]
 name = "druid-shell"
 version = "0.6.0"
-source = "git+https://github.com/xi-editor/druid.git?rev=7445345#7445345f90e8338bd04aa21f5193f2231f9a9f9a"
+source = "git+https://github.com/xi-editor/druid.git?rev=7fab0485#7fab0485cc523a0b6922c4240b47260c60388509"
 dependencies = [
  "cairo-rs",
  "cfg-if",
  "cocoa",
+ "core-graphics",
+ "foreign-types",
  "gdk",
  "gdk-sys",
  "gio",
@@ -404,7 +368,7 @@ dependencies = [
  "lazy_static",
  "log",
  "objc",
- "piet-common 0.0.12",
+ "piet-common",
  "time 0.2.9",
  "wasm-bindgen",
  "web-sys",
@@ -898,9 +862,9 @@ dependencies = [
 
 [[package]]
 name = "kurbo"
-version = "0.5.11"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf50e17a1697110c694d47c5b1a6b64faf5eb3ffe5a286df23fb8cd516e33be6"
+checksum = "5657aca5a36917d389d717f1a0c24d5ebcee5551fda8c1f555af597565d408e4"
 dependencies = [
  "arrayvec",
 ]
@@ -1008,10 +972,10 @@ dependencies = [
 [[package]]
 name = "norad"
 version = "0.1.0"
-source = "git+https://github.com/linebender/norad.git?rev=4a133aef#4a133aef28143de7d66d4194b97367e4ef2277d9"
+source = "git+https://github.com/linebender/norad.git?rev=0a18f6c#0a18f6c419060375b68df8d86ab86a871e010fae"
 dependencies = [
- "druid 0.5.0",
- "plist",
+ "druid",
+ "plist 1.0.0",
  "quick-xml",
  "serde",
  "serde_derive",
@@ -1144,123 +1108,79 @@ dependencies = [
 
 [[package]]
 name = "piet"
-version = "0.0.11"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc12ec839fb1931dadee762476260c068fd989d60c366dc6a0228a242c857f82"
-dependencies = [
- "kurbo",
-]
-
-[[package]]
-name = "piet"
-version = "0.0.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29420eccb68d6b9ad2f8dd87caf9c3bcd3bbd056bfe67871c48b6efab9316b79"
+checksum = "256d71caa7e165076ed6d2f0cda83b97fb4a5db2b42fd9a0d06cc8ac2deb11d4"
 dependencies = [
  "kurbo",
 ]
 
 [[package]]
 name = "piet-cairo"
-version = "0.0.11"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcc6ff3b4e078df5b4904b6e19efedca4142b896383ffcc53660825eb9d8191e"
+checksum = "a118675088b503c35ba2a91c43170ce2f843d88762285e48e8fc23ebdc7055b5"
 dependencies = [
  "cairo-rs",
- "piet 0.0.11",
- "unicode-segmentation",
-]
-
-[[package]]
-name = "piet-cairo"
-version = "0.0.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "868fd3fc61bae866e7b7478fc5cef8f16539c8253a40efa6da5ed19d123db080"
-dependencies = [
- "cairo-rs",
- "piet 0.0.12",
+ "piet",
  "unicode-segmentation",
  "xi-unicode",
 ]
 
 [[package]]
 name = "piet-common"
-version = "0.0.11"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4b532cd554b18c1931b9ca23ea6de342eb4f65cfe2288bdb1dc408ea765f6cc"
-dependencies = [
- "cairo-rs",
- "direct2d",
- "direct3d11",
- "directwrite",
- "dxgi",
- "piet 0.0.11",
- "piet-cairo 0.0.11",
- "piet-direct2d 0.0.11",
- "piet-web 0.0.11",
-]
-
-[[package]]
-name = "piet-common"
-version = "0.0.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d03ff40ba9fcbfd5f4a209919454ed375b3d426b935947ff82dcf6686b8061e7"
+checksum = "98b4d7930c9a4a818084b83e63a0b51aae4f62e148bc8d4494c2ce0b8f22dbf1"
 dependencies = [
  "cairo-rs",
  "cfg-if",
+ "core-graphics",
  "direct2d",
  "direct3d11",
  "directwrite",
  "dxgi",
- "piet 0.0.12",
- "piet-cairo 0.0.12",
- "piet-direct2d 0.0.12",
- "piet-web 0.0.12",
-]
-
-[[package]]
-name = "piet-direct2d"
-version = "0.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc87144e7af30fb0b40919e03f242309b71a063f564e68b8e36cd39ff198d6f7"
-dependencies = [
- "piet 0.0.11",
- "winapi",
- "wio",
-]
-
-[[package]]
-name = "piet-direct2d"
-version = "0.0.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ef59b37f94f032f98f62c9701b42b0ef98cf667edeb1cfca3206523854850d2"
-dependencies = [
- "piet 0.0.12",
- "winapi",
- "wio",
-]
-
-[[package]]
-name = "piet-web"
-version = "0.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "326c17c8d48d513b42e3b9531571c6c42785e1473b7154813b76c20c902d808d"
-dependencies = [
- "js-sys",
- "piet 0.0.11",
- "unicode-segmentation",
+ "piet",
+ "piet-cairo",
+ "piet-coregraphics",
+ "piet-direct2d",
+ "piet-web",
  "wasm-bindgen",
  "web-sys",
 ]
 
 [[package]]
-name = "piet-web"
-version = "0.0.12"
+name = "piet-coregraphics"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a63b986af9dc8ebfd8267cde277b0ae62af322ba877466422f450cabf1678e22"
+checksum = "57680871eb655f0cf34de62240762212f51c37994b4b79938b1f49d77ec54413"
+dependencies = [
+ "core-foundation",
+ "core-foundation-sys",
+ "core-graphics",
+ "core-text",
+ "piet",
+]
+
+[[package]]
+name = "piet-direct2d"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de6a8f033611d567c42c1b06803c169b1bd8b2bdc5c6a1daef0739165dd5c908"
+dependencies = [
+ "piet",
+ "winapi",
+ "wio",
+]
+
+[[package]]
+name = "piet-web"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e812147c55d1dd8be983f50f3a117e1cef1785b70c7e0a5e286db39ba986710"
 dependencies = [
  "js-sys",
- "piet 0.0.12",
+ "piet",
  "unicode-segmentation",
  "wasm-bindgen",
  "web-sys",
@@ -1285,8 +1205,22 @@ version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "50ce7c785e06e3a9e6f546c1a30d3d59111a31a21bc294fb1496241a572c9a00"
 dependencies = [
- "base64",
+ "base64 0.10.1",
  "humantime",
+ "indexmap",
+ "line-wrap",
+ "serde",
+ "xml-rs",
+]
+
+[[package]]
+name = "plist"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b336d94e8e4ce29bf15bba393164629764744c567e8ad306cc1fdd0119967fd"
+dependencies = [
+ "base64 0.12.1",
+ "chrono",
  "indexmap",
  "line-wrap",
  "serde",
@@ -1430,11 +1364,11 @@ dependencies = [
 name = "runebender"
 version = "0.2.0"
 dependencies = [
- "druid 0.6.0",
+ "druid",
  "log",
  "lopdf",
  "norad",
- "plist",
+ "plist 0.5.4",
  "serde",
  "serde_derive",
  "svg",

@@ -107,7 +107,7 @@ impl Editor {
         }
 
         if !formats.is_empty() {
-            Application::clipboard().put_formats(&formats);
+            Application::global().clipboard().put_formats(&formats);
         }
     }
 
