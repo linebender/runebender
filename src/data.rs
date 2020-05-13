@@ -182,7 +182,7 @@ impl Workspace {
             .ufo
             .font_info
             .as_ref()
-            .and_then(|info| info.units_per_em)
+            .and_then(|info| info.units_per_em.map(|v| v.get()))
             .unwrap_or(DEFAULT_UNITS_PER_EM)
     }
 
@@ -371,12 +371,15 @@ impl Default for FontObject {
 impl<'a> From<&'a FontInfo> for FontMetrics {
     fn from(src: &'a FontInfo) -> FontMetrics {
         FontMetrics {
-            units_per_em: src.units_per_em.unwrap_or(DEFAULT_UNITS_PER_EM),
-            descender: src.descender,
-            x_height: src.x_height,
-            cap_height: src.cap_height,
-            ascender: src.ascender,
-            italic_angle: src.italic_angle,
+            units_per_em: src
+                .units_per_em
+                .map(|v| v.get())
+                .unwrap_or(DEFAULT_UNITS_PER_EM),
+            descender: src.descender.map(|v| v.get()),
+            x_height: src.x_height.map(|v| v.get()),
+            cap_height: src.cap_height.map(|v| v.get()),
+            ascender: src.ascender.map(|v| v.get()),
+            italic_angle: src.italic_angle.map(|v| v.get()),
         }
     }
 }
