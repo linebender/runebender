@@ -21,16 +21,29 @@ pub fn make_code_string(session: &EditSession) -> Option<String> {
     }
 
     let mut out = String::from("let mut bez = BezPath::new();\n");
-    for path in session.paths.iter() {
-        let mut bezier = path.bezier();
 
-        // glyphs are y-up, but piet generally expects y-down, so we flipy that
-        bezier.apply_affine(Affine::FLIP_Y);
+    let paths = session
+        .paths
+        .iter()
+        .map(|p| {
+            let mut path = p.bezier();
+            // glyphs are y-up, but piet generally expects y-down, so we flipy that
+            path.apply_affine(Affine::FLIP_Y);
+            path
+        })
+        .collect::<Vec<_>>();
 
-        // and then we set our origin to be equal the origin of our bounding box
-        let bbox = bezier.bounding_box();
-        bezier.apply_affine(Affine::translate(-bbox.origin().to_vec2()));
+    // we want to zero everything to a common origin.
+    let origin = paths
+        .iter()
+        .map(|p| p.bounding_box().origin())
+        .fold(Point::new(f64::MAX, f64::MAX), |acc, pt| {
+            Point::new(acc.x.min(pt.x), acc.y.min(pt.y))
+        })
+        .to_vec2();
 
+    for mut bezier in paths {
+        bezier.apply_affine(Affine::translate(-origin));
         if let Err(e) = append_path(&bezier, &mut out) {
             log::error!("error generating code string: '{}'", e);
             return None;
