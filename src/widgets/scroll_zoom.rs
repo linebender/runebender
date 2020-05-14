@@ -1,11 +1,7 @@
-use druid::piet::{Color, FontBuilder, RenderContext, Text, TextLayout, TextLayoutBuilder};
-
-use druid::kurbo::{Point, Rect, RoundedRect, Size, Vec2};
+use druid::kurbo::{Point, Rect, Size, Vec2};
+use druid::widget::prelude::*;
 use druid::widget::Scroll;
-use druid::{
-    BoxConstraints, Command, Env, Event, EventCtx, HotKey, KeyCode, LayoutCtx, LifeCycle,
-    LifeCycleCtx, PaintCtx, Selector, UpdateCtx, Widget,
-};
+use druid::{Color, Command, HotKey, KeyCode, Selector};
 
 use crate::consts::CANVAS_SIZE;
 use crate::data::EditorState;
@@ -14,9 +10,6 @@ const MIN_ZOOM: f64 = 0.02;
 const MAX_ZOOM: f64 = 50.;
 /// mouse wheel deltas are big, so we scale them down
 const ZOOM_SCALE: f64 = 0.001;
-const TOOL_LABEL_SIZE: f64 = 18.0;
-/// A general ballpark guess at what the ascender height is, as a ratio of font size.
-const LIKELY_ASCENDER_RATIO: f64 = 0.8;
 
 /// A widget that wraps a scroll widget, adding zoom.
 pub struct ScrollZoom<T: Widget<EditorState>> {
@@ -143,32 +136,6 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
         };
     }
 
-    fn paint_label(&mut self, ctx: &mut PaintCtx, data: &EditorState, _: &Env) {
-        let font_name = label_font_name();
-        let bg_color = Color::WHITE.with_alpha(0.7);
-        let text_color = Color::grey(0.45);
-
-        let font = ctx
-            .text()
-            .new_font_by_name(font_name, TOOL_LABEL_SIZE)
-            .build()
-            .unwrap();
-        let layout = ctx
-            .text()
-            .new_text_layout(&font, &data.session.tool_desc, std::f64::INFINITY)
-            .build()
-            .unwrap();
-        let text_size = Size::new(layout.width(), TOOL_LABEL_SIZE);
-        let text_draw_origin = Point::new(10.0, 10.0 + TOOL_LABEL_SIZE * LIKELY_ASCENDER_RATIO);
-        let text_bounds = Rect::from_origin_size((10.0, 10.0), text_size);
-        let text_bg_bounds = text_bounds.inset(4.0);
-        //TODO: use Rect::to_rounded_rect when available
-        let text_box = RoundedRect::from_rect(text_bg_bounds, 4.0);
-        ctx.fill(text_box, &bg_color);
-        ctx.stroke(text_box, &text_color, 0.5);
-        ctx.draw_text(&layout, text_draw_origin, &text_color);
-    }
-
     fn after_zoom_changed(&mut self, ctx: &mut EventCtx, env: &Env) {
         self.child.reset_scrollbar_fade(ctx, env);
         ctx.request_layout();
@@ -181,7 +148,6 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
         //TODO: paint grid here?
         ctx.clear(Color::rgb8(100, 100, 20));
         self.child.paint(ctx, data, env);
-        self.paint_label(ctx, data, env);
     }
 
     fn layout(
@@ -271,17 +237,4 @@ fn most_significant_axis(delta: Vec2) -> f64 {
     } else {
         delta.y
     }
-}
-
-#[allow(unreachable_code)]
-fn label_font_name() -> &'static str {
-    #[cfg(target_os = "macos")]
-    {
-        return "Helvetica Neue Bold";
-    }
-    #[cfg(target_os = "windows")]
-    {
-        return "Segoe UI Bold";
-    }
-    "sans-serif"
 }
