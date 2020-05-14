@@ -15,7 +15,7 @@ use norad::{GlyphName, Ufo};
 use crate::consts;
 use crate::data::{lenses, AppState};
 use crate::edit_session::EditSession;
-use crate::widgets::{Editor, RootWindowController, ScrollZoom};
+use crate::widgets::{Editor, EditorController, RootWindowController, ScrollZoom};
 
 pub const EDIT_GLYPH: Selector = Selector::new("runebender.open-editor-with-glyph");
 
@@ -135,7 +135,9 @@ impl AppDelegate<AppState> for Delegate {
 }
 
 fn make_editor(session: &Arc<EditSession>) -> impl Widget<AppState> {
-    ScrollZoom::new(Editor::new(session.clone()))
-        .lens(AppState::workspace.then(lenses::app_state::EditorState(session.id)))
-        .controller(RootWindowController::default())
+    EditorController::new(
+        ScrollZoom::new(Editor::new(session.clone()))
+            .lens(AppState::workspace.then(lenses::app_state::EditorState(session.id)))
+            .controller(RootWindowController::default()),
+    )
 }
