@@ -50,8 +50,11 @@ pub fn validate_and_standardize_name(name: &str) -> Result<String, IllegalName> 
 pub fn codepoints_for_glyph(name: &str) -> Option<Vec<char>> {
     if let Some(chr) = GLYPH_NAMES.iter().find(|(_, n)| *n == name).map(|(c, _)| c) {
         Some(vec![*chr])
-    } else {
+    } else if name.chars().nth(1).is_none() {
+        // if we're at most one char long, use that as our codepoint
         name.chars().next().map(|c| vec![c])
+    } else {
+        None
     }
 }
 
@@ -90,6 +93,13 @@ mod tests {
         assert_eq!(glyph_name_for_char('<'), Some("less"));
         assert_eq!(glyph_name_for_glyph("ء"), None);
         assert_eq!(glyph_name_for_glyph("!"), Some("exclam"));
+    }
+
+    #[test]
+    fn codepoints_for_glyph_() {
+        assert_eq!(codepoints_for_glyph("A"), Some(vec!['A']));
+        assert_eq!(codepoints_for_glyph("eacute"), Some(vec!['é']));
+        assert_eq!(codepoints_for_glyph("some-string"), None);
     }
 
     #[test]
