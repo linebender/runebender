@@ -48,14 +48,18 @@ pub fn validate_and_standardize_name(name: &str) -> Result<String, IllegalName> 
 ///
 /// Works fine for known glyph names, otherwise just uses the first character :shrug:
 pub fn codepoints_for_glyph(name: &str) -> Option<Vec<char>> {
-    if let Some(chr) = GLYPH_NAMES.iter().find(|(_, n)| *n == name).map(|(c, _)| c) {
-        Some(vec![*chr])
-    } else if name.chars().nth(1).is_none() {
-        // if we're at most one char long, use that as our codepoint
-        name.chars().next().map(|c| vec![c])
-    } else {
-        None
-    }
+    GLYPH_NAMES
+        .iter()
+        .find(|(_, n)| *n == name)
+        .map(|(c, _)| vec![*c])
+        .or_else(|| {
+            let mut chars = name.chars();
+            // if we're at most one char long, use that as our codepoint
+            match (chars.next(), chars.next()) {
+                (Some(c), None) => Some(vec![c]),
+                _ => None,
+            }
+        })
 }
 
 /// An error indicating a name included illegal characters.
