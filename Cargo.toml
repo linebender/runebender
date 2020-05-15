@@ -6,7 +6,7 @@ license = "Apache-2.0"
 edition = "2018"
 
 [dependencies]
-norad = { git = "https://github.com/linebender/norad.git", rev = "0a18f6c", features = ["druid"] }
+norad = { git = "https://github.com/linebender/norad.git", rev = "50ab469", features = ["druid"] }
 druid = { git = "https://github.com/xi-editor/druid.git", rev = "7fab0485", version = "0.6" }
 log = "0.4.8"
 plist = "0.5"
@@ -14,3 +14,4 @@ serde = "1.0"
 serde_derive = "1.0"
 lopdf = "0.24.0"
 svg = "0.7.1"
+chrono = "0.4"

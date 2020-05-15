@@ -100,6 +100,7 @@ impl Workspace {
     pub fn save(&mut self) -> Result<(), Box<dyn Error>> {
         let font_obj = Arc::make_mut(&mut self.font);
         if let Some(path) = font_obj.path.as_ref() {
+            backup_ufo_at_path(path)?;
             log::info!("saving to {:?}", path);
             // flush all open sessions
             for session in self.sessions.values() {
@@ -110,26 +111,7 @@ impl Workspace {
                     .unwrap()
                     .insert_glyph(glyph);
             }
-            let tmp_file_name = format!(
-                "{}.savefile",
-                path.file_name()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("Untitled")
-            );
-            let tmp_path = path.with_file_name(tmp_file_name);
-            if tmp_path.exists() {
-                fs::remove_dir_all(&tmp_path)?;
-            }
-            font_obj.ufo.save(&tmp_path)?;
-            if path.exists() {
-                fs::remove_dir_all(path)?;
-            }
-            // see docs for fs::rename; the target directory must exist on unix.
-            // http://doc.rust-lang.org/1.39.0/std/fs/fn.rename.html
-            if cfg!(unix) {
-                fs::create_dir(path)?;
-            }
-            fs::rename(&tmp_path, path)?;
+            font_obj.ufo.save(&path)?;
         } else {
             log::error!("save called with no path set");
         }
@@ -761,4 +743,32 @@ fn placeholder_outline() -> BezPath {
     bez.line_to((202.0, 172.0));
     bez.close_path();
     bez
+}
+
+/// Move the contents of the file at `path` to another location.
+///
+/// If `path` exists, returns the backup location on success.
+fn backup_ufo_at_path(path: &Path) -> Result<Option<PathBuf>, std::io::Error> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let backup_dir = format!(
+        "{}_backups",
+        path.file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Untitled")
+    );
+    let mut backup_dir = path.with_file_name(backup_dir);
+    if !backup_dir.exists() {
+        fs::create_dir(&backup_dir)?;
+    }
+
+    let backup_date = chrono::Local::now();
+    let date_str = backup_date.format("%Y-%m-%d_%H&%%S.ufo");
+    backup_dir.push(date_str.to_string());
+    if backup_dir.exists() {
+        fs::remove_dir_all(&backup_dir)?;
+    }
+    fs::rename(path, &backup_dir)?;
+    Ok(Some(backup_dir))
 }

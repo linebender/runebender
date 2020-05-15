@@ -972,7 +972,7 @@ dependencies = [
 [[package]]
 name = "norad"
 version = "0.1.0"
-source = "git+https://github.com/linebender/norad.git?rev=0a18f6c#0a18f6c419060375b68df8d86ab86a871e010fae"
+source = "git+https://github.com/linebender/norad.git?rev=50ab469#50ab469fe8b7e77e425d94f4b2bf6e67410fef4a"
 dependencies = [
  "druid",
  "plist 1.0.0",
@@ -1364,6 +1364,7 @@ dependencies = [
 name = "runebender"
 version = "0.2.0"
 dependencies = [
+ "chrono",
  "druid",
  "log",
  "lopdf",
