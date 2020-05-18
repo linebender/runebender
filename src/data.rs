@@ -99,6 +99,7 @@ impl Workspace {
 
     pub fn save(&mut self) -> Result<(), Box<dyn Error>> {
         let font_obj = Arc::make_mut(&mut self.font);
+        font_obj.update_info(&self.info);
         if let Some(path) = font_obj.path.as_ref() {
             backup_ufo_at_path(path)?;
             log::info!("saving to {:?}", path);
@@ -342,6 +343,45 @@ impl EditorState {
         Arc::make_mut(&mut self.session)
     }
 }
+
+impl FontObject {
+    /// Update the actual `FontInfo` from the generated `SimpleFontInfo`
+    #[allow(clippy::float_cmp)]
+    fn update_info(&mut self, info: &SimpleFontInfo) {
+        // we don't want to change anything if we don't have to:
+        let existing_info = SimpleFontInfo::from_font(self);
+        if !existing_info.same(&info) {
+            let font_info = self.ufo.font_info.get_or_insert_with(Default::default);
+            // we don't want to set anything that hasn't changed.
+            if existing_info.family_name != info.family_name {
+                font_info.family_name = Some(info.family_name.clone());
+            }
+            if existing_info.style_name != info.style_name {
+                font_info.style_name = Some(info.style_name.clone());
+            }
+            if existing_info.metrics.units_per_em != info.metrics.units_per_em {
+                font_info.units_per_em = info.metrics.units_per_em.try_into().ok();
+            }
+            if existing_info.metrics.descender != info.metrics.descender {
+                font_info.descender = info.metrics.descender.map(Into::into);
+            }
+            if existing_info.metrics.ascender != info.metrics.ascender {
+                font_info.ascender = info.metrics.ascender.map(Into::into);
+            }
+            if existing_info.metrics.x_height != info.metrics.x_height {
+                font_info.x_height = info.metrics.x_height.map(Into::into);
+            }
+            if existing_info.metrics.cap_height != info.metrics.cap_height {
+                font_info.cap_height = info.metrics.cap_height.map(Into::into);
+            }
+            if existing_info.metrics.italic_angle != info.metrics.italic_angle {
+                font_info.italic_angle = info.metrics.italic_angle.map(Into::into);
+            }
+        }
+    }
+}
+
+use std::convert::TryInto;
 
 impl Default for FontObject {
     fn default() -> FontObject {
@@ -771,4 +811,34 @@ fn backup_ufo_at_path(path: &Path) -> Result<Option<PathBuf>, std::io::Error> {
     }
     fs::rename(path, &backup_dir)?;
     Ok(Some(backup_dir))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn font_info_changes() {
+        let mut fontobj = FontObject::default();
+        let font_info = fontobj.ufo.font_info.clone().unwrap();
+        assert!(font_info.style_name.is_none());
+        assert!(font_info.descender.is_none());
+        assert_eq!(font_info.family_name, Some("Untitled".to_string()));
+
+        let mut info = SimpleFontInfo::from_font(&fontobj);
+        info.metrics.descender = Some(420.);
+        info.style_name = "Extra Cheese".into();
+
+        fontobj.update_info(&info);
+        let font_info = fontobj.ufo.font_info.clone().unwrap();
+        assert_eq!(font_info.style_name, Some("Extra Cheese".to_string()));
+        assert_eq!(font_info.descender, Some(420.0.into()));
+
+        // see that it also works if there's _no_ font info:
+        fontobj.ufo.font_info = None;
+
+        fontobj.update_info(&info);
+        let font_info = fontobj.ufo.font_info.clone().unwrap();
+        assert_eq!(font_info.style_name, Some("Extra Cheese".to_string()));
+        assert_eq!(font_info.descender, Some(420.0.into()));
+    }
 }
