@@ -48,6 +48,10 @@ pub struct EditSession {
 }
 
 impl EditSession {
+    #[allow(non_upper_case_globals)]
+    /// a lens to return the selection if it is a single point.
+    pub const single_selection: lenses::SingleSelection = lenses::SingleSelection;
+
     pub fn new(name: &GlyphName, glyphs: &Workspace) -> Self {
         let name = name.to_owned();
         let glyph = glyphs.font.ufo.get_glyph(&name).unwrap().to_owned();
@@ -265,6 +269,19 @@ impl EditSession {
         self.selection_mut().clear()
     }
 
+    // used by our lens for displaying the selected coord
+    fn selection_dpoint_if_single(&self) -> Option<DPoint> {
+        if self.selection.len() == 1 {
+            self.selection
+                .iter()
+                .next()
+                .and_then(|id| self.path_point_for_id(*id))
+                .map(|pp| pp.point)
+        } else {
+            None
+        }
+    }
+
     /// If the current selection is a single point, select the next point
     /// on that path.
     pub fn select_next(&mut self) {
@@ -438,6 +455,39 @@ impl<'a> Iterator for PathSelectionIter<'a> {
             None
         } else {
             Some(&self.inner[range])
+        }
+    }
+}
+
+pub mod lenses {
+    use super::*;
+    use druid::Lens;
+
+    pub struct SingleSelection;
+
+    impl Lens<EditSession, Option<DPoint>> for SingleSelection {
+        fn with<V, F: FnOnce(&Option<DPoint>) -> V>(&self, data: &EditSession, f: F) -> V {
+            let dpoint = data.selection_dpoint_if_single();
+            f(&dpoint)
+        }
+
+        fn with_mut<V, F: FnOnce(&mut Option<DPoint>) -> V>(
+            &self,
+            data: &mut EditSession,
+            f: F,
+        ) -> V {
+            let dpoint = data.selection_dpoint_if_single();
+            let mut dpoint2 = dpoint;
+            let r = f(&mut dpoint2);
+            let delta = match (dpoint, dpoint2) {
+                (Some(one), Some(two)) => Some(two - one),
+                _ => None,
+            };
+
+            if let Some(delta) = delta {
+                data.nudge_selection(delta);
+            }
+            r
         }
     }
 }

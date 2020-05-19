@@ -9,7 +9,7 @@ use std::fmt;
 use std::ops::{Add, Sub};
 
 use druid::kurbo::{Affine, Point, Rect, Vec2};
-use druid::Data;
+use druid::{Data, Lens};
 
 /// The position of the view, relative to the design space.
 #[derive(Data, Debug, Clone, Copy, PartialEq)]
@@ -34,7 +34,7 @@ pub struct ViewPort {
 ///
 /// This type should only be constructed through a function that has access to,
 /// and takes account of, the current viewport.
-#[derive(Clone, Copy, Data, PartialEq)]
+#[derive(Clone, Copy, Data, Lens, PartialEq)]
 pub struct DPoint {
     pub x: f64,
     pub y: f64,

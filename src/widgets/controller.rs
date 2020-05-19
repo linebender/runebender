@@ -1,13 +1,14 @@
 //! Controller widgets
 
-use druid::widget::prelude::*;
-use druid::widget::Controller;
-use druid::{Command, Data, Env, Event, EventCtx, Rect, UpdateCtx, Widget, WidgetPod};
+use druid::widget::{prelude::*, Controller};
+use druid::{
+    Command, Env, Event, EventCtx, InternalLifeCycle, Rect, UpdateCtx, Widget, WidgetExt, WidgetPod,
+};
 
 use crate::consts;
-use crate::data::AppState;
+use crate::data::{AppState, EditorState};
 use crate::menus;
-use crate::widgets::Toolbar;
+use crate::widgets::{CoordPane, Toolbar};
 
 /// A widget that wraps all root widgets
 #[derive(Debug, Default)]
@@ -54,6 +55,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for RootWindowController {
 pub struct EditorController<W> {
     inner: W,
     toolbar: WidgetPod<(), Toolbar>,
+    coord_panel: WidgetPod<EditorState, Box<dyn Widget<EditorState>>>,
 }
 
 impl<W> EditorController<W> {
@@ -61,36 +63,80 @@ impl<W> EditorController<W> {
         EditorController {
             inner,
             toolbar: WidgetPod::new(Toolbar::default()),
+            coord_panel: WidgetPod::new(CoordPane::new().lens(EditorState::session).boxed()),
         }
     }
 }
 
-impl<T: Data, W: Widget<T>> Widget<T> for EditorController<W> {
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
+impl<W: Widget<EditorState>> Widget<EditorState> for EditorController<W> {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut EditorState, env: &Env) {
         self.toolbar.event(ctx, event, &mut (), env);
+        self.coord_panel.event(ctx, event, data, env);
         if !ctx.is_handled() {
             self.inner.event(ctx, event, data, env);
         }
     }
 
-    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
+    fn lifecycle(
+        &mut self,
+        ctx: &mut LifeCycleCtx,
+        event: &LifeCycle,
+        data: &EditorState,
+        env: &Env,
+    ) {
+        //HACK: we don't have 'ambient focus', so after the coord panel takes
+        //focus, and then finishes editing, we need to tell the editor to
+        //take focus back again so that it can handle keyboard input.
+        if matches!(event, LifeCycle::Internal(InternalLifeCycle::RouteFocusChanged { new, .. }) if new.is_none())
+        {
+            ctx.submit_command(crate::consts::cmd::TAKE_FOCUS, None);
+        }
         self.toolbar.lifecycle(ctx, event, &(), env);
+        self.coord_panel.lifecycle(ctx, event, data, env);
         self.inner.lifecycle(ctx, event, data, env);
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &T, data: &T, env: &Env) {
+    fn update(
+        &mut self,
+        ctx: &mut UpdateCtx,
+        old_data: &EditorState,
+        data: &EditorState,
+        env: &Env,
+    ) {
+        self.coord_panel.update(ctx, data, env);
         self.inner.update(ctx, old_data, data, env);
     }
 
-    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
-        let size = self.toolbar.layout(ctx, bc, &(), env);
+    fn layout(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        bc: &BoxConstraints,
+        data: &EditorState,
+        env: &Env,
+    ) -> Size {
+        let child_bc = bc.loosen();
+        let size = self.toolbar.layout(ctx, &child_bc, &(), env);
         self.toolbar
             .set_layout_rect(ctx, &(), env, Rect::from_origin_size((20.0, 20.0), size));
-        self.inner.layout(ctx, bc, data, env)
+        let our_size = self.inner.layout(ctx, bc, data, env);
+        let coords_size = self.coord_panel.layout(ctx, &child_bc, data, env);
+        let coords_origin = (
+            (our_size.width / 2.0) - coords_size.width / 2.0,
+            our_size.height - coords_size.height - 20.0,
+        );
+        self.coord_panel.set_layout_rect(
+            ctx,
+            data,
+            env,
+            Rect::from_origin_size(coords_origin, size),
+        );
+
+        our_size
     }
 
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &T, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &EditorState, env: &Env) {
         self.inner.paint(ctx, data, env);
+        self.coord_panel.paint_with_offset(ctx, data, env);
         self.toolbar.paint_with_offset(ctx, &(), env);
     }
 }

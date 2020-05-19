@@ -79,7 +79,7 @@ pub struct FontMetrics {
 }
 
 /// The state for an editor view.
-#[derive(Clone, Data)]
+#[derive(Clone, Data, Lens)]
 pub struct EditorState {
     pub metrics: FontMetrics,
     pub font: Workspace,
