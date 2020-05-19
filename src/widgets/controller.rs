@@ -8,7 +8,7 @@ use druid::{
 use crate::consts;
 use crate::data::{AppState, EditorState};
 use crate::menus;
-use crate::widgets::{CoordPane, Toolbar};
+use crate::widgets::{CoordPane, FloatingPanel, Toolbar};
 
 /// A widget that wraps all root widgets
 #[derive(Debug, Default)]
@@ -54,16 +54,18 @@ impl<W: Widget<AppState>> Controller<AppState, W> for RootWindowController {
 //TODO: we could combine this with controller above if we wanted?
 pub struct EditorController<W> {
     inner: W,
-    toolbar: WidgetPod<(), Toolbar>,
-    coord_panel: WidgetPod<EditorState, Box<dyn Widget<EditorState>>>,
+    toolbar: WidgetPod<(), FloatingPanel<Toolbar>>,
+    coord_panel: WidgetPod<EditorState, FloatingPanel<Box<dyn Widget<EditorState>>>>,
 }
 
 impl<W> EditorController<W> {
     pub fn new(inner: W) -> Self {
         EditorController {
             inner,
-            toolbar: WidgetPod::new(Toolbar::default()),
-            coord_panel: WidgetPod::new(CoordPane::new().lens(EditorState::session).boxed()),
+            toolbar: WidgetPod::new(FloatingPanel::new(Toolbar::default())),
+            coord_panel: WidgetPod::new(FloatingPanel::new(
+                CoordPane::new().lens(EditorState::session).boxed(),
+            )),
         }
     }
 }
@@ -128,7 +130,7 @@ impl<W: Widget<EditorState>> Widget<EditorState> for EditorController<W> {
             ctx,
             data,
             env,
-            Rect::from_origin_size(coords_origin, size),
+            Rect::from_origin_size(coords_origin, coords_size),
         );
 
         our_size

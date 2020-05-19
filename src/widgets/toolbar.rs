@@ -8,8 +8,6 @@ use druid::{Color, Data, Rect, WidgetPod};
 use crate::consts;
 use crate::tools::{Pen, Preview, Select, Tool};
 
-//type Action<T> = Box<dyn Fn(&mut EventCtx, &mut T, &Env)>;
-
 const TOOLBAR_ITEM_SIZE: Size = Size::new(40.0, 40.0);
 const TOOLBAR_ITEM_PADDING: f64 = 2.0;
 const TOOLBAR_ICON_PADDING: f64 = 5.0;
@@ -32,7 +30,12 @@ pub struct Toolbar {
     items: Vec<ToolbarItem>,
     selected: usize,
     widgets: Vec<WidgetPod<bool, Box<dyn Widget<bool>>>>,
-    hide_toolbar: bool,
+}
+
+/// A wrapper around control UI elements, drawing a drop shadow & rounded rect
+pub struct FloatingPanel<W> {
+    hide_panel: bool,
+    inner: W,
 }
 
 impl Toolbar {
@@ -62,7 +65,6 @@ impl Toolbar {
             items,
             widgets,
             selected: 0,
-            hide_toolbar: false,
         }
     }
 }
@@ -87,11 +89,6 @@ impl<T: Data> Widget<T> for Toolbar {
             };
 
             self.selected = selected.unwrap_or(self.selected);
-            if cmd.selector == consts::cmd::TOGGLE_PREVIEW_TOOL {
-                let in_temporary_preview: &bool = cmd.get_object().unwrap();
-                self.hide_toolbar = *in_temporary_preview;
-                ctx.request_paint();
-            }
         }
 
         for (i, child) in self.widgets.iter_mut().enumerate() {
@@ -128,7 +125,7 @@ impl<T: Data> Widget<T> for Toolbar {
 
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, _data: &T, env: &Env) -> Size {
         let constraints = BoxConstraints::tight(TOOLBAR_ITEM_SIZE);
-        let mut x_pos = TOOLBAR_ITEM_PADDING;
+        let mut x_pos = 0.0;
 
         for child in self.widgets.iter_mut() {
             // data doesn't matter here
@@ -138,25 +135,13 @@ impl<T: Data> Widget<T> for Toolbar {
         }
 
         // Size doesn't account for stroke etc
-        bc.constrain(Size::new(x_pos, TOOLBAR_ITEM_SIZE.height))
+        bc.constrain(Size::new(
+            x_pos - TOOLBAR_ITEM_PADDING,
+            TOOLBAR_ITEM_SIZE.height,
+        ))
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, _data: &T, env: &Env) {
-        if self.hide_toolbar {
-            return;
-        }
-        let frame = self
-            .widgets
-            .first()
-            .map(|w| w.layout_rect())
-            .unwrap_or_default();
-        let frame = self
-            .widgets
-            .iter()
-            .fold(frame, |acc, w| acc.union(w.layout_rect()));
-        ctx.blurred_rect(frame + Vec2::new(2.0, 2.0), 4.0, &Color::grey(0.5));
-        let rounded = frame.to_rounded_rect(5.0);
-        ctx.fill(rounded, &TOOLBAR_BG_DEFAULT);
         for (i, child) in self.widgets.iter_mut().enumerate() {
             let is_selected = i == self.selected;
             child.paint_with_offset(ctx, &is_selected, env);
@@ -171,6 +156,56 @@ impl<T: Data> Widget<T> for Toolbar {
             );
             ctx.stroke(line, &Color::BLACK, TOOLBAR_BORDER_STROKE_WIDTH);
         }
+    }
+}
+
+impl<W> FloatingPanel<W> {
+    pub fn new(inner: W) -> Self {
+        FloatingPanel {
+            hide_panel: false,
+            inner,
+        }
+    }
+}
+
+impl<T: Data, W: Widget<T>> Widget<T> for FloatingPanel<W> {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
+        self.inner.event(ctx, event, data, env);
+        if let Event::Command(cmd) = event {
+            if cmd.selector == consts::cmd::TOGGLE_PREVIEW_TOOL {
+                let in_temporary_preview: &bool = cmd.get_object().unwrap();
+                self.hide_panel = *in_temporary_preview;
+                ctx.request_paint();
+            }
+        }
+    }
+
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
+        self.inner.lifecycle(ctx, event, data, env);
+    }
+
+    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &T, data: &T, env: &Env) {
+        self.inner.update(ctx, old_data, data, env);
+    }
+
+    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
+        let size = self.inner.layout(ctx, bc, data, env);
+        ctx.set_paint_insets((0., 6.0, 6.0, 0.));
+        size
+    }
+
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &T, env: &Env) {
+        if self.hide_panel {
+            return;
+        }
+        let frame = ctx.size().to_rect();
+        ctx.blurred_rect(frame + Vec2::new(2.0, 2.0), 4.0, &Color::grey(0.5));
+        let rounded = frame.to_rounded_rect(5.0);
+        ctx.fill(rounded, &TOOLBAR_BG_DEFAULT);
+        ctx.with_save(|ctx| {
+            ctx.clip(rounded);
+            self.inner.paint(ctx, data, env);
+        });
         ctx.stroke(rounded, &Color::BLACK, TOOLBAR_BORDER_STROKE_WIDTH);
     }
 }
