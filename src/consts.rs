@@ -87,4 +87,11 @@ pub mod cmd {
         pub id: EntityId,
         pub pos: Point,
     }
+
+    /// A hack: asks the editor view to take focus, so that it can handle
+    /// keyboard events.
+    ///
+    /// This is sent by the `EditorController` when focus is changing to 'no widget',
+    /// as might happen after we finish editing a coordinate via a text field.
+    pub const TAKE_FOCUS: Selector = Selector::new("runebender.editor-steal-focus");
 }

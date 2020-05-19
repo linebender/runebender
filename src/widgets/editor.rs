@@ -250,14 +250,21 @@ impl Widget<EditorState> for Editor {
                 ctx.request_focus();
                 None
             }
-            Event::Command(c) => {
-                let (handled, edit) = self.handle_cmd(c, data);
-                if handled {
-                    ctx.is_handled();
-                    ctx.request_paint();
+            Event::Command(cmd) => match cmd {
+                c if c.selector == crate::consts::cmd::TAKE_FOCUS => {
+                    ctx.request_focus();
+                    ctx.set_handled();
+                    None
                 }
-                edit
-            }
+                c => {
+                    let (handled, edit) = self.handle_cmd(c, data);
+                    if handled {
+                        ctx.set_handled();
+                        ctx.request_paint();
+                    }
+                    edit
+                }
+            },
             Event::KeyDown(k) if k.key_code == KeyCode::Escape => {
                 data.session_mut().clear_selection();
                 None
