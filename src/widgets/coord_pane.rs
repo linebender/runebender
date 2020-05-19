@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use druid::widget::{prelude::*, Flex, Label, SizedBox};
-use druid::{Color, LensExt, WidgetExt, WidgetPod};
+use druid::{LensExt, WidgetExt, WidgetPod};
 
 use crate::design_space::DPoint;
 use crate::edit_session::EditSession;
@@ -34,19 +34,9 @@ impl CoordPane {
     fn rebuild_inner(&mut self, session: &Arc<EditSession>) {
         self.current_type = SelectionType::from_session(session);
         let new_widget = match self.current_type {
-            SelectionType::None => SizedBox::empty()
-                .width(40.0)
-                .height(40.0)
-                .background(Color::rgb(1.0, 0.4, 0.7))
-                .boxed(),
-            SelectionType::Single => single_point_selected()
-                .background(Color::rgb(0.4, 1.0, 0.7))
-                .boxed(),
-            SelectionType::Multi => SizedBox::empty()
-                .width(40.0)
-                .height(40.0)
-                .background(Color::rgb(0.7, 0.2, 1.0))
-                .boxed(),
+            SelectionType::None => SizedBox::empty().boxed(),
+            SelectionType::Single => single_point_selected().boxed(),
+            SelectionType::Multi => SizedBox::empty().width(40.0).height(40.0).boxed(),
         };
         self.inner = WidgetPod::new(new_widget);
     }
@@ -67,7 +57,7 @@ impl Widget<Arc<EditSession>> for CoordPane {
         data: &Arc<EditSession>,
         env: &Env,
     ) {
-        if self.current_type.will_change(data) {
+        if matches!(event, LifeCycle::WidgetAdded) || self.current_type.will_change(data) {
             self.rebuild_inner(data);
             ctx.children_changed();
         }
@@ -124,14 +114,14 @@ fn single_point_selected() -> impl Widget<Arc<EditSession>> {
     Maybe::or_empty(|| {
         Flex::row()
             .with_child(Label::new("x:"))
-            .with_spacer(8.0)
+            .with_spacer(4.0)
             .with_child(EditableLabel::parse().lens(DPoint::x).fix_width(40.0))
             .with_child(Label::new("y:"))
-            .with_spacer(8.0)
+            .with_spacer(4.0)
             .with_child(EditableLabel::parse().lens(DPoint::y).fix_width(40.0))
     })
     .lens(EditSession::single_selection.in_arc())
-    .debug_paint_layout()
+    .padding(8.0)
 }
 
 impl Default for CoordPane {

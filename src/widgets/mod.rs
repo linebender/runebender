@@ -22,4 +22,4 @@ use maybe::Maybe;
 pub use modal_host::ModalHost;
 pub use scroll_zoom::ScrollZoom;
 pub use sidebar::Sidebar;
-pub use toolbar::Toolbar;
+pub use toolbar::{FloatingPanel, Toolbar};
