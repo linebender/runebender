@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use druid::kurbo::{BezPath, Point, Rect, Shape};
-use druid::Data;
+use druid::kurbo::{BezPath, Point, Rect, Shape, Size};
+use druid::{Data, Lens};
 use norad::glyph::Outline;
 use norad::{Glyph, GlyphName};
 
@@ -43,14 +43,39 @@ pub struct EditSession {
     pub guides: Arc<Vec<Guide>>,
     pub viewport: ViewPort,
     work_bounds: Rect,
+    quadrant: Quadrant,
     /// A string describing the current tool
     pub tool_desc: Arc<str>,
 }
 
+/// when selecting multiple points, which coordinate value do we display?
+///
+/// This is really UI state, but it is convenient to keep it in our data model.
+#[derive(Debug, Clone, Copy, PartialEq, Data)]
+pub enum Quadrant {
+    Center,
+    TopLeft,
+    Top,
+    TopRight,
+    Right,
+    BottomRight,
+    Bottom,
+    BottomLeft,
+    Left,
+}
+
+/// A type that is only created by a lens, for our coordinate editing panel
+#[derive(Debug, Clone, Copy, Data, Lens)]
+pub struct CoordinateSelection {
+    pub count: usize,
+    pub frame: Rect,
+    pub quadrant: Quadrant,
+}
+
 impl EditSession {
+    /// a lens to return info on the current selection
     #[allow(non_upper_case_globals)]
-    /// a lens to return the selection if it is a single point.
-    pub const single_selection: lenses::SingleSelection = lenses::SingleSelection;
+    pub const selected_coord: lenses::CoordSelection = lenses::CoordSelection;
 
     pub fn new(name: &GlyphName, glyphs: &Workspace) -> Self {
         let name = name.to_owned();
@@ -86,6 +111,7 @@ impl EditSession {
             guides: Arc::new(guides),
             viewport: ViewPort::default(),
             tool_desc: Arc::from("Select"),
+            quadrant: Quadrant::Center,
             work_bounds,
         }
     }
@@ -269,17 +295,18 @@ impl EditSession {
         self.selection_mut().clear()
     }
 
-    // used by our lens for displaying the selected coord
-    fn selection_dpoint_if_single(&self) -> Option<DPoint> {
-        if self.selection.len() == 1 {
-            self.selection
-                .iter()
-                .next()
-                .and_then(|id| self.path_point_for_id(*id))
-                .map(|pp| pp.point)
-        } else {
-            None
-        }
+    /// returns a rect representing the containing rect of the current selection
+    ///
+    /// Will return Rect::ZERO if nothing is selected.
+    fn selection_dpoint_bbox(&self) -> Rect {
+        let mut iter = self
+            .selection
+            .iter()
+            .flat_map(|id| self.path_point_for_id(*id).map(|pt| pt.point.to_raw()));
+
+        let first_point = iter.next().unwrap_or_default();
+        let bbox = Rect::ZERO.with_origin(first_point);
+        iter.fold(bbox, |bb, pt| bb.union_pt(pt))
     }
 
     /// If the current selection is a single point, select the next point
@@ -459,35 +486,177 @@ impl<'a> Iterator for PathSelectionIter<'a> {
     }
 }
 
+impl CoordinateSelection {
+    /// a lens to return the point representation of the current selected coord(s)
+    #[allow(non_upper_case_globals)]
+    pub const quadrant_coord: lenses::QuadrantCoord = lenses::QuadrantCoord;
+}
+
+static ALL_QUADRANTS: &[Quadrant] = &[
+    Quadrant::TopLeft,
+    Quadrant::Top,
+    Quadrant::TopRight,
+    Quadrant::Left,
+    Quadrant::Center,
+    Quadrant::Right,
+    Quadrant::BottomLeft,
+    Quadrant::Bottom,
+    Quadrant::BottomRight,
+];
+
+impl Quadrant {
+    pub fn all() -> &'static [Quadrant] {
+        ALL_QUADRANTS
+    }
+
+    pub fn for_point_in_size(pt: Point, size: Size) -> Self {
+        let zone_x = size.width / 3.0;
+        let zone_y = size.height / 3.0;
+        let mouse_x = match pt.x {
+            x if x < zone_x => 0,
+            x if x >= zone_x && x < zone_x * 2.0 => 1,
+            x if x >= zone_x * 2.0 => 2,
+            _ => unreachable!(),
+        };
+
+        let mouse_y = match pt.y {
+            y if y < zone_y => 0,
+            y if y >= zone_y && y < zone_y * 2.0 => 1,
+            y if y >= zone_y * 2.0 => 2,
+            _ => unreachable!(),
+        };
+
+        match (mouse_x, mouse_y) {
+            (0, 0) => Quadrant::TopLeft,
+            (1, 0) => Quadrant::Top,
+            (2, 0) => Quadrant::TopRight,
+            (0, 1) => Quadrant::Left,
+            (1, 1) => Quadrant::Center,
+            (2, 1) => Quadrant::Right,
+            (0, 2) => Quadrant::BottomLeft,
+            (1, 2) => Quadrant::Bottom,
+            (2, 2) => Quadrant::BottomRight,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn pos_in_size(self, size: Size) -> Point {
+        match self {
+            Quadrant::TopLeft => Point::new(0., 0.),
+            Quadrant::Top => Point::new(size.width / 2.0, 0.),
+            Quadrant::TopRight => Point::new(size.width, 0.),
+            Quadrant::Left => Point::new(0., size.height / 2.0),
+            Quadrant::Center => Point::new(size.width / 2.0, size.height / 2.0),
+            Quadrant::Right => Point::new(size.width, size.height / 2.0),
+            Quadrant::BottomLeft => Point::new(0.0, size.height),
+            Quadrant::Bottom => Point::new(size.width / 2.0, size.height),
+            Quadrant::BottomRight => Point::new(size.width, size.height),
+        }
+    }
+
+    fn pos_in_rect_in_design_space(self, rect: Rect) -> Point {
+        let flipped = match self {
+            Quadrant::TopRight => Quadrant::BottomRight,
+            Quadrant::TopLeft => Quadrant::BottomLeft,
+            Quadrant::Top => Quadrant::Bottom,
+            Quadrant::BottomRight => Quadrant::TopRight,
+            Quadrant::BottomLeft => Quadrant::TopLeft,
+            Quadrant::Bottom => Quadrant::Top,
+            other => other,
+        };
+        flipped.pos_in_size(rect.size()) + rect.origin().to_vec2()
+    }
+}
+
 pub mod lenses {
     use super::*;
     use druid::Lens;
 
-    pub struct SingleSelection;
+    pub struct CoordSelection;
 
-    impl Lens<EditSession, Option<DPoint>> for SingleSelection {
-        fn with<V, F: FnOnce(&Option<DPoint>) -> V>(&self, data: &EditSession, f: F) -> V {
-            let dpoint = data.selection_dpoint_if_single();
-            f(&dpoint)
+    impl Lens<EditSession, CoordinateSelection> for CoordSelection {
+        fn with<V, F: FnOnce(&CoordinateSelection) -> V>(&self, data: &EditSession, f: F) -> V {
+            let count = data.selection.len();
+            let frame = data.selection_dpoint_bbox();
+            let quadrant = data.quadrant;
+            f(&CoordinateSelection {
+                count,
+                quadrant,
+                frame,
+            })
         }
 
-        fn with_mut<V, F: FnOnce(&mut Option<DPoint>) -> V>(
+        fn with_mut<V, F: FnOnce(&mut CoordinateSelection) -> V>(
             &self,
             data: &mut EditSession,
             f: F,
         ) -> V {
-            let dpoint = data.selection_dpoint_if_single();
-            let mut dpoint2 = dpoint;
-            let r = f(&mut dpoint2);
-            let delta = match (dpoint, dpoint2) {
-                (Some(one), Some(two)) => Some(two - one),
-                _ => None,
+            let count = data.selection.len();
+            let frame = data.selection_dpoint_bbox();
+            let quadrant = data.quadrant;
+            let mut sel = CoordinateSelection {
+                count,
+                quadrant,
+                frame,
             };
+            let r = f(&mut sel);
+            if sel.frame != frame {
+                let delta = sel.frame.origin() - frame.origin();
+                data.nudge_selection(DVec2::from_raw(delta));
+            }
+            data.quadrant = sel.quadrant;
+            r
+        }
+    }
 
-            if let Some(delta) = delta {
-                data.nudge_selection(delta);
+    pub struct QuadrantCoord;
+
+    impl Lens<CoordinateSelection, Point> for QuadrantCoord {
+        fn with<V, F: FnOnce(&Point) -> V>(&self, data: &CoordinateSelection, f: F) -> V {
+            let point = data.quadrant.pos_in_rect_in_design_space(data.frame);
+            f(&point)
+        }
+
+        fn with_mut<V, F: FnOnce(&mut Point) -> V>(
+            &self,
+            data: &mut CoordinateSelection,
+            f: F,
+        ) -> V {
+            let point = data.quadrant.pos_in_rect_in_design_space(data.frame);
+            let mut point2 = point;
+            let r = f(&mut point2);
+
+            if point != point2 {
+                let delta = point2 - point;
+                data.frame = data.frame.with_origin(data.frame.origin() + delta);
             }
             r
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn quadrant_pos() {
+        let rect = Rect::new(10.0, 10., 100., 100.);
+        assert_eq!(
+            Quadrant::BottomLeft.pos_in_rect_in_design_space(rect),
+            rect.origin()
+        );
+        assert_eq!(
+            Quadrant::Center.pos_in_rect_in_design_space(rect),
+            Point::new(55.0, 55.0)
+        );
+        assert_eq!(
+            Quadrant::TopRight.pos_in_rect_in_design_space(rect),
+            Point::new(100.0, 100.0)
+        );
+        assert_eq!(
+            Quadrant::Top.pos_in_rect_in_design_space(rect),
+            Point::new(55.0, 100.0)
+        );
     }
 }

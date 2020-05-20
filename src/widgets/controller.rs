@@ -2,11 +2,13 @@
 
 use druid::widget::{prelude::*, Controller};
 use druid::{
-    Command, Env, Event, EventCtx, InternalLifeCycle, Rect, UpdateCtx, Widget, WidgetExt, WidgetPod,
+    Command, Env, Event, EventCtx, InternalLifeCycle, LensExt, Rect, UpdateCtx, Widget, WidgetExt,
+    WidgetPod,
 };
 
 use crate::consts;
 use crate::data::{AppState, EditorState};
+use crate::edit_session::EditSession;
 use crate::menus;
 use crate::widgets::{CoordPane, FloatingPanel, Toolbar};
 
@@ -64,7 +66,9 @@ impl<W> EditorController<W> {
             inner,
             toolbar: WidgetPod::new(FloatingPanel::new(Toolbar::default())),
             coord_panel: WidgetPod::new(FloatingPanel::new(
-                CoordPane::new().lens(EditorState::session).boxed(),
+                CoordPane::new()
+                    .lens(EditorState::session.then(EditSession::selected_coord.in_arc()))
+                    .boxed(),
             )),
         }
     }
