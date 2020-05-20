@@ -2,106 +2,42 @@
 //! selected point.
 
 use druid::kurbo::{Circle, Vec2};
-use druid::widget::{prelude::*, Either, Flex, Label, SizedBox};
-use druid::{Color, Point, WidgetExt, WidgetPod};
+use druid::widget::{prelude::*, Controller, Either, Flex, Label, SizedBox};
+use druid::{Color, Point, WidgetExt};
 
 use crate::edit_session::{CoordinateSelection, Quadrant};
 use crate::widgets::EditableLabel;
 
 /// A panel for editing the selected coordinate
-pub struct CoordPane {
-    inner: WidgetPod<CoordinateSelection, Box<dyn Widget<CoordinateSelection>>>,
-    current_type: SelectionType,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum SelectionType {
-    None,
-    Single,
-    Multi,
-}
-
-/// A widget for picking how to represent a multi-point selection.
-struct CoordRepresentationPicker;
+pub struct CoordPane;
 
 impl CoordPane {
-    pub fn new() -> Self {
-        CoordPane {
-            inner: WidgetPod::new(SizedBox::empty().boxed()),
-            current_type: SelectionType::None,
-        }
-    }
-
-    fn rebuild_inner(&mut self, selection: &CoordinateSelection) {
-        self.current_type = SelectionType::from_selection(selection);
-        let new_widget = match self.current_type {
-            SelectionType::None => SizedBox::empty().boxed(),
-            SelectionType::Single => single_point_selected().boxed(),
-            SelectionType::Multi => single_point_selected().boxed(),
-        };
-        self.inner = WidgetPod::new(new_widget);
+    // this is not a blessed pattern
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new() -> impl Widget<CoordinateSelection> {
+        build_widget().controller(CoordPane)
     }
 }
 
-impl Widget<CoordinateSelection> for CoordPane {
+impl<W: Widget<CoordinateSelection>> Controller<CoordinateSelection, W> for CoordPane {
     fn event(
         &mut self,
+        child: &mut W,
         ctx: &mut EventCtx,
         event: &Event,
         data: &mut CoordinateSelection,
         env: &Env,
     ) {
-        self.inner.event(ctx, event, data, env);
+        child.event(ctx, event, data, env);
+        // suppress clicks so that the editor doesn't handle them.
         if matches!(event,Event::MouseUp(_) | Event::MouseDown(_)) {
             ctx.set_handled();
         }
     }
-
-    fn lifecycle(
-        &mut self,
-        ctx: &mut LifeCycleCtx,
-        event: &LifeCycle,
-        data: &CoordinateSelection,
-        env: &Env,
-    ) {
-        if matches!(event, LifeCycle::WidgetAdded) || self.current_type.will_change(data) {
-            self.rebuild_inner(data);
-            ctx.children_changed();
-        }
-        self.inner.lifecycle(ctx, event, data, env);
-    }
-
-    fn update(
-        &mut self,
-        ctx: &mut UpdateCtx,
-        _old_data: &CoordinateSelection,
-        data: &CoordinateSelection,
-        env: &Env,
-    ) {
-        if self.current_type.will_change(data) {
-            self.rebuild_inner(data);
-            ctx.children_changed();
-        } else {
-            self.inner.update(ctx, data, env);
-        }
-    }
-
-    fn layout(
-        &mut self,
-        ctx: &mut LayoutCtx,
-        bc: &BoxConstraints,
-        data: &CoordinateSelection,
-        env: &Env,
-    ) -> Size {
-        let size = self.inner.layout(ctx, bc, data, env);
-        self.inner.set_layout_rect(ctx, data, env, size.to_rect());
-        size
-    }
-
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &CoordinateSelection, env: &Env) {
-        self.inner.paint(ctx, data, env);
-    }
 }
+
+/// A widget for picking how to represent a multi-point selection.
+struct CoordRepresentationPicker;
 
 impl Widget<Quadrant> for CoordRepresentationPicker {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut Quadrant, _env: &Env) {
@@ -135,7 +71,7 @@ impl Widget<Quadrant> for CoordRepresentationPicker {
     fn paint(&mut self, ctx: &mut PaintCtx, data: &Quadrant, env: &Env) {
         let frame_size = ctx.size();
         let padding = 5.0;
-        let circle_radius = 2.0;
+        let circle_radius = 2.5;
         let rect = frame_size.to_rect().inset(-padding);
         ctx.stroke(rect, &Color::BLACK, 1.0);
         for quadrant in Quadrant::all() {
@@ -151,21 +87,8 @@ impl Widget<Quadrant> for CoordRepresentationPicker {
     }
 }
 
-impl SelectionType {
-    fn from_selection(session: &CoordinateSelection) -> Self {
-        match session.count {
-            0 => Self::None,
-            1 => Self::Single,
-            _ => Self::Multi,
-        }
-    }
-
-    fn will_change(self, session: &CoordinateSelection) -> bool {
-        self != Self::from_selection(session)
-    }
-}
-
-fn single_point_selected() -> impl Widget<CoordinateSelection> {
+fn build_widget() -> impl Widget<CoordinateSelection> {
+    // kurbo types don't derive lens
     let point_x_lens = druid::lens!(Point, x);
     let point_y_lens = druid::lens!(Point, y);
 
@@ -193,14 +116,11 @@ fn single_point_selected() -> impl Widget<CoordinateSelection> {
         )
         .lens(CoordinateSelection::quadrant_coord);
 
-    Flex::row()
+    let picker_and_editor = Flex::row()
         .with_child(coord_picker)
         .with_child(coord_editor)
-        .padding(4.0)
-}
+        .padding(4.0);
 
-impl Default for CoordPane {
-    fn default() -> Self {
-        CoordPane::new()
-    }
+    // if we have any points selected, show the numerical adjust widget, else an empty widget
+    Either::new(|d, _| d.count != 0, picker_and_editor, SizedBox::empty())
 }
