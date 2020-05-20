@@ -1,18 +1,16 @@
 //! The floating panel that displays the coordinate of the currently
 //! selected point.
 
-use std::sync::Arc;
+use druid::kurbo::{Circle, Vec2};
+use druid::widget::{prelude::*, Either, Flex, Label, SizedBox};
+use druid::{Color, Point, WidgetExt, WidgetPod};
 
-use druid::widget::{prelude::*, Flex, Label, SizedBox};
-use druid::{LensExt, WidgetExt, WidgetPod};
-
-use crate::design_space::DPoint;
-use crate::edit_session::EditSession;
-use crate::widgets::{EditableLabel, Maybe};
+use crate::edit_session::{CoordinateSelection, Quadrant};
+use crate::widgets::EditableLabel;
 
 /// A panel for editing the selected coordinate
 pub struct CoordPane {
-    inner: WidgetPod<Arc<EditSession>, Box<dyn Widget<Arc<EditSession>>>>,
+    inner: WidgetPod<CoordinateSelection, Box<dyn Widget<CoordinateSelection>>>,
     current_type: SelectionType,
 }
 
@@ -23,6 +21,9 @@ enum SelectionType {
     Multi,
 }
 
+/// A widget for picking how to represent a multi-point selection.
+struct CoordRepresentationPicker;
+
 impl CoordPane {
     pub fn new() -> Self {
         CoordPane {
@@ -31,19 +32,25 @@ impl CoordPane {
         }
     }
 
-    fn rebuild_inner(&mut self, session: &Arc<EditSession>) {
-        self.current_type = SelectionType::from_session(session);
+    fn rebuild_inner(&mut self, selection: &CoordinateSelection) {
+        self.current_type = SelectionType::from_selection(selection);
         let new_widget = match self.current_type {
             SelectionType::None => SizedBox::empty().boxed(),
             SelectionType::Single => single_point_selected().boxed(),
-            SelectionType::Multi => SizedBox::empty().width(40.0).height(40.0).boxed(),
+            SelectionType::Multi => single_point_selected().boxed(),
         };
         self.inner = WidgetPod::new(new_widget);
     }
 }
 
-impl Widget<Arc<EditSession>> for CoordPane {
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut Arc<EditSession>, env: &Env) {
+impl Widget<CoordinateSelection> for CoordPane {
+    fn event(
+        &mut self,
+        ctx: &mut EventCtx,
+        event: &Event,
+        data: &mut CoordinateSelection,
+        env: &Env,
+    ) {
         self.inner.event(ctx, event, data, env);
         if matches!(event,Event::MouseUp(_) | Event::MouseDown(_)) {
             ctx.set_handled();
@@ -54,7 +61,7 @@ impl Widget<Arc<EditSession>> for CoordPane {
         &mut self,
         ctx: &mut LifeCycleCtx,
         event: &LifeCycle,
-        data: &Arc<EditSession>,
+        data: &CoordinateSelection,
         env: &Env,
     ) {
         if matches!(event, LifeCycle::WidgetAdded) || self.current_type.will_change(data) {
@@ -67,8 +74,8 @@ impl Widget<Arc<EditSession>> for CoordPane {
     fn update(
         &mut self,
         ctx: &mut UpdateCtx,
-        _old_data: &Arc<EditSession>,
-        data: &Arc<EditSession>,
+        _old_data: &CoordinateSelection,
+        data: &CoordinateSelection,
         env: &Env,
     ) {
         if self.current_type.will_change(data) {
@@ -83,7 +90,7 @@ impl Widget<Arc<EditSession>> for CoordPane {
         &mut self,
         ctx: &mut LayoutCtx,
         bc: &BoxConstraints,
-        data: &Arc<EditSession>,
+        data: &CoordinateSelection,
         env: &Env,
     ) -> Size {
         let size = self.inner.layout(ctx, bc, data, env);
@@ -91,37 +98,105 @@ impl Widget<Arc<EditSession>> for CoordPane {
         size
     }
 
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &Arc<EditSession>, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &CoordinateSelection, env: &Env) {
         self.inner.paint(ctx, data, env);
     }
 }
 
+impl Widget<Quadrant> for CoordRepresentationPicker {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut Quadrant, _env: &Env) {
+        match event {
+            Event::MouseDown(mouse) if mouse.button.is_left() => {
+                ctx.set_active(true);
+                *data = Quadrant::for_point_in_size(mouse.pos, ctx.size());
+                dbg!(data);
+                ctx.request_paint();
+            }
+            Event::MouseUp(_) => {
+                if ctx.is_active() {
+                    ctx.set_active(false);
+                    ctx.request_paint();
+                }
+            }
+            _ => (),
+        }
+    }
+
+    fn lifecycle(&mut self, _: &mut LifeCycleCtx, _: &LifeCycle, _: &Quadrant, _: &Env) {}
+
+    fn update(&mut self, _ctx: &mut UpdateCtx, _old_data: &Quadrant, _data: &Quadrant, _env: &Env) {
+    }
+
+    fn layout(&mut self, _ctx: &mut LayoutCtx, bc: &BoxConstraints, _: &Quadrant, _: &Env) -> Size {
+        let side_len = bc.max().min_side();
+        Size::new(side_len, side_len)
+    }
+
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &Quadrant, env: &Env) {
+        let frame_size = ctx.size();
+        let padding = 5.0;
+        let circle_radius = 2.0;
+        let rect = frame_size.to_rect().inset(-padding);
+        ctx.stroke(rect, &Color::BLACK, 1.0);
+        for quadrant in Quadrant::all() {
+            let pt = quadrant.pos_in_size(rect.size());
+            let pt = pt + Vec2::new(5.0, 5.0);
+            let color = if data == quadrant {
+                env.get(druid::theme::SELECTION_COLOR)
+            } else {
+                Color::BLACK
+            };
+            ctx.fill(Circle::new(pt, circle_radius), &color);
+        }
+    }
+}
+
 impl SelectionType {
-    fn from_session(session: &Arc<EditSession>) -> Self {
-        match session.selection.len() {
+    fn from_selection(session: &CoordinateSelection) -> Self {
+        match session.count {
             0 => Self::None,
             1 => Self::Single,
             _ => Self::Multi,
         }
     }
 
-    fn will_change(self, session: &Arc<EditSession>) -> bool {
-        self != Self::from_session(session)
+    fn will_change(self, session: &CoordinateSelection) -> bool {
+        self != Self::from_selection(session)
     }
 }
 
-fn single_point_selected() -> impl Widget<Arc<EditSession>> {
-    Maybe::or_empty(|| {
-        Flex::row()
-            .with_child(Label::new("x:"))
-            .with_spacer(4.0)
-            .with_child(EditableLabel::parse().lens(DPoint::x).fix_width(40.0))
-            .with_child(Label::new("y:"))
-            .with_spacer(4.0)
-            .with_child(EditableLabel::parse().lens(DPoint::y).fix_width(40.0))
-    })
-    .lens(EditSession::single_selection.in_arc())
-    .padding(8.0)
+fn single_point_selected() -> impl Widget<CoordinateSelection> {
+    let point_x_lens = druid::lens!(Point, x);
+    let point_y_lens = druid::lens!(Point, y);
+
+    let coord_picker = Either::new(
+        |d, _| d.count > 1,
+        CoordRepresentationPicker
+            .lens(CoordinateSelection::quadrant)
+            .fix_width(40.0)
+            .padding((0., 0., 8.0, 0.)),
+        SizedBox::empty(),
+    );
+
+    let coord_editor = Flex::column()
+        .with_child(
+            Flex::row()
+                .with_child(Label::new("x:").with_text_size(12.0))
+                .with_spacer(4.0)
+                .with_child(EditableLabel::parse().lens(point_x_lens).fix_width(40.0)),
+        )
+        .with_child(
+            Flex::row()
+                .with_child(Label::new("y:").with_text_size(12.0))
+                .with_spacer(4.0)
+                .with_child(EditableLabel::parse().lens(point_y_lens).fix_width(40.0)),
+        )
+        .lens(CoordinateSelection::quadrant_coord);
+
+    Flex::row()
+        .with_child(coord_picker)
+        .with_child(coord_editor)
+        .padding(4.0)
 }
 
 impl Default for CoordPane {
