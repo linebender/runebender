@@ -97,8 +97,7 @@ impl AppDelegate<AppState> for Delegate {
                             .menu(crate::menus::make_menu(&data));
 
                         let id = new_win.id;
-                        let command = Command::one_shot(druid::commands::NEW_WINDOW, new_win);
-                        ctx.submit_command(command, None);
+                        ctx.new_window(new_win);
 
                         Arc::make_mut(&mut data.workspace.open_glyphs).insert(payload.clone(), id);
                     }

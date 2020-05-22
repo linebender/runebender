@@ -2,7 +2,7 @@
 
 use druid::kurbo::Vec2;
 use druid::widget::prelude::*;
-use druid::{Color, Command, Data, Rect, Selector, WidgetExt, WidgetPod};
+use druid::{Color, Command, Data, Rect, Selector, SingleUse, WidgetExt, WidgetPod};
 
 /// A wrapper around a closure for constructing a widget.
 struct ModalBuilder<T>(Box<dyn FnOnce() -> Box<dyn Widget<T>>>);
@@ -44,7 +44,7 @@ impl ModalHost<(), ()> {
         T: Data,
         W: Widget<T> + 'static,
     {
-        Command::one_shot(ModalHost::SHOW_MODAL, ModalBuilder::new(f))
+        Command::new(ModalHost::SHOW_MODAL, SingleUse::new(ModalBuilder::new(f)))
     }
 }
 
@@ -63,9 +63,9 @@ impl<T: Data, W: Widget<T>> Widget<T> for ModalHost<T, W> {
             Event::Command(cmd) if cmd.selector == ModalHost::SHOW_MODAL => {
                 if self.modal.is_none() {
                     let payload = cmd
-                        .take_object::<ModalBuilder<T>>()
+                        .get_object::<SingleUse<ModalBuilder<T>>>()
                         .expect("incorrect payload for SHOW_MODAL");
-                    self.modal = Some(WidgetPod::new(payload.build()));
+                    self.modal = Some(WidgetPod::new(payload.take().unwrap().build()));
                     ctx.children_changed();
                 } else {
                     log::warn!("cannot show modal; already showing modal");

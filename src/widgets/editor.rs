@@ -56,8 +56,9 @@ impl Editor {
         } else if let TaggedEvent::Down(m) = event {
             let menu = crate::menus::make_context_menu(data, m.pos);
             let menu = ContextMenu::new(menu, m.window_pos);
-            let cmd = Command::new(druid::commands::SHOW_CONTEXT_MENU, menu);
-            ctx.submit_command(cmd, None);
+            ctx.show_context_menu(menu);
+            //let cmd = Command::new(druid::commands::SHOW_CONTEXT_MENU, menu);
+            //ctx.submit_command(cmd, None);
         }
         None
     }
