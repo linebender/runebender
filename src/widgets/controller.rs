@@ -2,8 +2,7 @@
 
 use druid::widget::{prelude::*, Controller};
 use druid::{
-    Command, Env, Event, EventCtx, InternalLifeCycle, LensExt, Rect, UpdateCtx, Widget, WidgetExt,
-    WidgetPod,
+    Env, Event, EventCtx, InternalLifeCycle, LensExt, Rect, UpdateCtx, Widget, WidgetExt, WidgetPod,
 };
 
 use crate::consts;
@@ -28,8 +27,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for RootWindowController {
         match event {
             Event::Command(cmd) if cmd.selector == consts::cmd::REBUILD_MENUS => {
                 let menu = menus::make_menu(data);
-                let cmd = Command::new(druid::commands::SET_MENU, menu);
-                ctx.submit_command(cmd, None);
+                ctx.set_menu(menu);
             }
             other => child.event(ctx, other, data, env),
         }
@@ -45,8 +43,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for RootWindowController {
     ) {
         if old_data.workspace.selected.is_none() != data.workspace.selected.is_none() {
             let menu = menus::make_menu(data);
-            let cmd = Command::new(druid::commands::SET_MENU, menu);
-            ctx.submit_command(cmd, None);
+            ctx.set_menu(menu);
         }
         child.update(ctx, old_data, data, env);
     }
