@@ -75,7 +75,7 @@ impl Tool for Select {
             }
             e if HotKey::new(None, KeyCode::Tab).matches(e) => data.select_next(),
             //TODO: add Shift to SysMods
-            e if HotKey::new(RawMods::Shift, KeyCode::Tab).matches(e) => data.select_next(),
+            e if HotKey::new(RawMods::Shift, KeyCode::Tab).matches(e) => data.select_prev(),
             _ => return None,
         }
         self.this_edit_type.take()
