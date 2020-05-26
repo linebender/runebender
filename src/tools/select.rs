@@ -2,17 +2,20 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use druid::kurbo::{Point, Rect, Vec2};
-use druid::piet::{Color, RenderContext};
+use druid::piet::{
+    Color, FontBuilder, PietTextLayout, RenderContext, Text, TextLayout, TextLayoutBuilder,
+};
 use druid::{Data, Env, EventCtx, HotKey, KeyCode, KeyEvent, MouseEvent, PaintCtx, RawMods};
 
 use crate::design_space::{DPoint, DVec2};
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
-use crate::path::EntityId;
+use crate::path::{EntityId, PathPoint};
 use crate::tools::{EditType, Tool, ToolId};
 
 const SELECTION_RECT_BG_COLOR: Color = Color::rgba8(0xDD, 0xDD, 0xDD, 0x55);
 const SELECTION_RECT_STROKE_COLOR: Color = Color::rgb8(0x53, 0x8B, 0xBB);
+const HOVER_LABEL_PADDING: f64 = 8.0;
 
 #[derive(Debug, Clone)]
 enum DragState {
@@ -44,11 +47,55 @@ pub struct Select {
     this_edit_type: Option<EditType>,
 }
 
+fn make_text_for_point(ctx: &mut PaintCtx, pt: PathPoint) -> PietTextLayout {
+    let mut text = ctx.text();
+    let font = text.new_font_by_name("Helvetica", 10.0).build().unwrap();
+    let label_text = format!("{}, {}", pt.point.x, pt.point.y);
+    text.new_text_layout(&font, &label_text, None)
+        .build()
+        .unwrap()
+}
+
 impl Tool for Select {
-    fn paint(&mut self, ctx: &mut PaintCtx, _data: &EditSession, _env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &EditSession, env: &Env) {
         if let DragState::Select { rect, .. } = self.drag {
             ctx.fill(rect, &SELECTION_RECT_BG_COLOR);
             ctx.stroke(rect, &SELECTION_RECT_STROKE_COLOR, 1.0);
+        }
+
+        if data.settings().show_coordinate_on_hover {
+            let closest = data
+                .iter_items_near_point(self.last_pos, Some(8.0))
+                .filter(|(id, _)| !id.is_guide())
+                .fold((f64::MAX, None), |(nearest, its_id), (id, dist)| {
+                    if dist < nearest {
+                        (dist, Some(id))
+                    } else {
+                        (nearest, its_id)
+                    }
+                })
+                .1
+                .and_then(|id| data.path_point_for_id(id));
+            if let Some(closest) = closest {
+                let text = make_text_for_point(ctx, closest);
+                //FIXME: be more methodical about picking a drawing location
+                let mut draw_pt = closest.to_screen(data.viewport);
+                let height = text.line_metric(0).map(|m| m.height).unwrap_or_default();
+                let ascent = text.line_metric(0).map(|m| m.baseline).unwrap_or_default();
+                draw_pt.x -= text.width() + HOVER_LABEL_PADDING;
+                if draw_pt.x + text.width() > ctx.size().width {
+                    draw_pt.x -= text.width();
+                }
+                if draw_pt.y + height > ctx.size().height {
+                    draw_pt.y -= 10.0;
+                }
+                let rect =
+                    Rect::from_origin_size(draw_pt - Vec2::new(0., ascent), (text.width(), height))
+                        .inset(2.0)
+                        .to_rounded_rect(2.0);
+                ctx.fill(rect, &Color::WHITE.with_alpha(0.5));
+                ctx.draw_text(&text, draw_pt, &env.get(druid::theme::LABEL_COLOR));
+            }
         }
     }
 
@@ -89,6 +136,9 @@ impl Tool for Select {
         data: &mut EditSession,
         _: &Env,
     ) -> Option<EditType> {
+        if data.settings().show_coordinate_on_hover {
+            ctx.request_paint();
+        }
         assert!(self.this_edit_type.is_none());
         let pre_rect = self.drag.drag_rect();
         mouse.mouse_event(event, data, self);
@@ -138,7 +188,7 @@ impl MouseDelegate<EditSession> for Select {
     fn left_down(&mut self, event: &MouseEvent, data: &mut EditSession) {
         if event.count == 1 {
             let sel = data.iter_items_near_point(event.pos, None).next();
-            if let Some(point_id) = sel {
+            if let Some((point_id, _)) = sel {
                 if !event.mods.shift {
                     // when clicking a point, if it is not selected we set it as the selection,
                     // otherwise we keep the selection intact for a drag.
@@ -155,7 +205,7 @@ impl MouseDelegate<EditSession> for Select {
         } else if event.count == 2 {
             let sel = data.iter_items_near_point(event.pos, None).next();
             match sel {
-                Some(id)
+                Some((id, _))
                     if data
                         .path_point_for_id(id)
                         .map(|p| p.is_on_curve())
@@ -164,7 +214,7 @@ impl MouseDelegate<EditSession> for Select {
                     data.toggle_selected_on_curve_type();
                     self.this_edit_type = Some(EditType::Normal);
                 }
-                Some(id) if id.is_guide() => {
+                Some((id, _)) if id.is_guide() => {
                     data.toggle_guide(id, event.pos);
                     self.this_edit_type = Some(EditType::Normal);
                 }

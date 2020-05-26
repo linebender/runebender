@@ -79,6 +79,9 @@ pub mod cmd {
     /// The arguments **must** be a `ToggleGuideCmdArgs`.
     pub const TOGGLE_GUIDE: Selector<ToggleGuideCmdArgs> = Selector::new("runebender.toggle-guide");
 
+    pub const TOGGLE_COORDINATE_HOVER: Selector =
+        Selector::new("runebender.toggle-coordinate-hover");
+
     /// Arguments passed along with the TOGGLE_GUIDE command
     pub struct ToggleGuideCmdArgs {
         pub id: EntityId,

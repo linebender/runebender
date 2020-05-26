@@ -1,5 +1,6 @@
 //! Application state.
 
+use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
@@ -28,6 +29,7 @@ pub struct AppState {
 /// A workspace is a single font, corresponding to a UFO file on disk.
 #[derive(Clone, Lens, Data, Default)]
 pub struct Workspace {
+    pub shared_settings: SharedSettings,
     pub font: Arc<FontObject>,
     /// The currently selected glyph (in the main glyph list) if any.
     //TODO: allow multiple selections
@@ -38,6 +40,14 @@ pub struct Workspace {
     session_map: Arc<HashMap<GlyphName, SessionId>>,
     pub info: SimpleFontInfo,
 }
+
+/// Global application preferences
+#[derive(Clone, Debug, Default, Data, Lens)]
+pub struct Settings {
+    pub show_coordinate_on_hover: bool,
+}
+
+pub type SharedSettings = Arc<RefCell<Settings>>;
 
 #[derive(Clone, Data)]
 pub struct FontObject {
@@ -81,6 +91,7 @@ pub struct FontMetrics {
 /// The state for an editor view.
 #[derive(Clone, Data, Lens)]
 pub struct EditorState {
+    pub settings: SharedSettings,
     pub metrics: FontMetrics,
     pub font: Workspace,
     pub session: Arc<EditSession>,
@@ -275,6 +286,14 @@ impl Workspace {
 
     pub fn font_mut(&mut self) -> &mut FontObject {
         Arc::make_mut(&mut self.font)
+    }
+
+    pub fn settings_mut(&mut self) -> RefMut<Settings> {
+        self.shared_settings.borrow_mut()
+    }
+
+    pub fn settings(&self) -> Ref<Settings> {
+        self.shared_settings.borrow()
     }
 }
 
@@ -485,6 +504,7 @@ pub mod lenses {
                 let metrics = data.info.metrics.clone();
                 let session = data.sessions.get(&self.0).cloned().unwrap();
                 let glyph = EditorState_ {
+                    settings: data.shared_settings.clone(),
                     font: data.clone(),
                     metrics,
                     session,
@@ -502,6 +522,7 @@ pub mod lenses {
                 let metrics = data.info.metrics.clone();
                 let session = data.sessions.get(&self.0).unwrap().to_owned();
                 let mut glyph = EditorState_ {
+                    settings: data.shared_settings.clone(),
                     font: data.clone(),
                     metrics,
                     session,
