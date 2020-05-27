@@ -2,10 +2,12 @@
 
 mod pen;
 mod preview;
+mod rectangle;
 mod select;
 
 pub use pen::Pen;
 pub use preview::Preview;
+pub use rectangle::Rectangle;
 pub use select::Select;
 
 use crate::edit_session::EditSession;
@@ -106,6 +108,7 @@ pub fn tool_for_id(id: ToolId) -> Option<Box<dyn Tool>> {
         "Preview" => Some(Box::new(Preview::default())),
         "Pen" => Some(Box::new(Pen::default())),
         "Select" => Some(Box::new(Select::default())),
+        "Rectangle" => Some(Box::new(Rectangle::default())),
         _ => None,
     }
 }

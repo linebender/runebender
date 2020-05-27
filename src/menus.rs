@@ -196,4 +196,11 @@ fn tools_menu<T: Data>() -> MenuDesc<T> {
             )
             .hotkey(SysMods::None, "h"),
         )
+        .append(
+            MenuItem::new(
+                LocalizedString::new("menu-item-rectangle-tool").with_placeholder("Rectangle"),
+                Command::new(consts::cmd::SET_TOOL, "Rectangle"),
+            )
+            .hotkey(SysMods::None, "u"),
+        )
 }
