@@ -1,7 +1,7 @@
 use druid::kurbo::{Point, Rect, Size, Vec2};
 use druid::widget::prelude::*;
 use druid::widget::Scroll;
-use druid::{Color, Command, HotKey, KeyCode, Selector};
+use druid::{Color, Command, KeyCode, Selector};
 
 use crate::consts::CANVAS_SIZE;
 use crate::data::EditorState;
@@ -180,16 +180,6 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
             Event::WindowSize(size) if self.needs_center_after_layout => {
                 self.set_initial_viewport(data, *size);
                 ctx.request_layout();
-            }
-            //FIXME: this is toolbar's job
-            Event::KeyDown(k) if HotKey::new(None, "v").matches(k) => {
-                ctx.submit_command(Command::new(cmd::SET_TOOL, "Select"), None);
-            }
-            Event::KeyDown(k) if HotKey::new(None, "p").matches(k) => {
-                ctx.submit_command(Command::new(cmd::SET_TOOL, "Pen"), None);
-            }
-            Event::KeyDown(k) if HotKey::new(None, "h").matches(k) => {
-                ctx.submit_command(Command::new(cmd::SET_TOOL, "Preview"), None);
             }
             Event::KeyDown(k) if !k.is_repeat && k.key_code == KeyCode::Space => {
                 let cmd = Command::new(cmd::TOGGLE_PREVIEW_TOOL, true);
