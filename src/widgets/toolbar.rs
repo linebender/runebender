@@ -227,7 +227,14 @@ impl Default for Toolbar {
             icon: constrain_path(preview_path()),
             hotkey: HotKey::new(None, "h"),
         };
-        Toolbar::new(vec![select, pen, preview])
+
+        let rectangle = ToolbarItem {
+            name: "Rectangle",
+            icon: constrain_path(rect_path()),
+            hotkey: HotKey::new(None, "u"),
+        };
+
+        Toolbar::new(vec![select, pen, preview, rectangle])
     }
 }
 
@@ -311,5 +318,24 @@ fn preview_path() -> BezPath {
     bez.line_to((304.5, 576.5));
     bez.close_path();
 
+    bez
+}
+
+fn rect_path() -> BezPath {
+    let mut bez = BezPath::new();
+
+    bez.move_to((0.0, 0.0));
+    bez.line_to((246.0, 0.0));
+    bez.line_to((246.0, 246.0));
+    bez.line_to((0.0, 246.0));
+    bez.line_to((0.0, 0.0));
+    bez.close_path();
+
+    bez.move_to((404.0, 404.0));
+    bez.line_to((140.0, 404.0));
+    bez.line_to((140.0, 140.0));
+    bez.line_to((404.0, 140.0));
+    bez.line_to((404.0, 404.0));
+    bez.close_path();
     bez
 }
