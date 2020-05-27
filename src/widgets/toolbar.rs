@@ -98,6 +98,11 @@ impl<T: Data> Widget<T> for Toolbar {
                 ctx.submit_command(cmd, None);
             }
         }
+
+        // if there's a click here we don't want to pass it down to the child
+        if matches!(event, Event::MouseDown(_) | Event::MouseUp(_)) {
+            ctx.set_handled();
+        }
     }
 
     fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, _data: &T, env: &Env) {
