@@ -1,12 +1,10 @@
 //! Application menus.
 
-use druid::kurbo::Point;
-
 use druid::commands;
 use druid::platform_menus;
 use druid::{
     Command, Data, FileDialogOptions, FileSpec, KeyCode, LocalizedString, MenuDesc, MenuItem,
-    SysMods,
+    Point, SysMods,
 };
 
 use crate::consts;
@@ -49,12 +47,6 @@ pub(crate) fn make_menu(data: &AppState) -> MenuDesc<AppState> {
         .append(glyph_menu(data))
         .append(tools_menu())
 }
-
-/// a work around for the fact that the first windows MenuDesc has to
-/// have the root data type. (:shrug:)
-//pub(crate) fn make_root_menu(data: &AppState) -> MenuDesc<AppState> {
-//make_menu(&data.workspace)
-//}
 
 fn file_menu(data: &AppState) -> MenuDesc<AppState> {
     let has_path = data.workspace.font.path.is_some();
@@ -186,21 +178,21 @@ fn tools_menu<T: Data>() -> MenuDesc<T> {
         .append(
             MenuItem::new(
                 LocalizedString::new("menu-item-select-tool").with_placeholder("Select"),
-                consts::cmd::SELECT_TOOL,
+                Command::new(consts::cmd::SET_TOOL, "Select"),
             )
             .hotkey(SysMods::None, "v"),
         )
         .append(
             MenuItem::new(
                 LocalizedString::new("menu-item-pen-tool").with_placeholder("Pen"),
-                consts::cmd::PEN_TOOL,
+                Command::new(consts::cmd::SET_TOOL, "Pen"),
             )
             .hotkey(SysMods::None, "p"),
         )
         .append(
             MenuItem::new(
                 LocalizedString::new("menu-item-preview-tool").with_placeholder("Preview"),
-                consts::cmd::PREVIEW_TOOL,
+                Command::new(consts::cmd::SET_TOOL, "Preview"),
             )
             .hotkey(SysMods::None, "h"),
         )

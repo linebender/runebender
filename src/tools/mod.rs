@@ -12,6 +12,9 @@ use crate::edit_session::EditSession;
 use crate::mouse::{Mouse, TaggedEvent};
 use druid::{Env, EventCtx, KeyEvent, PaintCtx};
 
+/// Something to pass around instead of a Box<dyn Tool>
+pub type ToolId = &'static str;
+
 /// Types of state modifications, for the purposes of undo.
 ///
 /// Certain state modifications group together in undo; for instance when dragging
@@ -94,7 +97,17 @@ pub trait Tool {
         None
     }
 
-    fn name(&self) -> &str;
+    fn name(&self) -> ToolId;
+}
+
+/// Returns the tool for the given `ToolId`.
+pub fn tool_for_id(id: ToolId) -> Option<Box<dyn Tool>> {
+    match id {
+        "Preview" => Some(Box::new(Preview::default())),
+        "Pen" => Some(Box::new(Pen::default())),
+        "Select" => Some(Box::new(Select::default())),
+        _ => None,
+    }
 }
 
 impl EditType {
