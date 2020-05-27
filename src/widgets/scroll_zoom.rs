@@ -181,14 +181,15 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
                 self.set_initial_viewport(data, *size);
                 ctx.request_layout();
             }
+            //FIXME: this is toolbar's job
             Event::KeyDown(k) if HotKey::new(None, "v").matches(k) => {
-                ctx.submit_command(cmd::SELECT_TOOL, None)
+                ctx.submit_command(Command::new(cmd::SET_TOOL, "Select"), None);
             }
             Event::KeyDown(k) if HotKey::new(None, "p").matches(k) => {
-                ctx.submit_command(cmd::PEN_TOOL, None)
+                ctx.submit_command(Command::new(cmd::SET_TOOL, "Pen"), None);
             }
             Event::KeyDown(k) if HotKey::new(None, "h").matches(k) => {
-                ctx.submit_command(cmd::PREVIEW_TOOL, None)
+                ctx.submit_command(Command::new(cmd::SET_TOOL, "Preview"), None);
             }
             Event::KeyDown(k) if !k.is_repeat && k.key_code == KeyCode::Space => {
                 let cmd = Command::new(cmd::TOGGLE_PREVIEW_TOOL, true);

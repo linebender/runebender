@@ -46,14 +46,10 @@ pub mod cmd {
     /// sent by the 'add component' menu item
     pub const ADD_COMPONENT: Selector = Selector::new("runebender.add-component");
 
-    /// Sent when the 'select' tool should be activated
-    pub const SELECT_TOOL: Selector = Selector::new("runebender.tool-select");
-
-    /// Sent when the 'pen' tool should be activated
-    pub const PEN_TOOL: Selector = Selector::new("runebender.tool-pen");
-
-    /// Sent when the 'preview/hand' tool should be activated.
-    pub const PREVIEW_TOOL: Selector = Selector::new("runebender.tool-preview");
+    /// Sent when a new tool has been selected.
+    ///
+    /// The payload must be a `ToolId`.
+    pub const SET_TOOL: Selector = Selector::new("runebender.set-tool");
 
     /// Sent when the preview tool is toggled  temporarily.
     ///

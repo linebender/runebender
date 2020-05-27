@@ -13,7 +13,7 @@ use crate::data::EditorState;
 use crate::draw;
 use crate::edit_session::EditSession;
 use crate::mouse::{Mouse, TaggedEvent};
-use crate::tools::{EditType, Pen, Preview, Select, Tool};
+use crate::tools::{EditType, Select, Tool, ToolId};
 use crate::undo::UndoState;
 
 /// The root widget of the glyph editor window.
@@ -150,15 +150,6 @@ impl Editor {
             consts::cmd::SELECT_ALL => data.session_mut().select_all(),
             consts::cmd::DESELECT_ALL => data.session_mut().clear_selection(),
             consts::cmd::DELETE => data.session_mut().delete_selection(),
-            consts::cmd::SELECT_TOOL => {
-                self.set_tool(data, Box::new(Select::default()));
-            }
-            consts::cmd::PEN_TOOL => {
-                self.set_tool(data, Box::new(Pen::default()));
-            }
-            consts::cmd::PREVIEW_TOOL => {
-                self.set_tool(data, Box::new(Preview::default()));
-            }
             consts::cmd::TOGGLE_PREVIEW_TOOL => {
                 let is_mouse_down: &bool = cmd.get_object().unwrap();
                 // we don't toggle preview if we're actually *in* preview
@@ -255,6 +246,13 @@ impl Widget<EditorState> for Editor {
                 c if c.selector == crate::consts::cmd::TAKE_FOCUS => {
                     ctx.request_focus();
                     ctx.set_handled();
+                    None
+                }
+
+                c if c.selector == consts::cmd::SET_TOOL => {
+                    let tool = cmd.get_object::<ToolId>().unwrap();
+                    let tool = crate::tools::tool_for_id(tool).unwrap();
+                    self.set_tool(data, tool);
                     None
                 }
                 c => {

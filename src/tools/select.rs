@@ -9,7 +9,7 @@ use crate::design_space::{DPoint, DVec2};
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
 use crate::path::EntityId;
-use crate::tools::{EditType, Tool};
+use crate::tools::{EditType, Tool, ToolId};
 
 const SELECTION_RECT_BG_COLOR: Color = Color::rgba8(0xDD, 0xDD, 0xDD, 0x55);
 const SELECTION_RECT_STROKE_COLOR: Color = Color::rgb8(0x53, 0x8B, 0xBB);
@@ -98,7 +98,7 @@ impl Tool for Select {
         self.this_edit_type.take()
     }
 
-    fn name(&self) -> &str {
+    fn name(&self) -> ToolId {
         "Select"
     }
 }

@@ -4,14 +4,14 @@
 //! the workspace by clicking and dragging, although whether this makes sense
 //! in the era of the touchpad is an open question.
 
-use crate::tools::Tool;
+use crate::tools::{Tool, ToolId};
 
 /// The state of the preview tool.
 #[derive(Debug, Default, Clone)]
 pub struct Preview {}
 
 impl Tool for Preview {
-    fn name(&self) -> &str {
+    fn name(&self) -> ToolId {
         "Preview"
     }
 }

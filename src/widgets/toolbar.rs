@@ -3,10 +3,10 @@
 use druid::kurbo::{Affine, BezPath, Circle, Line, Shape, Vec2};
 use druid::widget::prelude::*;
 use druid::widget::{Painter, WidgetExt};
-use druid::{Color, Data, Rect, WidgetPod};
+use druid::{Color, Command, Data, Rect, WidgetPod};
 
 use crate::consts;
-use crate::tools::{Pen, Preview, Select, Tool};
+use crate::tools::ToolId;
 
 const TOOLBAR_ITEM_SIZE: Size = Size::new(40.0, 40.0);
 const TOOLBAR_ITEM_PADDING: f64 = 2.0;
@@ -19,7 +19,7 @@ const TOOLBAR_BG_SELECTED: Color = Color::grey8(0xAD);
 
 struct ToolbarItem {
     icon: BezPath,
-    tool: Box<dyn Tool>,
+    name: ToolId,
 }
 
 /// The floating toolbar.
@@ -72,23 +72,12 @@ impl Toolbar {
 impl<T: Data> Widget<T> for Toolbar {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, _data: &mut T, env: &Env) {
         if let Event::Command(cmd) = event {
-            //TODO: move to just a like 'SET_TOOL' command or something
-            let selected = match cmd.selector {
-                consts::cmd::PEN_TOOL => {
-                    self.items.iter().position(|item| item.tool.name() == "Pen")
-                }
-                consts::cmd::SELECT_TOOL => self
-                    .items
-                    .iter()
-                    .position(|item| item.tool.name() == "Select"),
-                consts::cmd::PREVIEW_TOOL => self
-                    .items
-                    .iter()
-                    .position(|item| item.tool.name() == "Preview"),
-                _ => None,
-            };
-
-            self.selected = selected.unwrap_or(self.selected);
+            if cmd.selector == consts::cmd::SET_TOOL {
+                let tool = cmd.get_object::<ToolId>().unwrap();
+                let sel = self.items.iter().position(|item| item.name == *tool);
+                self.selected = sel.unwrap_or(self.selected);
+                ctx.request_paint();
+            }
         }
 
         for (i, child) in self.widgets.iter_mut().enumerate() {
@@ -96,17 +85,8 @@ impl<T: Data> Widget<T> for Toolbar {
             child.event(ctx, event, &mut is_selected, env);
 
             if is_selected && i != self.selected {
-                self.selected = i;
-                //FIXME: this is dumb
-                let cmd = match self.items[self.selected].tool.name() {
-                    "Pen" => consts::cmd::PEN_TOOL,
-                    "Select" => consts::cmd::SELECT_TOOL,
-                    "Preview" => consts::cmd::PREVIEW_TOOL,
-                    other => {
-                        log::warn!("unknown tool '{}'", other);
-                        return;
-                    }
-                };
+                let tool = self.items[i].name;
+                let cmd = Command::new(consts::cmd::SET_TOOL, tool);
                 ctx.submit_command(cmd, None);
             }
         }
@@ -213,18 +193,18 @@ impl<T: Data, W: Widget<T>> Widget<T> for FloatingPanel<W> {
 impl Default for Toolbar {
     fn default() -> Self {
         let select = ToolbarItem {
+            name: "Select",
             icon: constrain_path(select_path()),
-            tool: Box::new(Select::default()),
         };
 
         let pen = ToolbarItem {
+            name: "Pen",
             icon: constrain_path(pen_path()),
-            tool: Box::new(Pen::default()),
         };
 
         let preview = ToolbarItem {
+            name: "Preview",
             icon: constrain_path(preview_path()),
-            tool: Box::new(Preview::default()),
         };
         Toolbar::new(vec![select, pen, preview])
     }

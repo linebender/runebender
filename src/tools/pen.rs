@@ -5,7 +5,7 @@ use druid::{Env, EventCtx, MouseEvent};
 
 use crate::edit_session::{EditSession, MIN_CLICK_DISTANCE};
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
-use crate::tools::{EditType, Tool};
+use crate::tools::{EditType, Tool, ToolId};
 
 /// The state of the pen.
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -88,7 +88,7 @@ impl Tool for Pen {
         self.this_edit_type.take()
     }
 
-    fn name(&self) -> &str {
+    fn name(&self) -> ToolId {
         "Pen"
     }
 }
