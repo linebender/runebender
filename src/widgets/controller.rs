@@ -2,7 +2,8 @@
 
 use druid::widget::{prelude::*, Controller};
 use druid::{
-    Env, Event, EventCtx, InternalLifeCycle, LensExt, Rect, UpdateCtx, Widget, WidgetExt, WidgetPod,
+    Command, Env, Event, EventCtx, InternalLifeCycle, LensExt, Rect, UpdateCtx, Widget, WidgetExt,
+    WidgetPod,
 };
 
 use crate::consts;
@@ -73,6 +74,16 @@ impl<W> EditorController<W> {
 
 impl<W: Widget<EditorState>> Widget<EditorState> for EditorController<W> {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut EditorState, env: &Env) {
+        // we would prefer to just handle this event in toolbar but it won't have focus
+        // and so won't get the key event.
+        if let Event::KeyDown(k) = event {
+            if let Some(new_tool) = self.toolbar.widget().inner().tool_for_keypress(k) {
+                let cmd = Command::new(consts::cmd::SET_TOOL, new_tool);
+                ctx.submit_command(cmd, None);
+                ctx.set_handled();
+                return;
+            }
+        }
         self.toolbar.event(ctx, event, &mut (), env);
         self.coord_panel.event(ctx, event, data, env);
         if !ctx.is_handled() {

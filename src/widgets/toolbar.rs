@@ -3,7 +3,7 @@
 use druid::kurbo::{Affine, BezPath, Circle, Line, Shape, Vec2};
 use druid::widget::prelude::*;
 use druid::widget::{Painter, WidgetExt};
-use druid::{Color, Command, Data, Rect, WidgetPod};
+use druid::{Color, Command, Data, HotKey, KeyEvent, Rect, WidgetPod};
 
 use crate::consts;
 use crate::tools::ToolId;
@@ -20,6 +20,7 @@ const TOOLBAR_BG_SELECTED: Color = Color::grey8(0xAD);
 struct ToolbarItem {
     icon: BezPath,
     name: ToolId,
+    hotkey: HotKey,
 }
 
 /// The floating toolbar.
@@ -66,6 +67,13 @@ impl Toolbar {
             widgets,
             selected: 0,
         }
+    }
+
+    pub fn tool_for_keypress(&self, key: &KeyEvent) -> Option<ToolId> {
+        self.items
+            .iter()
+            .find(|tool| tool.hotkey.matches(key))
+            .map(|tool| tool.name)
     }
 }
 
@@ -146,6 +154,11 @@ impl<W> FloatingPanel<W> {
             inner,
         }
     }
+
+    /// return a reference to the inner widget.
+    pub fn inner(&self) -> &W {
+        &self.inner
+    }
 }
 
 impl<T: Data, W: Widget<T>> Widget<T> for FloatingPanel<W> {
@@ -195,16 +208,19 @@ impl Default for Toolbar {
         let select = ToolbarItem {
             name: "Select",
             icon: constrain_path(select_path()),
+            hotkey: HotKey::new(None, "v"),
         };
 
         let pen = ToolbarItem {
             name: "Pen",
             icon: constrain_path(pen_path()),
+            hotkey: HotKey::new(None, "p"),
         };
 
         let preview = ToolbarItem {
             name: "Preview",
             icon: constrain_path(preview_path()),
+            hotkey: HotKey::new(None, "h"),
         };
         Toolbar::new(vec![select, pen, preview])
     }
