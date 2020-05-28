@@ -5,7 +5,7 @@ use druid::piet::{
     FontBuilder, PietText, PietTextLayout, RenderContext, Text, TextLayout, TextLayoutBuilder,
 };
 use druid::{
-    BoxConstraints, Command, Data, Env, Event, EventCtx, Insets, LayoutCtx, LensWrap, LifeCycle,
+    BoxConstraints, Data, Env, Event, EventCtx, Insets, LayoutCtx, LensWrap, LifeCycle,
     LifeCycleCtx, PaintCtx, UpdateCtx, Widget, WidgetExt, WidgetPod,
 };
 
@@ -52,7 +52,7 @@ impl Widget<Workspace> for GlyphGrid {
         }
 
         for child in &mut self.children {
-            child.paint_with_offset(ctx, data, env);
+            child.paint(ctx, data, env);
         }
     }
 
@@ -191,7 +191,7 @@ impl Widget<GlyphPlus> for GridInner {
                 if m.count == 1 {
                     data.is_selected = true;
                 } else if m.count == 2 {
-                    ctx.submit_command(Command::new(EDIT_GLYPH, data.glyph.name.clone()), None);
+                    ctx.submit_command(EDIT_GLYPH.with(data.glyph.name.clone()), None);
                 }
             }
             Event::MouseUp(_) => {

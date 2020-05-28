@@ -26,7 +26,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for RootWindowController {
         env: &Env,
     ) {
         match event {
-            Event::Command(cmd) if cmd.selector == consts::cmd::REBUILD_MENUS => {
+            Event::Command(cmd) if cmd.is(consts::cmd::REBUILD_MENUS) => {
                 let menu = menus::make_menu(data);
                 ctx.set_menu(menu);
             }
@@ -150,7 +150,7 @@ impl<W: Widget<EditorState>> Widget<EditorState> for EditorController<W> {
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &EditorState, env: &Env) {
         self.inner.paint(ctx, data, env);
-        self.coord_panel.paint_with_offset(ctx, data, env);
-        self.toolbar.paint_with_offset(ctx, &(), env);
+        self.coord_panel.paint(ctx, data, env);
+        self.toolbar.paint(ctx, &(), env);
     }
 }
