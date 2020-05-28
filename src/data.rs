@@ -513,7 +513,7 @@ pub mod lenses {
                     .map(|s| s.same(&glyph.session))
                     .unwrap_or(true)
                 {
-                    Arc::make_mut(&mut data.sessions).insert(self.0.clone(), glyph.session);
+                    Arc::make_mut(&mut data.sessions).insert(self.0, glyph.session);
                 }
                 v
             }

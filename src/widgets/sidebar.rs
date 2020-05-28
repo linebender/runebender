@@ -133,7 +133,7 @@ impl Widget<Workspace> for Sidebar {
         let rect = Rect::ZERO.with_size(ctx.size());
         ctx.fill(rect, &env.get(theme::SIDEBAR_BACKGROUND));
 
-        self.selected_glyph.paint_with_offset(ctx, data, env);
+        self.selected_glyph.paint(ctx, data, env);
 
         // to get clean strokes we have to *not* align on pixel boundaries
         let max_x = rect.max_x() - 0.5;

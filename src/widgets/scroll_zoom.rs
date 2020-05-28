@@ -1,7 +1,7 @@
 use druid::kurbo::{Point, Rect, Size, Vec2};
 use druid::widget::prelude::*;
 use druid::widget::Scroll;
-use druid::{Color, Command, KeyCode, Selector};
+use druid::{Color, Command, KeyCode};
 
 use crate::consts::CANVAS_SIZE;
 use crate::data::EditorState;
@@ -118,26 +118,22 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
         data.session_mut().viewport.zoom = new_zoom;
     }
 
-    fn handle_zoom_cmd(&mut self, sel: &Selector, view_size: Size, data: &mut EditorState) {
+    fn handle_zoom_cmd(&mut self, cmd: &Command, view_size: Size, data: &mut EditorState) {
         use crate::consts::cmd;
         let view_center = Rect::ZERO.with_size(view_size).center().to_vec2();
-        match *sel {
-            cmd::ZOOM_IN => {
-                self.wheel_zoom(data, Vec2::new(50.0, 0.), view_size, Some(view_center))
-            }
-            cmd::ZOOM_OUT => {
-                self.wheel_zoom(data, Vec2::new(-50.0, 0.), view_size, Some(view_center))
-            }
-            cmd::ZOOM_DEFAULT => {
-                self.set_zoom(data, 1.0, view_size, None);
-                self.needs_center_after_layout = true;
-            }
-            _ => unreachable!("selectors have already been validated"),
-        };
+        if cmd.is(cmd::ZOOM_IN) {
+            self.wheel_zoom(data, Vec2::new(50.0, 0.), view_size, Some(view_center))
+        } else if cmd.is(cmd::ZOOM_OUT) {
+            self.wheel_zoom(data, Vec2::new(-50.0, 0.), view_size, Some(view_center))
+        } else if cmd.is(cmd::ZOOM_DEFAULT) {
+            self.set_zoom(data, 1.0, view_size, None);
+            self.needs_center_after_layout = true;
+        }
     }
 
     fn after_zoom_changed(&mut self, ctx: &mut EventCtx, env: &Env) {
-        self.child.reset_scrollbar_fade(ctx, env);
+        self.child
+            .reset_scrollbar_fade(|d| ctx.request_timer(d), env);
         ctx.request_layout();
         ctx.set_handled();
     }
@@ -169,11 +165,9 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
         use crate::consts::cmd;
         match event {
             Event::Command(c)
-                if c.selector == cmd::ZOOM_IN
-                    || c.selector == cmd::ZOOM_OUT
-                    || c.selector == cmd::ZOOM_DEFAULT =>
+                if c.is(cmd::ZOOM_IN) || c.is(cmd::ZOOM_OUT) || c.is(cmd::ZOOM_DEFAULT) =>
             {
-                self.handle_zoom_cmd(&c.selector, ctx.size(), data);
+                self.handle_zoom_cmd(&c, ctx.size(), data);
                 self.after_zoom_changed(ctx, env);
                 return;
             }

@@ -3,8 +3,7 @@
 use std::sync::Arc;
 
 use druid::{
-    AppDelegate, Command, DelegateCtx, Env, FileInfo, Selector, Target, Widget, WindowDesc,
-    WindowId,
+    AppDelegate, Command, DelegateCtx, Env, Selector, Target, Widget, WindowDesc, WindowId,
 };
 
 use druid::kurbo::Size;
@@ -17,7 +16,7 @@ use crate::data::{lenses, AppState};
 use crate::edit_session::EditSession;
 use crate::widgets::{Editor, EditorController, RootWindowController, ScrollZoom};
 
-pub const EDIT_GLYPH: Selector = Selector::new("runebender.open-editor-with-glyph");
+pub const EDIT_GLYPH: Selector<GlyphName> = Selector::new("runebender.open-editor-with-glyph");
 
 #[derive(Debug, Default)]
 pub struct Delegate;
@@ -31,80 +30,62 @@ impl AppDelegate<AppState> for Delegate {
         data: &mut AppState,
         _env: &Env,
     ) -> bool {
-        match cmd.selector {
-            druid::commands::OPEN_FILE => {
-                let info = cmd.get_object::<FileInfo>().expect("api violation");
-                match Ufo::load(info.path()) {
-                    Ok(ufo) => data.workspace.set_file(ufo, info.path().to_owned()),
-                    Err(e) => log::error!("failed to open file {:?}: '{:?}'", info.path(), e),
-                };
+        if let Some(info) = cmd.get(druid::commands::OPEN_FILE) {
+            match Ufo::load(info.path()) {
+                Ok(ufo) => data.workspace.set_file(ufo, info.path().to_owned()),
+                Err(e) => log::error!("failed to open file {:?}: '{:?}'", info.path(), e),
+            };
+            ctx.submit_command(consts::cmd::REBUILD_MENUS, None);
+            false
+        } else if let Some(info) = cmd.get(druid::commands::SAVE_FILE) {
+            if let Some(path) = info.as_ref().map(|info| info.path()) {
+                Arc::make_mut(&mut data.workspace.font).path = Some(path.into());
                 ctx.submit_command(consts::cmd::REBUILD_MENUS, None);
-                false
             }
-            druid::commands::SAVE_FILE => {
-                if let Ok(info) = cmd.get_object::<FileInfo>() {
-                    Arc::make_mut(&mut data.workspace.font).path = Some(info.path().into());
-                    ctx.submit_command(consts::cmd::REBUILD_MENUS, None);
+            if let Err(e) = data.workspace.save() {
+                log::error!("saving failed: '{}'", e);
+            }
+            false
+        } else if cmd.is(consts::cmd::NEW_GLYPH) {
+            let new_glyph_name = data.workspace.add_new_glyph();
+            data.workspace.selected = Some(new_glyph_name);
+            false
+        } else if cmd.is(consts::cmd::DELETE_SELECTED_GLYPH) {
+            data.workspace.delete_selected_glyph();
+            false
+        } else if let Some(consts::cmd::RenameGlyphArgs { old, new }) =
+            cmd.get(consts::cmd::RENAME_GLYPH)
+        {
+            data.workspace.rename_glyph(old.clone(), new.clone());
+            false
+        } else if let Some(payload) = cmd.get(EDIT_GLYPH) {
+            match data.workspace.open_glyphs.get(payload).to_owned() {
+                Some(id) => {
+                    ctx.submit_command(druid::commands::SHOW_WINDOW, *id);
                 }
-                if let Err(e) = data.workspace.save() {
-                    log::error!("saving failed: '{}'", e);
+                None => {
+                    let session = data.workspace.get_or_create_session(&payload);
+                    let session_id = session.id;
+                    let new_win = WindowDesc::new(move || make_editor(&session))
+                        .title(move |d: &AppState, _: &_| {
+                            d.workspace
+                                .sessions
+                                .get(&session_id)
+                                .map(|s| s.name.to_string())
+                                .unwrap_or_else(|| "Unknown".to_string())
+                        })
+                        .window_size(Size::new(900.0, 800.0))
+                        .menu(crate::menus::make_menu(&data));
+
+                    let id = new_win.id;
+                    ctx.new_window(new_win);
+
+                    Arc::make_mut(&mut data.workspace.open_glyphs).insert(payload.clone(), id);
                 }
-                false
             }
-
-            consts::cmd::NEW_GLYPH => {
-                let new_glyph_name = data.workspace.add_new_glyph();
-                data.workspace.selected = Some(new_glyph_name);
-                false
-            }
-
-            consts::cmd::DELETE_SELECTED_GLYPH => {
-                data.workspace.delete_selected_glyph();
-                false
-            }
-
-            consts::cmd::RENAME_GLYPH => {
-                let consts::cmd::RenameGlyphArgs { old, new } = cmd
-                    .get_object()
-                    .expect("RENAME_GLYPH has incorrect payload");
-                data.workspace.rename_glyph(old.clone(), new.clone());
-                false
-            }
-
-            EDIT_GLYPH => {
-                let payload = cmd
-                    .get_object::<GlyphName>()
-                    .map(GlyphName::clone)
-                    .expect("EDIT_GLYPH has incorrect payload");
-
-                match data.workspace.open_glyphs.get(&payload).to_owned() {
-                    Some(id) => {
-                        let command = Command::new(druid::commands::SHOW_WINDOW, *id);
-                        ctx.submit_command(command, *id);
-                    }
-                    None => {
-                        let session = data.workspace.get_or_create_session(&payload);
-                        let session_id = session.id;
-                        let new_win = WindowDesc::new(move || make_editor(&session))
-                            .title(move |d: &AppState, _: &_| {
-                                d.workspace
-                                    .sessions
-                                    .get(&session_id)
-                                    .map(|s| s.name.to_string())
-                                    .unwrap_or_else(|| "Unknown".to_string())
-                            })
-                            .window_size(Size::new(900.0, 800.0))
-                            .menu(crate::menus::make_menu(&data));
-
-                        let id = new_win.id;
-                        ctx.new_window(new_win);
-
-                        Arc::make_mut(&mut data.workspace.open_glyphs).insert(payload.clone(), id);
-                    }
-                }
-                false
-            }
-            _ => true,
+            false
+        } else {
+            true
         }
     }
 

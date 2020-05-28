@@ -13,6 +13,7 @@ pub mod cmd {
     use norad::GlyphName;
 
     use crate::path::EntityId;
+    use crate::tools::ToolId;
 
     /// Sent when windows should rebuild their menus.
     pub const REBUILD_MENUS: Selector = Selector::new("runebender.rebuid-menus");
@@ -35,7 +36,7 @@ pub mod cmd {
     /// Sent to the root to rename a glyph.
     ///
     /// The arguments **must** be a `RenameGlyphArgs`
-    pub const RENAME_GLYPH: Selector = Selector::new("runebender.rename-glyph");
+    pub const RENAME_GLYPH: Selector<RenameGlyphArgs> = Selector::new("runebender.rename-glyph");
 
     /// Arguments passed with the RENAME_GLYPH command.
     pub struct RenameGlyphArgs {
@@ -49,7 +50,7 @@ pub mod cmd {
     /// Sent when a new tool has been selected.
     ///
     /// The payload must be a `ToolId`.
-    pub const SET_TOOL: Selector = Selector::new("runebender.set-tool");
+    pub const SET_TOOL: Selector<ToolId> = Selector::new("runebender.set-tool");
 
     /// Sent when the preview tool is toggled  temporarily.
     ///
@@ -57,7 +58,7 @@ pub mod cmd {
     ///
     /// The argument should be a bool indicating whether this is a keydown (true)
     /// or a keyup (false).
-    pub const TOGGLE_PREVIEW_TOOL: Selector = Selector::new("runebender.tool-preview-toggle");
+    pub const TOGGLE_PREVIEW_TOOL: Selector<bool> = Selector::new("runebender.tool-preview-toggle");
 
     /// Sent when the 'zoom in' menu item is selected
     pub const ZOOM_IN: Selector = Selector::new("runebender.zoom-in");
@@ -71,12 +72,12 @@ pub mod cmd {
     /// Sent when the 'add guide' context menu item is selected
     ///
     /// The arguments **must** be a `Point`, where the guide will be added.
-    pub const ADD_GUIDE: Selector = Selector::new("runebender.add-guide");
+    pub const ADD_GUIDE: Selector<Point> = Selector::new("runebender.add-guide");
 
     /// Sent when the 'toggle guide' context menu item is selected
     ///
     /// The arguments **must** be a `ToggleGuideCmdArgs`.
-    pub const TOGGLE_GUIDE: Selector = Selector::new("runebender.toggle-guide");
+    pub const TOGGLE_GUIDE: Selector<ToggleGuideCmdArgs> = Selector::new("runebender.toggle-guide");
 
     /// Arguments passed along with the TOGGLE_GUIDE command
     pub struct ToggleGuideCmdArgs {

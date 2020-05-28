@@ -57,7 +57,7 @@ impl Rectangle {
     fn label_text(&self, ctx: &mut PaintCtx) -> Option<PietTextLayout> {
         let (start, current) = self.pts_for_rect()?;
         let size = start - current;
-        let text = ctx.text();
+        let mut text = ctx.text();
         let font = text.new_font_by_name("Helvetica", 10.0).build().unwrap();
         let label_text = format!("{}, {}", size.x.abs(), size.y.abs());
         text.new_text_layout(&font, &label_text, None).build().ok()

@@ -3,7 +3,7 @@
 use druid::kurbo::{Affine, BezPath, Circle, Line, Shape, Vec2};
 use druid::widget::prelude::*;
 use druid::widget::{Painter, WidgetExt};
-use druid::{Color, Command, Data, HotKey, KeyEvent, Rect, WidgetPod};
+use druid::{Color, Data, HotKey, KeyEvent, Rect, WidgetPod};
 
 use crate::consts;
 use crate::tools::ToolId;
@@ -80,9 +80,8 @@ impl Toolbar {
 impl<T: Data> Widget<T> for Toolbar {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, _data: &mut T, env: &Env) {
         if let Event::Command(cmd) = event {
-            if cmd.selector == consts::cmd::SET_TOOL {
-                let tool = cmd.get_object::<ToolId>().unwrap();
-                let sel = self.items.iter().position(|item| item.name == *tool);
+            if let Some(tool_id) = cmd.get(consts::cmd::SET_TOOL) {
+                let sel = self.items.iter().position(|item| item.name == *tool_id);
                 self.selected = sel.unwrap_or(self.selected);
                 ctx.request_paint();
             }
@@ -94,8 +93,7 @@ impl<T: Data> Widget<T> for Toolbar {
 
             if is_selected && i != self.selected {
                 let tool = self.items[i].name;
-                let cmd = Command::new(consts::cmd::SET_TOOL, tool);
-                ctx.submit_command(cmd, None);
+                ctx.submit_command(consts::cmd::SET_TOOL.with(tool), None);
             }
         }
 
@@ -137,7 +135,7 @@ impl<T: Data> Widget<T> for Toolbar {
     fn paint(&mut self, ctx: &mut PaintCtx, _data: &T, env: &Env) {
         for (i, child) in self.widgets.iter_mut().enumerate() {
             let is_selected = i == self.selected;
-            child.paint_with_offset(ctx, &is_selected, env);
+            child.paint(ctx, &is_selected, env);
         }
 
         let stroke_inset = TOOLBAR_BORDER_STROKE_WIDTH / 2.0;
@@ -170,8 +168,7 @@ impl<T: Data, W: Widget<T>> Widget<T> for FloatingPanel<W> {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
         self.inner.event(ctx, event, data, env);
         if let Event::Command(cmd) = event {
-            if cmd.selector == consts::cmd::TOGGLE_PREVIEW_TOOL {
-                let in_temporary_preview: &bool = cmd.get_object().unwrap();
+            if let Some(in_temporary_preview) = cmd.get(consts::cmd::TOGGLE_PREVIEW_TOOL) {
                 self.hide_panel = *in_temporary_preview;
                 ctx.request_paint();
             }

@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use druid::kurbo::{Point, Rect, Size};
+use druid::kurbo::{Rect, Size};
 use druid::{
     Application, BoxConstraints, Clipboard, ClipboardFormat, Command, ContextMenu, Data, Env,
     Event, EventCtx, KeyCode, LayoutCtx, LifeCycle, LifeCycleCtx, PaintCtx, UpdateCtx, Widget,
@@ -13,7 +13,7 @@ use crate::data::EditorState;
 use crate::draw;
 use crate::edit_session::EditSession;
 use crate::mouse::{Mouse, TaggedEvent};
-use crate::tools::{EditType, Select, Tool, ToolId};
+use crate::tools::{EditType, Select, Tool};
 use crate::undo::UndoState;
 
 /// The root widget of the glyph editor window.
@@ -146,30 +146,31 @@ impl Editor {
     /// handled at all, and an optional `EditType` if this command did work
     /// that should go on the undo stack.
     fn handle_cmd(&mut self, cmd: &Command, data: &mut EditorState) -> (bool, Option<EditType>) {
-        match cmd.selector {
-            consts::cmd::SELECT_ALL => data.session_mut().select_all(),
-            consts::cmd::DESELECT_ALL => data.session_mut().clear_selection(),
-            consts::cmd::DELETE => data.session_mut().delete_selection(),
-            consts::cmd::TOGGLE_PREVIEW_TOOL => {
-                let is_mouse_down: &bool = cmd.get_object().unwrap();
+        match cmd {
+            c if c.is(consts::cmd::SELECT_ALL) => data.session_mut().select_all(),
+            c if c.is(consts::cmd::DESELECT_ALL) => data.session_mut().clear_selection(),
+            c if c.is(consts::cmd::DELETE) => data.session_mut().delete_selection(),
+            c if c.is(consts::cmd::TOGGLE_PREVIEW_TOOL) => {
+                let is_mouse_down: &bool = cmd.get_unchecked(consts::cmd::TOGGLE_PREVIEW_TOOL);
                 // we don't toggle preview if we're actually *in* preview
                 if self.tool.name() != "Preview" {
                     self.draw_filled_outlines = *is_mouse_down;
                     return (true, None);
                 }
             }
-            consts::cmd::ADD_GUIDE => {
-                let point = cmd.get_object::<Point>().unwrap();
+            c if c.is(consts::cmd::ADD_GUIDE) => {
+                let point = cmd.get_unchecked(consts::cmd::ADD_GUIDE);
                 data.session_mut().add_guide(*point);
                 return (true, Some(EditType::Normal));
             }
-            consts::cmd::TOGGLE_GUIDE => {
-                let consts::cmd::ToggleGuideCmdArgs { id, pos } = cmd.get_object().unwrap();
+            c if c.is(consts::cmd::TOGGLE_GUIDE) => {
+                let consts::cmd::ToggleGuideCmdArgs { id, pos } =
+                    cmd.get_unchecked(consts::cmd::TOGGLE_GUIDE);
                 data.session_mut().toggle_guide(*id, *pos);
                 return (true, Some(EditType::Normal));
             }
-            druid::commands::COPY => self.do_copy(&data.session),
-            druid::commands::UNDO => {
+            c if c.is(druid::commands::COPY) => self.do_copy(&data.session),
+            c if c.is(druid::commands::UNDO) => {
                 if let Some(prev) = self.do_undo() {
                     //HACK: because zoom & offset is part of data, and we don't
                     //want to jump around during undo/redo, we always manually
@@ -179,7 +180,7 @@ impl Editor {
                     data.session_mut().viewport = saved_viewport;
                 }
             }
-            druid::commands::REDO => {
+            c if c.is(druid::commands::REDO) => {
                 if let Some(next) = self.do_redo() {
                     let saved_viewport = data.session.viewport;
                     data.session = next.clone();
@@ -242,28 +243,24 @@ impl Widget<EditorState> for Editor {
                 ctx.request_focus();
                 None
             }
-            Event::Command(cmd) => match cmd {
-                c if c.selector == crate::consts::cmd::TAKE_FOCUS => {
+            Event::Command(cmd) => {
+                if cmd.is(consts::cmd::TAKE_FOCUS) {
                     ctx.request_focus();
                     ctx.set_handled();
                     None
-                }
-
-                c if c.selector == consts::cmd::SET_TOOL => {
-                    let tool = cmd.get_object::<ToolId>().unwrap();
+                } else if let Some(tool) = cmd.get(consts::cmd::SET_TOOL) {
                     let tool = crate::tools::tool_for_id(tool).unwrap();
                     self.set_tool(data, tool);
                     None
-                }
-                c => {
-                    let (handled, edit) = self.handle_cmd(c, data);
+                } else {
+                    let (handled, edit) = self.handle_cmd(cmd, data);
                     if handled {
                         ctx.set_handled();
                         ctx.request_paint();
                     }
                     edit
                 }
-            },
+            }
             Event::KeyDown(k) if k.key_code == KeyCode::Escape => {
                 data.session_mut().clear_selection();
                 None

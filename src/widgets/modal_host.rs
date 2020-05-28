@@ -5,7 +5,7 @@ use druid::widget::prelude::*;
 use druid::{Color, Command, Data, Rect, Selector, SingleUse, WidgetExt, WidgetPod};
 
 /// A wrapper around a closure for constructing a widget.
-struct ModalBuilder<T>(Box<dyn FnOnce() -> Box<dyn Widget<T>>>);
+pub struct ModalBuilder<T>(Box<dyn FnOnce() -> Box<dyn Widget<T>>>);
 
 impl<T: Data> ModalBuilder<T> {
     /// Create a new `ModalBuilder
@@ -20,66 +20,60 @@ impl<T: Data> ModalBuilder<T> {
 
 /// A widget that has a child, and can optionally show a modal dialog
 /// that obscures the child.
-pub struct ModalHost<T, W> {
-    child: WidgetPod<T, W>,
+pub struct ModalHost<T> {
+    child: WidgetPod<T, Box<dyn Widget<T>>>,
     modal: Option<WidgetPod<T, Box<dyn Widget<T>>>>,
 }
 
-// this impl block has concrete types or else we would need to specify the type
-// parameters in order to access the consts.
-impl ModalHost<(), ()> {
+// this impl block has () type so that you can use this const without knowing `T`.
+impl ModalHost<()> {
+    /// Command to dismiss the modal.
+    pub const DISMISS_MODAL: Selector = Selector::new("runebender.dismiss-modal-widget");
+}
+
+impl<T: Data> ModalHost<T> {
     /// Command to display a modal in this host.
     ///
     /// The argument **must** be a `ModalBuilder`.
-    pub const SHOW_MODAL: Selector = Selector::new("runebender.show-modal-widget");
-
-    /// Command to dismiss the modal.
-    pub const DISMISS_MODAL: Selector = Selector::new("runebender.dismiss-modal-widget");
+    pub const SHOW_MODAL: Selector<SingleUse<ModalBuilder<T>>> =
+        Selector::new("runebender.show-modal-widget");
 
     /// A convenience for creating a command to send to this widget.
     ///
     /// This mostly just requires the user to import fewer types.
-    pub fn make_modal_command<T, W>(f: impl FnOnce() -> W + 'static) -> Command
-    where
-        T: Data,
-        W: Widget<T> + 'static,
-    {
-        Command::new(ModalHost::SHOW_MODAL, SingleUse::new(ModalBuilder::new(f)))
+    pub fn make_modal_command<W: Widget<T> + 'static>(f: impl FnOnce() -> W + 'static) -> Command {
+        Self::SHOW_MODAL.with(SingleUse::new(ModalBuilder::new(f)))
     }
-}
 
-impl<T, W: Widget<T>> ModalHost<T, W> {
-    pub fn new(widget: W) -> Self {
+    pub fn new(widget: impl Widget<T> + 'static) -> Self {
         ModalHost {
-            child: WidgetPod::new(widget),
+            child: WidgetPod::new(widget.boxed()),
             modal: None,
         }
     }
 }
 
-impl<T: Data, W: Widget<T>> Widget<T> for ModalHost<T, W> {
+impl<T: Data> Widget<T> for ModalHost<T> {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
         match event {
-            Event::Command(cmd) if cmd.selector == ModalHost::SHOW_MODAL => {
-                if self.modal.is_none() {
-                    let payload = cmd
-                        .get_object::<SingleUse<ModalBuilder<T>>>()
-                        .expect("incorrect payload for SHOW_MODAL");
-                    self.modal = Some(WidgetPod::new(payload.take().unwrap().build()));
-                    ctx.children_changed();
-                } else {
-                    log::warn!("cannot show modal; already showing modal");
+            Event::Command(cmd) => {
+                if let Some(payload) = cmd.get(Self::SHOW_MODAL) {
+                    if self.modal.is_none() {
+                        self.modal = Some(WidgetPod::new(payload.take().unwrap().build()));
+                        ctx.children_changed();
+                    } else {
+                        log::warn!("cannot show modal; already showing modal");
+                    }
+                    ctx.set_handled();
+                } else if cmd.is(ModalHost::DISMISS_MODAL) {
+                    if self.modal.is_some() {
+                        self.modal = None;
+                        ctx.children_changed();
+                    } else {
+                        log::warn!("cannot dismiss modal; no modal shown");
+                    }
+                    ctx.set_handled();
                 }
-                ctx.set_handled();
-            }
-            Event::Command(cmd) if cmd.selector == ModalHost::DISMISS_MODAL => {
-                if self.modal.is_some() {
-                    self.modal = None;
-                    ctx.children_changed();
-                } else {
-                    log::warn!("cannot dismiss modal; no modal shown");
-                }
-                ctx.set_handled();
             }
 
             // user input only gets delivered to modal, if modal is present
@@ -132,7 +126,7 @@ impl<T: Data, W: Widget<T>> Widget<T> for ModalHost<T, W> {
             let modal_rect = modal.layout_rect() + Vec2::new(5.0, 5.0);
             let blur_color = Color::grey8(100);
             ctx.blurred_rect(modal_rect, 5.0, &blur_color);
-            modal.paint_with_offset(ctx, data, env);
+            modal.paint(ctx, data, env);
         }
     }
 }

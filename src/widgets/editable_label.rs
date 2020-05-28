@@ -120,12 +120,12 @@ impl<T: Data> Widget<T> for EditableLabel<T> {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
         if self.editing {
             match event {
-                Event::Command(cmd) if cmd.selector == COMPLETE_EDITING => self.complete(ctx, data),
+                Event::Command(cmd) if cmd.is(COMPLETE_EDITING) => self.complete(ctx, data),
+                Event::Command(cmd) if cmd.is(CANCEL_EDITING) => self.cancel(ctx),
                 Event::KeyDown(k_e) if HotKey::new(None, KeyCode::Return).matches(k_e) => {
                     ctx.set_handled();
                     self.complete(ctx, data);
                 }
-                Event::Command(cmd) if cmd.selector == CANCEL_EDITING => self.cancel(ctx),
                 Event::KeyDown(k_e) if HotKey::new(None, KeyCode::Escape).matches(k_e) => {
                     ctx.set_handled();
                     self.cancel(ctx);
