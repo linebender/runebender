@@ -151,6 +151,55 @@ impl Path {
         }
     }
 
+    /// Attempt to create a `Path` from a BezPath.
+    ///
+    /// - on the first 'segment' of the bezier will be used.
+    /// - we don't currently support quadratics.
+    #[cfg(test)]
+    pub(crate) fn from_bezpath(
+        path: impl IntoIterator<Item = PathEl>,
+    ) -> Result<Self, &'static str> {
+        use druid::kurbo::PathEl;
+
+        let path_id = next_id();
+        let mut els = path.into_iter();
+        let mut points = Vec::new();
+        let mut closed = false;
+
+        let start_point = match els.next() {
+            Some(PathEl::MoveTo(pt)) => pt,
+            _ => return Err("missing initial moveto"),
+        };
+
+        points.push(PathPoint::on_curve(path_id, DPoint::from_raw(start_point)));
+
+        for el in els {
+            match el {
+                // we only take the first path segment
+                PathEl::MoveTo(_) => break,
+                PathEl::LineTo(pt) => {
+                    points.push(PathPoint::on_curve(path_id, DPoint::from_raw(pt)));
+                }
+                PathEl::CurveTo(p0, p1, p2) => {
+                    points.push(PathPoint::off_curve(path_id, DPoint::from_raw(p0)));
+                    points.push(PathPoint::off_curve(path_id, DPoint::from_raw(p1)));
+                    points.push(PathPoint::on_curve(path_id, DPoint::from_raw(p2)));
+                }
+                PathEl::QuadTo(..) => return Err("quads not currently supported"),
+                PathEl::ClosePath => {
+                    closed = true;
+                    break;
+                }
+            }
+        }
+
+        if closed {
+            points.rotate_left(1);
+        }
+
+        Ok(Self::from_raw_parts(path_id, points, None, closed))
+    }
+
     pub fn from_norad(src: &norad::glyph::Contour) -> Path {
         use norad::glyph::PointType as NoradPType;
         assert!(
@@ -610,5 +659,20 @@ impl Path {
         let idx = self.idx_for_point(point).expect("bad input to next_point");
         let idx = self.next_idx(idx);
         self.points[idx]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use druid::kurbo::{Rect, Shape};
+
+    #[test]
+    fn from_bezpath() {
+        let rect = Rect::from_origin_size((0., 0.), (10., 10.));
+        let path = Path::from_bezpath(rect.to_bez_path(0.1)).unwrap();
+        assert!(path.is_closed());
+        assert_eq!(path.points.len(), 4);
+        assert_eq!(path.start_point().point.to_raw(), Point::ORIGIN);
     }
 }
