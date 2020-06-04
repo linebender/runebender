@@ -199,6 +199,8 @@ impl Editor {
         self.draw_filled_outlines = tool.name() == "Preview";
         data.session_mut().tool_desc = tool.name().into();
         self.tool = tool;
+        self.mouse.reset();
+        self.tool.init_mouse(&mut self.mouse);
     }
 }
 

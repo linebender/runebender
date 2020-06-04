@@ -81,6 +81,12 @@ pub trait Tool {
     ) -> Option<EditType> {
         None
     }
+
+    /// Called whenever a tool is first activated, so that it can access or modify
+    /// mouse settings.
+    #[allow(unused)]
+    fn init_mouse(&mut self, mouse: &mut Mouse) {}
+
     /// Called with each mouse event. The `mouse` argument is a reference to a [`Mouse`]
     /// struct that is shared between all tools; a particular `Tool` can implement the
     /// [`MouseDelegate`] trait and pass the events to `Mouse` instance.
