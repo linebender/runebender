@@ -200,6 +200,11 @@ impl TaggedEvent {
 }
 
 impl Mouse {
+    /// reset any settable internal state to its default value.
+    pub fn reset(&mut self) {
+        self.min_drag_distance = DEFAULT_MIN_DRAG_DISTANCE;
+    }
+
     /// The current position of  the mouse.
     #[allow(dead_code)]
     pub fn pos(&self) -> Point {
