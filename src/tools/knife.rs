@@ -1,10 +1,6 @@
 //! The knife tool
 
-use std::cmp::{Ord, Ordering, PartialEq, PartialOrd};
-
-use druid::kurbo::{
-    CubicBez, Line, LineIntersection, ParamCurve, ParamCurveNearest, PathSeg as KurboPathSeg,
-};
+use druid::kurbo::{Line, LineIntersection, ParamCurve, ParamCurveNearest};
 use druid::piet::StrokeStyle;
 use druid::{Color, Env, EventCtx, KeyCode, KeyEvent, MouseEvent, PaintCtx, Point, RenderContext};
 
@@ -14,6 +10,12 @@ use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
 use crate::path::{Path, PathPoint, PathSeg};
 use crate::tools::{EditType, Tool};
 
+const MAX_RECURSE: usize = 16;
+// an amount of `t` we insert between slice 'segments', so that after finishing
+// a first slice we don't accidentally count the end of the previous slice as
+// the start of a new one.
+const SLICE_EP: f64 = 1e-9;
+
 /// The state of the rectangle tool.
 #[derive(Debug, Clone)]
 pub struct Knife {
@@ -22,14 +24,7 @@ pub struct Knife {
     stroke_style: StrokeStyle,
     /// during a drag, the places where we intersect a path; we just hold
     /// on to this so we don't always need to reallocate.
-    intersections: Vec<Intersection>,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct Intersection {
-    point: DPoint,
-    seg: PathSeg,
-    hit: LineIntersection,
+    intersections: Vec<DPoint>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -37,6 +32,13 @@ enum GestureState {
     Ready,
     Begun { start: DPoint, current: DPoint },
     Finished,
+}
+
+#[derive(Clone, Copy)]
+struct Hit {
+    intersection: LineIntersection,
+    point: Point,
+    seg: PathSeg,
 }
 
 impl Default for Knife {
@@ -49,6 +51,12 @@ impl Default for Knife {
             stroke_style,
             intersections: Vec::new(),
         }
+    }
+}
+
+impl Default for GestureState {
+    fn default() -> Self {
+        GestureState::Ready
     }
 }
 
@@ -96,14 +104,9 @@ impl Knife {
                 seg.to_kurbo()
                     .intersect_line(line)
                     .into_iter()
-                    .map(move |hit| Intersection {
-                        point: DPoint::from_raw(line.eval(hit.line_t)),
-                        seg,
-                        hit,
-                    })
+                    .map(move |hit| DPoint::from_raw(line.eval(hit.line_t)))
             });
         self.intersections.extend(iter);
-        self.intersections.sort();
     }
 }
 
@@ -142,7 +145,7 @@ impl Tool for Knife {
         None
     }
     fn init_mouse(&mut self, mouse: &mut Mouse) {
-        mouse.min_drag_distance = 0.0;
+        mouse.min_drag_distance = 2.0;
     }
 
     fn mouse_event(
@@ -174,8 +177,8 @@ impl Tool for Knife {
 
             ctx.stroke_styled(line, &Color::BLACK, 1.0, &self.stroke_style);
 
-            for hit in &self.intersections {
-                let point = data.viewport.to_screen(hit.point);
+            for point in &self.intersections {
+                let point = data.viewport.to_screen(*point);
                 let cut_mark_start = point - (unit_vec * 4.0);
                 let cut_mark_end = point + (unit_vec * 4.0);
                 let cut_mark = Line::new(cut_mark_start, cut_mark_end);
@@ -225,18 +228,8 @@ impl MouseDelegate<EditSession> for Knife {
             }
         }
 
-        //if !self.intersections.is_empty() {
-        //let new_paths = slice_paths(&data.paths, &self.intersections);
-        //}
         self.gesture = GestureState::Finished;
     }
-
-    //fn left_drag_began(&mut self, event: Drag, data: &mut EditSession) {
-    //if let GestureState::Down(start) = self.gesture {
-    //let current = data.viewport.from_screen(event.current.pos);
-    //self.gesture = GestureState::Begun { start, current };
-    //}
-    //}
 
     fn left_drag_changed(&mut self, drag: Drag, data: &mut EditSession) {
         if let GestureState::Begun { current, .. } = &mut self.gesture {
@@ -246,34 +239,18 @@ impl MouseDelegate<EditSession> for Knife {
     }
 }
 
-impl Default for GestureState {
-    fn default() -> Self {
-        GestureState::Ready
+impl Hit {
+    fn new(line: Line, intersection: LineIntersection, seg: PathSeg) -> Self {
+        let point = line.eval(intersection.line_t);
+        Hit {
+            intersection,
+            point,
+            seg,
+        }
     }
-}
 
-impl PartialEq for Intersection {
-    fn eq(&self, other: &Self) -> bool {
-        self.point == other.point
-            && self.seg == other.seg
-            && self.hit.line_t == other.hit.line_t
-            && self.hit.segment_t == other.hit.segment_t
-    }
-}
-
-impl Eq for Intersection {}
-
-impl Ord for Intersection {
-    fn cmp(&self, other: &Self) -> Ordering {
-        (self.seg.start_id().parent, self.hit.line_t)
-            .partial_cmp(&(other.seg.start_id().parent, self.hit.line_t))
-            .unwrap()
-    }
-}
-
-impl PartialOrd for Intersection {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+    fn seg_t(&self) -> f64 {
+        self.intersection.segment_t
     }
 }
 
@@ -296,93 +273,78 @@ impl PartialOrd for Intersection {
 fn slice_paths(paths: &[Path], line: Line) -> Vec<Path> {
     let mut out = Vec::new();
     for path in paths {
-        eprintln!("#####original path {} ######", path.id());
-        slice_path(path, line, &mut out, 0);
-        eprintln!("##### {} new paths #####", out.len());
+        slice_path(path, line, &mut out);
     }
     out
 }
 
-#[derive(Clone, Copy)]
-struct Hit {
-    intersection: LineIntersection,
-    point: Point,
-    seg: PathSeg,
-}
-
-impl Hit {
-    fn new(line: Line, intersection: LineIntersection, seg: PathSeg) -> Self {
-        let point = line.eval(intersection.line_t);
-        Hit {
-            intersection,
-            point,
-            seg,
-        }
-    }
-}
-
-const MAX_RECURSE: usize = 2;
-// an amount of `t` we insert between slice 'segments', so that after finishing
-// a first slice we don't accidentally count the end of the previous slice as
-// the start of a new one.
-const SLICE_EP: f64 = 1e-9;
 /// Slice a path with a line.
 ///
 /// Resulting paths are pushed to the `acc` vec.
 ///
 /// If no modifications are made, the source `path` should still be pushed to `acc`.
-fn slice_path(path: &Path, line: Line, acc: &mut Vec<Path>, recurse: usize) {
-    eprintln!("slicing path {}", path.id());
-    let mut intersections = path
-        .iter_segments()
-        .flat_map(|seg| {
-            seg.to_kurbo()
-                .intersect_line(line)
-                .into_iter()
-                .map(move |hit| Hit::new(line, hit, seg))
-        })
-        .collect::<Vec<_>>();
+fn slice_path(path: &Path, line: Line, acc: &mut Vec<Path>) {
+    let mut hits = Vec::new();
+    // we clone here; the impl is recursive and if this path isn't sliced the
+    // clone will be returned in `acc`.
+    slice_path_impl(path.clone(), line, acc, &mut hits, 0)
+}
 
-    if intersections.is_empty() || recurse == MAX_RECURSE {
+/// does the actual work
+/// - we reuse a vector for calculating hits, because... why not
+/// - we track recursions and bail at some limit, because I don't trust all the edge cases.
+fn slice_path_impl(
+    path: Path,
+    line: Line,
+    acc: &mut Vec<Path>,
+    hit_buf: &mut Vec<Hit>,
+    recurse: usize,
+) {
+    hit_buf.clear();
+    hit_buf.extend(path.iter_segments().flat_map(|seg| {
+        seg.to_kurbo()
+            .intersect_line(line)
+            .into_iter()
+            .map(move |hit| Hit::new(line, hit, seg))
+    }));
+
+    if hit_buf.len() <= 1 || recurse == MAX_RECURSE {
+        if recurse == MAX_RECURSE {
+            log::info!("slice_path hit recurse limit");
+        }
         acc.push(path.to_owned());
         return;
     }
 
-    intersections.sort_by(|a, b| {
+    // we sort based on `t` on the line, that is, in the order of the "cut"
+    hit_buf.sort_by(|a, b| {
         a.intersection
             .line_t
             .partial_cmp(&b.intersection.line_t)
             .unwrap()
     });
-    // we now have a non-zero number of intersections.
-    let start = intersections[0];
-    let end = match intersections.get(1) {
-        Some(thing) => *thing,
-        //TODO: in case of only one intersection, add a point to the line
-        None => {
-            acc.push(path.to_owned());
-            return;
-        }
-    };
 
-    eprintln!(
-        "{} intersections, slicing {:.1}..{:.1}",
-        intersections.len(),
-        start.point,
-        end.point
-    );
+    // we just work with the first two intersections at a time.
+    let start = hit_buf[0];
+    let end = *hit_buf.get(1).expect("len already checked");
 
+    // stash where on the line the last hit we're using is;
+    // we will resume from here afterwards.
     let next_line_start_t = end.intersection.line_t + SLICE_EP;
 
-    eprintln!("preorder {} {}", start.seg.start_id(), end.seg.start_id());
-    let (start, end) = order_points(path, start, end);
-    eprintln!("{} {}", start.seg.start_id(), end.seg.start_id());
-    let path_one = slice_first_path(path, start, end);
-    let path_two = slice_second_path(path, start, end);
-    eprintln!("new paths {} and {}", path_one.id(), path_two.id());
+    // order the points based on the order they appear in the source path;
+    // this makes other logic easier (we will hit the start pt first when iterating).
+    let (start, end) = order_points(&path, start, end);
+
+    // generate the path on either side of the cut
+    let path_one = slice_first_path(&path, start, end);
+    let path_two = slice_second_path(&path, start, end);
+
+    // calculate the cut line that remains to be processed
     let line = line.subsegment(next_line_start_t..1.0);
-    slice_path(&path_one, line, acc, recurse + 1);
-    slice_path(&path_two, line, acc, recurse + 1);
+    // recurse on each of the new paths
+    slice_path_impl(path_one, line, acc, hit_buf, recurse + 1);
+    slice_path_impl(path_two, line, acc, hit_buf, recurse + 1);
 }
 
 /// The 'first' path includes the paths original start point, and may be open.
@@ -391,17 +353,13 @@ fn slice_first_path(path: &Path, start: Hit, end: Hit) -> Path {
     let mut iter = path.iter_segments();
     let mut start_seg = None;
 
-    //eprintln!("slicing {} to {}", start.seg.start_id(), end.seg.start_id());
     for seg in &mut iter {
-        eprintln!("seg {:?}", seg);
         // just copy over all points up to our first cut
         if seg.start_id() != start.seg.start_id() {
             append_all_points(&mut points, seg);
-            eprintln!("appending all, len {}", points.len());
         } else {
             let (cut_t, _dst) = seg.to_kurbo().nearest(start.point, 0.1);
-            append_clipped_segment(&mut points, path.id(), seg, 0.0, cut_t);
-            eprintln!("appending truncated, len {}", points.len());
+            append_all_points(&mut points, seg.subsegment(0.0..cut_t));
             assert!(_dst <= 0.1, "total sanity check");
             start_seg = Some(seg);
             break;
@@ -410,18 +368,15 @@ fn slice_first_path(path: &Path, start: Hit, end: Hit) -> Path {
 
     let mut iter = start_seg.iter().copied().chain(iter);
     for seg in &mut iter {
-        eprintln!("seg {:?} {}", seg, points.len());
         if seg.start_id() == end.seg.start_id() {
             let (cut_t, _dst) = seg.to_kurbo().nearest(end.point, 0.1);
-            append_clipped_segment(&mut points, path.id(), seg, cut_t, 1.0);
-            eprintln!("appending clipped, len {}", points.len());
+            append_all_points(&mut points, seg.subsegment(cut_t..1.0));
             break;
         }
     }
 
     // and finally append all remaining segments:
-    iter.inspect(|seg| eprintln!("appending {:?}, seg", seg))
-        .for_each(|seg| append_all_points(&mut points, seg));
+    iter.for_each(|seg| append_all_points(&mut points, seg));
     points.iter_mut().for_each(|p| p.id.parent = path.id());
 
     if points.first().map(|p| p.point) == points.last().map(|p| p.point) {
@@ -441,7 +396,6 @@ fn slice_second_path(path: &Path, start: Hit, end: Hit) -> Path {
     let mut done = false;
 
     for seg in &mut iter {
-        eprintln!("seg {:?}", seg);
         // ignore all points to the first cut
         if seg.start_id() != start.seg.start_id() {
             continue;
@@ -454,9 +408,9 @@ fn slice_second_path(path: &Path, start: Hit, end: Hit) -> Path {
             } else {
                 1.0
             };
-            append_clipped_segment(&mut points, path_id, seg, cut_t, end_t);
+            append_all_points(&mut points, seg.subsegment(cut_t..end_t));
             if !path.is_closed() {
-            // add the cut line
+                // add the cut line
                 points.push(PathPoint::on_curve(path_id, DPoint::from_raw(start.point)));
             }
             break;
@@ -469,7 +423,7 @@ fn slice_second_path(path: &Path, start: Hit, end: Hit) -> Path {
                 append_all_points(&mut points, seg);
             } else {
                 let end_t = seg.to_kurbo().nearest(end.point, 0.1).0;
-                append_clipped_segment(&mut points, path_id, seg, 0.0, end_t);
+                append_all_points(&mut points, seg.subsegment(0.0..end_t));
                 break;
             }
         }
@@ -481,51 +435,13 @@ fn slice_second_path(path: &Path, start: Hit, end: Hit) -> Path {
 }
 
 fn append_all_points(dest: &mut Vec<PathPoint>, seg: PathSeg) {
-    match seg {
-        PathSeg::Line(one, two) => {
-            if dest.last().map(|p| p.point) != Some(one.point) {
-                dest.push(one);
-            }
-            dest.push(two);
-        }
-        PathSeg::Cubic(a, b, c, d) => {
-            if dest.last().map(|p| p.point) != Some(a.point) {
-                dest.push(a);
-            }
-            dest.extend(&[b, c, d]);
-        }
+    let mut iter = seg.into_iter();
+    let first = iter.next().unwrap();
+    // we skip the first point if it's the same as the current previous point
+    if dest.last().map(|p| p.point) != Some(first.point) {
+        dest.push(first);
     }
-}
-
-// clip the segment from time `t1..t2`.
-fn append_clipped_segment(
-    dest: &mut Vec<PathPoint>,
-    path_id: usize,
-    seg: PathSeg,
-    t1: f64,
-    t2: f64,
-) {
-    match seg.to_kurbo().subsegment(t1..t2) {
-        KurboPathSeg::Line(Line { p0, p1 }) => {
-            if dest.last().map(|p| p.point.to_raw()) != Some(p0) {
-                let one = PathPoint::on_curve(path_id, DPoint::from_raw(p0));
-                dest.push(one);
-            }
-            let two = PathPoint::on_curve(path_id, DPoint::from_raw(p1));
-            dest.push(two);
-        }
-        KurboPathSeg::Cubic(CubicBez { p0, p1, p2, p3 }) => {
-            if dest.last().map(|p| p.point.to_raw()) != Some(p0) {
-                let one = PathPoint::on_curve(path_id, DPoint::from_raw(p0));
-                dest.push(one);
-            }
-            let b = PathPoint::off_curve(path_id, DPoint::from_raw(p1));
-            let c = PathPoint::off_curve(path_id, DPoint::from_raw(p2));
-            let d = PathPoint::on_curve(path_id, DPoint::from_raw(p3));
-            dest.extend(&[b, c, d]);
-        }
-        _ => (),
-    }
+    dest.extend(iter);
 }
 
 /// order our two cut points based on the order of points in the path.
@@ -612,7 +528,7 @@ mod tests {
 
         let line = Line::new((3., 6.), (8., -2.));
         let mut out = Vec::new();
-        slice_path(&path, line, &mut out, 0);
+        slice_path(&path, line, &mut out);
 
         assert_eq!(out.len(), 2);
         let one = &out[0];
@@ -656,16 +572,15 @@ mod tests {
 
         let path = Path::from_bezpath(bez).unwrap();
 
-
-     // first try slicing a non-first segment
+        // first try slicing a non-first segment
         let slice_line1 = Line::new((10., 20.), (25., 10.));
         let slice_line2 = Line::new((25., 10.), (10., 20.));
 
         let mut out = Vec::new();
-        slice_path(&path, slice_line1, &mut out, 0);
+        slice_path(&path, slice_line1, &mut out);
         let first = out.clone();
         out.clear();
-        slice_path(&path, slice_line2, &mut out, 0);
+        slice_path(&path, slice_line2, &mut out);
         let second = out;
         assert_eq!(first.len(), 2);
         assert_eq!(second.len(), 2);
@@ -678,11 +593,11 @@ mod tests {
         let slice_line2 = Line::new((10., 0.), (0., 10.));
 
         let mut out = Vec::new();
-        slice_path(&path, slice_line1, &mut out, 0);
+        slice_path(&path, slice_line1, &mut out);
         eprintln!("\n$$$$\n");
         let first = out.clone();
         out.clear();
-        slice_path(&path, slice_line2, &mut out, 0);
+        slice_path(&path, slice_line2, &mut out);
         //panic!("awww");
         let second = out;
         assert_eq!(first.len(), 2);
