@@ -231,7 +231,13 @@ impl Default for Toolbar {
             hotkey: HotKey::new(None, "u"),
         };
 
-        Toolbar::new(vec![select, pen, preview, rectangle])
+        let knife = ToolbarItem {
+            name: "Knife",
+            icon: constrain_path(knife_path()),
+            hotkey: HotKey::new(None, "e"),
+        };
+
+        Toolbar::new(vec![select, pen, knife, preview, rectangle])
     }
 }
 
@@ -333,6 +339,31 @@ fn rect_path() -> BezPath {
     bez.line_to((140.0, 140.0));
     bez.line_to((404.0, 140.0));
     bez.line_to((404.0, 404.0));
+    bez.close_path();
+    bez
+}
+
+fn knife_path() -> BezPath {
+    let mut bez = BezPath::new();
+
+    bez.move_to((174.0, 647.0));
+    bez.line_to((50.0, 647.0));
+    bez.line_to((50.0, 218.0));
+    bez.line_to((174.0, 218.0));
+    bez.line_to((174.0, 647.0));
+    bez.close_path();
+
+    bez.move_to((50.0, 183.0));
+    bez.line_to((50.0, 0.0));
+    bez.line_to((175.0, 183.0));
+    bez.line_to((50.0, 183.0));
+    bez.close_path();
+
+    bez.move_to((0.0, 311.0));
+    bez.curve_to((0.0, 281.0), (30.0, 261.0), (50.0, 261.0));
+    bez.curve_to((74.0, 261.0), (100.0, 289.0), (100.0, 311.0));
+    bez.curve_to((100.0, 333.0), (71.0, 361.0), (50.0, 361.0));
+    bez.curve_to((29.0, 361.0), (0.0, 340.0), (0.0, 311.0));
     bez.close_path();
     bez
 }

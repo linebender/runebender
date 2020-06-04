@@ -2,8 +2,11 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use super::design_space::{DPoint, DVec2, ViewPort};
-use druid::kurbo::{BezPath, Point, Vec2};
+use druid::kurbo::{BezPath, CubicBez, Line, PathSeg as KurboPathSeg, Point, Vec2};
 use druid::Data;
+
+#[cfg(test)]
+use druid::kurbo::PathEl;
 
 const RESERVED_ID_COUNT: usize = 5;
 const GUIDE_TYPE_ID: usize = 1;
@@ -28,7 +31,7 @@ pub enum PointType {
     OffCurve,
 }
 
-#[derive(Debug, Clone, Copy, Data)]
+#[derive(Debug, Clone, Copy, Data, PartialEq)]
 pub struct PathPoint {
     pub id: EntityId,
     pub point: DPoint,
@@ -38,9 +41,30 @@ pub struct PathPoint {
 #[derive(Debug, Data, Clone)]
 pub struct Path {
     id: usize,
-    points: std::sync::Arc<Vec<PathPoint>>,
+    points: Arc<Vec<PathPoint>>,
     trailing: Option<DPoint>,
     closed: bool,
+}
+
+/// Questionable.
+///
+/// We use this in the knife tool. Really all we need is the kurbo PathSeg and
+/// the start/end EntityIds, but we needed more at an earlier iteration.
+#[derive(Clone, Copy, PartialEq)]
+pub enum PathSeg {
+    Line(PathPoint, PathPoint),
+    Cubic(PathPoint, PathPoint, PathPoint, PathPoint),
+}
+
+struct PathSegIter {
+    points: Arc<Vec<PathPoint>>,
+    prev_pt: PathPoint,
+    idx: usize,
+}
+
+pub struct SegPointIter {
+    seg: PathSeg,
+    idx: usize,
 }
 
 impl EntityId {
@@ -130,10 +154,30 @@ impl Path {
 
         Path {
             id,
-            points: std::sync::Arc::new(vec![start]),
+            points: Arc::new(vec![start]),
             closed: false,
             trailing: None,
         }
+    }
+
+    #[cfg(test)]
+    pub fn line_to(mut self, point: impl Into<Point>) -> Self {
+        self.append_point(DPoint::from_raw(point));
+        self
+    }
+
+    #[cfg(test)]
+    pub fn curve_to(
+        mut self,
+        p1: impl Into<Point>,
+        p2: impl Into<Point>,
+        p3: impl Into<Point>,
+    ) -> Self {
+        let p1 = PathPoint::off_curve(self.id, DPoint::from_raw(p1));
+        let p2 = PathPoint::off_curve(self.id, DPoint::from_raw(p2));
+        self.points_mut().extend(&[p1, p2]);
+        self.append_point(DPoint::from_raw(p3));
+        self
     }
 
     pub fn from_raw_parts(
@@ -143,6 +187,7 @@ impl Path {
         closed: bool,
     ) -> Self {
         assert!(!points.is_empty(), "path may not be empty");
+        assert!(points.iter().all(|pt| pt.id.parent == id), "{:#?}", points);
         Path {
             id,
             points: Arc::new(points),
@@ -159,7 +204,6 @@ impl Path {
     pub(crate) fn from_bezpath(
         path: impl IntoIterator<Item = PathEl>,
     ) -> Result<Self, &'static str> {
-        use druid::kurbo::PathEl;
 
         let path_id = next_id();
         let mut els = path.into_iter();
@@ -286,6 +330,10 @@ impl Path {
         }
     }
 
+    pub fn id(&self) -> usize {
+        self.id
+    }
+
     pub fn is_closed(&self) -> bool {
         self.closed
     }
@@ -295,7 +343,17 @@ impl Path {
     }
 
     fn points_mut(&mut self) -> &mut Vec<PathPoint> {
-        std::sync::Arc::make_mut(&mut self.points)
+        Arc::make_mut(&mut self.points)
+    }
+
+    pub fn iter_segments(&self) -> impl Iterator<Item = PathSeg> {
+        let prev_pt = *self.start_point();
+        let idx = if self.closed { 0 } else { 1 };
+        PathSegIter {
+            points: self.points.clone(),
+            prev_pt,
+            idx,
+        }
     }
 
     pub fn trailing(&self) -> Option<&DPoint> {
@@ -662,6 +720,144 @@ impl Path {
     }
 }
 
+impl PathSeg {
+    pub fn start_id(&self) -> EntityId {
+        match self {
+            PathSeg::Line(p1, _) => p1.id,
+            PathSeg::Cubic(p1, ..) => p1.id,
+        }
+    }
+
+    pub fn end_id(&self) -> EntityId {
+        match self {
+            PathSeg::Line(_, p2) => p2.id,
+            PathSeg::Cubic(.., p2) => p2.id,
+        }
+    }
+
+    pub fn to_kurbo(self) -> KurboPathSeg {
+        match self {
+            PathSeg::Line(p1, p2) => {
+                KurboPathSeg::Line(Line::new(p1.point.to_raw(), p2.point.to_raw()))
+            }
+            PathSeg::Cubic(p1, p2, p3, p4) => KurboPathSeg::Cubic(CubicBez::new(
+                p1.point.to_raw(),
+                p2.point.to_raw(),
+                p3.point.to_raw(),
+                p4.point.to_raw(),
+            )),
+        }
+    }
+}
+
+impl Iterator for PathSegIter {
+    type Item = PathSeg;
+
+    fn next(&mut self) -> Option<PathSeg> {
+        if self.idx >= self.points.len() {
+            return None;
+        }
+        let seg_start = self.prev_pt;
+        let seg = if !self.points[self.idx].is_on_curve() {
+            let p1 = self.points[self.idx];
+            let p2 = self.points[self.idx + 1];
+            self.prev_pt = self.points[self.idx + 2];
+            self.idx += 3;
+            assert!(
+                self.prev_pt.typ.is_on_curve(),
+                "{:#?} idx{}",
+                &self.points,
+                self.idx
+            );
+            PathSeg::Cubic(seg_start, p1, p2, self.prev_pt)
+        } else {
+            self.prev_pt = self.points[self.idx];
+            self.idx += 1;
+            PathSeg::Line(seg_start, self.prev_pt)
+        };
+        Some(seg)
+    }
+}
+
+impl std::iter::IntoIterator for PathSeg {
+    type Item = PathPoint;
+    type IntoIter = SegPointIter;
+    fn into_iter(self) -> Self::IntoIter {
+        SegPointIter {
+            seg: self,
+            idx: 0,
+        }
+    }
+
+}
+
+impl Iterator for SegPointIter {
+    type Item = PathPoint;
+
+    fn next(&mut self) -> Option<PathPoint> {
+        self.idx += 1;
+        match (self.idx, self.seg) {
+            (1, PathSeg::Line(p1, _)) => Some(p1),
+            (2, PathSeg::Line(_, p2)) => Some(p2),
+            (1, PathSeg::Cubic(p1, ..)) => Some(p1),
+            (2, PathSeg::Cubic(_, p2, ..)) => Some(p2),
+            (3, PathSeg::Cubic(_, _, p3, ..)) => Some(p3),
+            (4, PathSeg::Cubic(_, _, _, p4)) => Some(p4),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for EntityId {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "id{}.{}", self.parent, self.point)
+    }
+}
+
+impl std::fmt::Debug for PathSeg {
+    #[allow(clippy::many_single_char_names)]
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            PathSeg::Line(one, two) => write!(
+                f,
+                "({}->{}) Line({:?}, {:?})",
+                self.start_id(),
+                self.end_id(),
+                one.point,
+                two.point
+            ),
+            PathSeg::Cubic(a, b, c, d) => write!(
+                f,
+                "Cubic({:?}, {:?}, {:?}, {:?})",
+                a.point, b.point, c.point, d.point
+            ),
+        }
+    }
+}
+
+//#[cfg(test)]
+//mod tests {
+    //use super::*;
+    //use druid::kurbo::Rect;
+
+    //fn make_rect_path(rect: Rect) -> Path {
+        //let path_id = crate::path::next_id();
+        //let p1 = DPoint::from_raw(rect.origin());
+        //let p2 = DPoint::new(rect.x1, rect.y0);
+        //let p3 = DPoint::new(rect.x1, rect.y1);
+        //let p4 = DPoint::new(rect.x0, rect.y1);
+        //// first point goes last in closed paths
+        //let points = vec![
+            //PathPoint::on_curve(path_id, p2),
+            //PathPoint::on_curve(path_id, p3),
+            //PathPoint::on_curve(path_id, p4),
+            //PathPoint::on_curve(path_id, p1),
+        //];
+
+        //Path::from_raw_parts(path_id, points, None, true)
+    //}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -674,5 +870,51 @@ mod tests {
         assert!(path.is_closed());
         assert_eq!(path.points.len(), 4);
         assert_eq!(path.start_point().point.to_raw(), Point::ORIGIN);
+    }
+
+    #[test]
+    fn iter_rect_segs() {
+        let rect = Rect::new(0., 0., 10., 10.);
+        let path = Path::from_bezpath(rect.to_bez_path(0.1)).unwrap();// make_rect_path(rect);
+
+        let mut seg_iter = path.iter_segments();
+        assert!(matches!(seg_iter.next().unwrap(), PathSeg::Line(..)));
+        assert!(matches!(seg_iter.next().unwrap(), PathSeg::Line(..)));
+        assert!(matches!(seg_iter.next().unwrap(), PathSeg::Line(..)));
+        assert!(matches!(seg_iter.next().unwrap(), PathSeg::Line(..)));
+    }
+
+    #[test]
+    fn iter_line_sects() {
+        let mut path = Path::new(DPoint::new(0., 0.));
+        path.append_point(DPoint::new(10., 10.));
+
+        let mut seg_iter = path.iter_segments();
+        let seg = seg_iter.next().unwrap();
+        let line = match seg.to_kurbo() {
+            KurboPathSeg::Line(line) => line,
+            other => panic!("expected line found {:?}", other),
+        };
+
+        assert!(seg_iter.next().is_none());
+        assert!(!path.is_closed());
+        assert_eq!(line.p0, Point::ORIGIN);
+        assert_eq!(line.p1, Point::new(10., 10.));
+    }
+
+    #[test]
+    fn iter_triangle_sects() {
+        let path = Path::new(DPoint::new(10., 10.))
+            .line_to((0., 0.))
+            .line_to((20., 0.))
+            .line_to((10., 10.));
+
+        assert!(path.is_closed());
+        assert_eq!(path.points().len(), 3);
+
+        let mut iter = path.iter_segments().map(PathSeg::to_kurbo);
+        assert_eq!(iter.next(), Some(Line::new((10., 10.), (0., 0.)).into()));
+        assert_eq!(iter.next(), Some(Line::new((0., 0.), (20., 0.)).into()));
+        assert_eq!(iter.next(), Some(Line::new((20., 0.), (10., 10.)).into()));
     }
 }

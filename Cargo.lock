@@ -976,9 +976,8 @@ dependencies = [
 
 [[package]]
 name = "kurbo"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2520c9c9010461ec2b4573599bca458272319a314fd0b9476cacfcb9b6e5adc8"
+version = "0.6.2"
+source = "git+https://github.com/linebender/kurbo.git?rev=af1d76be#af1d76be5a0a5f0f9cc60dc1a5ce3c72cd9d47f5"
 dependencies = [
  "arrayvec",
 ]
