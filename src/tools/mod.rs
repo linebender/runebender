@@ -1,10 +1,12 @@
 //! A tool accepts user input and modifies the canvas.
 
+mod knife;
 mod pen;
 mod preview;
 mod rectangle;
 mod select;
 
+pub use knife::Knife;
 pub use pen::Pen;
 pub use preview::Preview;
 pub use rectangle::Rectangle;
@@ -115,6 +117,7 @@ pub fn tool_for_id(id: ToolId) -> Option<Box<dyn Tool>> {
         "Pen" => Some(Box::new(Pen::default())),
         "Select" => Some(Box::new(Select::default())),
         "Rectangle" => Some(Box::new(Rectangle::default())),
+        "Knife" => Some(Box::new(Knife::default())),
         _ => None,
     }
 }
