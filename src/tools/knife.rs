@@ -7,7 +7,7 @@ use druid::{Color, Env, EventCtx, KeyCode, KeyEvent, MouseEvent, PaintCtx, Point
 use crate::design_space::DPoint;
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
-use crate::path::{Path, PathPoint, PathSeg};
+use crate::path::{Path, PathPoint, PathSeg, PointType};
 use crate::tools::{EditType, Tool};
 
 const MAX_RECURSE: usize = 16;
@@ -410,20 +410,51 @@ fn split_path_at_intersections(path: &Path, start: Hit, end: Hit) -> (Path, Path
         one_points.pop();
     }
 
-    // in our internal representation (based on ufo) closed paths have their
-    // first point at the end.
-    if path.is_closed() {
-        one_points.rotate_left(1);
-    }
-    two_points.rotate_left(1);
-
-    // ensure that all our points have the correct parent ID
-    one_points.iter_mut().for_each(|p| p.id.parent = one_id);
-    two_points.iter_mut().for_each(|p| p.id.parent = two_id);
-
-    let path1 = Path::from_raw_parts(one_id, one_points, None, path.is_closed());
-    let path2 = Path::from_raw_parts(two_id, two_points, None, true);
+    let path1 = finalize_path(one_points, one_id, path.is_closed());
+    let path2 = finalize_path(two_points, two_id, true);
     (path1, path2)
+}
+
+/// set tangent handles, set correct parent ids, and construct the path
+fn finalize_path(mut points: Vec<PathPoint>, parent_id: usize, closed: bool) -> Path {
+    let len = points.len();
+
+    // a closure for calculating indices
+    let prev_and_next_idx = |idx: usize| {
+        let prev = (idx + len).saturating_sub(1) % len;
+        let next = (idx + 1) % len;
+        (prev, next)
+    };
+
+    // now convert any tangent-like on-curve points to be tangent points.
+    let mut idx = 0;
+    while idx < len {
+        let mut pt = points[idx];
+        if pt.is_on_curve() {
+            let (prev, next) = prev_and_next_idx(idx);
+            let prev = points[prev];
+            let next = points[next];
+            if !prev.is_on_curve() && !next.is_on_curve() {
+                let prev_angle = (prev.point.to_raw() - pt.point.to_raw()).atan2();
+                let next_angle = (pt.point.to_raw() - next.point.to_raw()).atan2();
+                let delta_angle = (prev_angle - next_angle).abs();
+                // if the angle between the control points and the on-curve
+                // point are within ~a degree of each other, consider it a tangent point.
+                if delta_angle <= 0.018 {
+                    pt.typ = PointType::OnCurveSmooth;
+                }
+            }
+        }
+        pt.id.parent = parent_id;
+        points[idx] = pt;
+        idx += 1;
+    }
+
+    if closed {
+        points.rotate_left(1);
+    }
+
+    Path::from_raw_parts(parent_id, points, None, closed)
 }
 
 fn append_all_points(dest: &mut Vec<PathPoint>, seg: PathSeg) {
