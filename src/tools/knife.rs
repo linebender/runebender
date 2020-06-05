@@ -30,7 +30,11 @@ pub struct Knife {
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum GestureState {
     Ready,
-    Begun { start: DPoint, current: DPoint },
+    /// these points are in design space but may be fractional, hence not DPoint
+    Begun {
+        start: Point,
+        current: Point,
+    },
     Finished,
 }
 
@@ -61,7 +65,7 @@ impl Default for GestureState {
 }
 
 impl Knife {
-    fn current_points(&self) -> Option<(DPoint, DPoint)> {
+    fn current_points(&self) -> Option<(Point, Point)> {
         if let GestureState::Begun { start, current } = self.gesture {
             let mut current = current;
             if self.shift_locked {
@@ -79,13 +83,13 @@ impl Knife {
     }
 
     fn current_line_in_dspace(&self) -> Option<Line> {
-        self.current_points()
-            .map(|(p1, p2)| Line::new(p1.to_raw(), p2.to_raw()))
+        self.current_points().map(|(p1, p2)| Line::new(p1, p2))
     }
 
     fn current_line_in_screen_space(&self, data: &EditSession) -> Option<Line> {
+        let xform = data.viewport.affine();
         self.current_points()
-            .map(|(p1, p2)| Line::new(data.viewport.to_screen(p1), data.viewport.to_screen(p2)))
+            .map(|(p1, p2)| Line::new(xform * p1, xform * p2))
     }
 
     fn update_intersections(&mut self, data: &EditSession) {
@@ -203,7 +207,7 @@ impl MouseDelegate<EditSession> for Knife {
 
     fn left_down(&mut self, event: &MouseEvent, data: &mut EditSession) {
         if event.count == 1 {
-            let pt = data.viewport.from_screen(event.pos);
+            let pt = data.viewport.inverse_affine() * event.pos;
             self.gesture = GestureState::Begun {
                 start: pt,
                 current: pt,
@@ -214,7 +218,7 @@ impl MouseDelegate<EditSession> for Knife {
 
     fn left_drag_ended(&mut self, drag: Drag, data: &mut EditSession) {
         if let GestureState::Begun { current, .. } = &mut self.gesture {
-            let now = data.viewport.from_screen(drag.current.pos);
+            let now = data.viewport.inverse_affine() * drag.current.pos;
             if now != *current {
                 *current = now;
                 self.update_intersections(data);
@@ -233,7 +237,7 @@ impl MouseDelegate<EditSession> for Knife {
 
     fn left_drag_changed(&mut self, drag: Drag, data: &mut EditSession) {
         if let GestureState::Begun { current, .. } = &mut self.gesture {
-            *current = data.viewport.from_screen(drag.current.pos);
+            *current = data.viewport.inverse_affine() * drag.current.pos;
             self.update_intersections(data);
         }
     }
