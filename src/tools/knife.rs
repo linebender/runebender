@@ -1,6 +1,6 @@
 //! The knife tool
 
-use druid::kurbo::{Line, LineIntersection, ParamCurve};
+use druid::kurbo::{Line, LineIntersection, ParamCurve, ParamCurveArclen};
 use druid::piet::StrokeStyle;
 use druid::{Color, Env, EventCtx, KeyCode, KeyEvent, MouseEvent, PaintCtx, Point, RenderContext};
 
@@ -11,10 +11,6 @@ use crate::path::{Path, PathPoint, PathSeg};
 use crate::tools::{EditType, Tool};
 
 const MAX_RECURSE: usize = 16;
-// an amount of `t` we insert between slice 'segments', so that after finishing
-// a first slice we don't accidentally count the end of the previous slice as
-// the start of a new one.
-const SLICE_EP: f64 = 1e-9;
 
 /// The state of the rectangle tool.
 #[derive(Debug, Clone)]
@@ -334,7 +330,12 @@ fn slice_path_impl(
 
     // stash where on the line the last hit we're using is;
     // we will resume from here afterwards.
-    let next_line_start_t = end.intersection.line_t + SLICE_EP;
+    //
+    // we add an amount of `t` equal to half a design-space unit between slice segments.
+    // this hopefully means we won't cut a line, and then immediately cut one of the
+    // new segments.
+    let slice_ep = 0.5 / line.arclen(1e-6);
+    let next_line_start_t = end.intersection.line_t + slice_ep;
 
     // order the points based on the order they appear in the source path;
     // this makes other logic easier (we will hit the start pt first when iterating).
