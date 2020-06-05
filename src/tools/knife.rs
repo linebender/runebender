@@ -1,6 +1,6 @@
 //! The knife tool
 
-use druid::kurbo::{Line, LineIntersection, ParamCurve, ParamCurveNearest};
+use druid::kurbo::{Line, LineIntersection, ParamCurve};
 use druid::piet::StrokeStyle;
 use druid::{Color, Env, EventCtx, KeyCode, KeyEvent, MouseEvent, PaintCtx, Point, RenderContext};
 
@@ -337,8 +337,7 @@ fn slice_path_impl(
     let (start, end) = order_points(&path, start, end);
 
     // generate the path on either side of the cut
-    let path_one = slice_first_path(&path, start, end);
-    let path_two = slice_second_path(&path, start, end);
+    let (path_one, path_two) = split_path_at_intersections(&path, start, end);
 
     // calculate the cut line that remains to be processed
     let line = line.subsegment(next_line_start_t..1.0);
@@ -347,91 +346,79 @@ fn slice_path_impl(
     slice_path_impl(path_two, line, acc, hit_buf, recurse + 1);
 }
 
+/// Given a path and two points on that path, divide it in two.
+///
 /// The 'first' path includes the paths original start point, and may be open.
-fn slice_first_path(path: &Path, start: Hit, end: Hit) -> Path {
-    let mut points = Vec::new();
+/// The 'second' path is the part that is 'sliced off', and it always closed.
+fn split_path_at_intersections(path: &Path, start: Hit, end: Hit) -> (Path, Path) {
+    let one_id = path.id();
+    let two_id = crate::path::next_id();
+    let mut one_points = Vec::new();
+    let mut two_points = Vec::new();
     let mut iter = path.iter_segments();
-    let mut start_seg = None;
+    let mut two_is_done = false;
 
+    // the part leading up to the cut
     for seg in &mut iter {
         // just copy over all points up to our first cut
         if seg.start_id() != start.seg.start_id() {
-            append_all_points(&mut points, seg);
+            append_all_points(&mut one_points, seg);
         } else {
-            let (cut_t, _dst) = seg.to_kurbo().nearest(start.point, 0.1);
-            append_all_points(&mut points, seg.subsegment(0.0..cut_t));
-            assert!(_dst <= 0.1, "total sanity check");
-            start_seg = Some(seg);
-            break;
-        }
-    }
+            let cut_t = start.seg_t();
+            append_all_points(&mut one_points, seg.subsegment(0.0..cut_t));
 
-    let mut iter = start_seg.iter().copied().chain(iter);
-    for seg in &mut iter {
-        if seg.start_id() == end.seg.start_id() {
-            let (cut_t, _dst) = seg.to_kurbo().nearest(end.point, 0.1);
-            append_all_points(&mut points, seg.subsegment(cut_t..1.0));
-            break;
-        }
-    }
-
-    // and finally append all remaining segments:
-    iter.for_each(|seg| append_all_points(&mut points, seg));
-    points.iter_mut().for_each(|p| p.id.parent = path.id());
-
-    if points.first().map(|p| p.point) == points.last().map(|p| p.point) {
-        points.pop();
-    }
-    if path.is_closed() {
-        points.rotate_left(1);
-    }
-    Path::from_raw_parts(path.id(), points, None, path.is_closed())
-}
-
-/// The 'second' path does not include the start point, and is always closed.
-fn slice_second_path(path: &Path, start: Hit, end: Hit) -> Path {
-    let path_id = crate::path::next_id();
-    let mut points = Vec::new();
-    let mut iter = path.iter_segments();
-    let mut done = false;
-
-    for seg in &mut iter {
-        // ignore all points to the first cut
-        if seg.start_id() != start.seg.start_id() {
-            continue;
-        } else {
-            let (cut_t, _dst) = seg.to_kurbo().nearest(start.point, 0.1);
-            assert!(_dst <= 0.1, "total sanity check");
-            let end_t = if seg.start_id() == end.seg.start_id() {
-                done = true;
-                seg.to_kurbo().nearest(end.point, 0.1).0
+            if seg.start_id() == end.seg.start_id() {
+                // the special case where the cut starts and ends in the same segment:
+                append_all_points(&mut one_points, seg.subsegment(end.seg_t()..1.));
+                append_all_points(&mut two_points, seg.subsegment(cut_t..end.seg_t()));
+                two_is_done = true;
             } else {
-                1.0
-            };
-            append_all_points(&mut points, seg.subsegment(cut_t..end_t));
+                append_all_points(&mut two_points, seg.subsegment(cut_t..1.));
+            }
+
             if !path.is_closed() {
                 // add the cut line
-                points.push(PathPoint::on_curve(path_id, DPoint::from_raw(start.point)));
+                two_points.push(PathPoint::on_curve(two_id, DPoint::from_raw(start.point)));
             }
             break;
         }
     }
 
-    if !done {
-        for seg in iter {
-            if seg.start_id() != end.seg.start_id() {
-                append_all_points(&mut points, seg);
-            } else {
-                let end_t = seg.to_kurbo().nearest(end.point, 0.1).0;
-                append_all_points(&mut points, seg.subsegment(0.0..end_t));
-                break;
+    // the part between the two cuts
+    for seg in &mut iter {
+        if seg.start_id() == end.seg.start_id() {
+            let cut_t = end.seg_t();
+            append_all_points(&mut one_points, seg.subsegment(cut_t..1.0));
+            if !two_is_done {
+                append_all_points(&mut two_points, seg.subsegment(0.0..cut_t));
             }
+            break;
+        } else if !two_is_done {
+            append_all_points(&mut two_points, seg);
         }
     }
 
-    points.iter_mut().for_each(|p| p.id.parent = path_id);
-    points.rotate_left(1);
-    Path::from_raw_parts(path_id, points, None, true)
+    // the part after the cut
+    iter.for_each(|seg| append_all_points(&mut one_points, seg));
+
+    if one_points.first().map(|p| p.point) == one_points.last().map(|p| p.point) {
+        one_points.pop();
+    }
+
+    // in our internal representation (based on ufo) closed paths have their
+    // first point at the end.
+    if path.is_closed() {
+        one_points.rotate_left(1);
+    }
+    two_points.rotate_left(1);
+
+    // ensure that all our points have the correct parent ID
+    one_points.iter_mut().for_each(|p| p.id.parent = one_id);
+    two_points.iter_mut().for_each(|p| p.id.parent = two_id);
+
+    let path1 = Path::from_raw_parts(one_id, one_points, None, path.is_closed());
+    let path2 = Path::from_raw_parts(two_id, two_points, None, true);
+    (path1, path2)
 }
 
 fn append_all_points(dest: &mut Vec<PathPoint>, seg: PathSeg) {
@@ -594,11 +581,9 @@ mod tests {
 
         let mut out = Vec::new();
         slice_path(&path, slice_line1, &mut out);
-        eprintln!("\n$$$$\n");
         let first = out.clone();
         out.clear();
         slice_path(&path, slice_line2, &mut out);
-        //panic!("awww");
         let second = out;
         assert_eq!(first.len(), 2);
         assert_eq!(second.len(), 2);
