@@ -698,6 +698,76 @@ impl Path {
         let idx = self.next_idx(idx);
         self.points[idx]
     }
+
+    pub(crate) fn split_segment_at_point(&mut self, seg: PathSeg, t: f64) {
+        let (existing_control_pts, points_to_insert) = match seg {
+            PathSeg::Line(..) => (0, 1),
+            PathSeg::Cubic(..) => (2, 5),
+        };
+
+        let pre_seg = seg.subsegment(0.0..t);
+        let post_seg = seg.subsegment(t..1.0);
+        let mut insert_idx = self
+            .points
+            .iter()
+            .position(|p| p.id == seg.start_id())
+            .unwrap();
+        insert_idx = self.next_idx(insert_idx);
+        //let mut to_replace = points_to_insert;
+        let mut iter = pre_seg
+            .into_iter()
+            .skip(1)
+            .chain(post_seg.into_iter().skip(1));
+        let self_id = self.id();
+        let points = self.points_mut();
+        for i in 0..points_to_insert {
+            let mut next_pt = iter.next().unwrap();
+            next_pt.id.parent = self_id;
+            if i < existing_control_pts {
+                points[insert_idx] = next_pt;
+            } else {
+                points.insert(insert_idx, next_pt);
+            }
+            insert_idx += 1;
+        }
+        mark_tangent_handles(points);
+    }
+}
+
+/// Walk the points in a list and mark those that look like tangent points
+/// as being tangent points (OnCurveSmooth).
+pub(crate) fn mark_tangent_handles(points: &mut [PathPoint]) {
+    let len = points.len();
+
+    // a closure for calculating indices
+    let prev_and_next_idx = |idx: usize| {
+        let prev = (idx + len).saturating_sub(1) % len;
+        let next = (idx + 1) % len;
+        (prev, next)
+    };
+
+    let mut idx = 0;
+    while idx < len {
+        let mut pt = points[idx];
+        if pt.is_on_curve() {
+            let (prev, next) = prev_and_next_idx(idx);
+            let prev = points[prev];
+            let next = points[next];
+            if !prev.is_on_curve() && !next.is_on_curve() {
+                let prev_angle = (prev.point.to_raw() - pt.point.to_raw()).atan2();
+                let next_angle = (pt.point.to_raw() - next.point.to_raw()).atan2();
+                let delta_angle = (prev_angle - next_angle).abs();
+                // if the angle between the control points and the on-curve
+                // point are within ~a degree of each other, consider it a tangent point.
+                if delta_angle <= 0.018 {
+                    pt.typ = PointType::OnCurveSmooth;
+                }
+            }
+        }
+        //pt.id.parent = parent_id;
+        points[idx] = pt;
+        idx += 1;
+    }
 }
 
 impl PathSeg {

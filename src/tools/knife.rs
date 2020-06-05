@@ -7,7 +7,7 @@ use druid::{Color, Env, EventCtx, KeyCode, KeyEvent, MouseEvent, PaintCtx, Point
 use crate::design_space::DPoint;
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
-use crate::path::{Path, PathPoint, PathSeg, PointType};
+use crate::path::{Path, PathPoint, PathSeg};
 use crate::tools::{EditType, Tool};
 
 const MAX_RECURSE: usize = 16;
@@ -294,7 +294,7 @@ fn slice_path(path: &Path, line: Line, acc: &mut Vec<Path>) {
 /// - we reuse a vector for calculating hits, because... why not
 /// - we track recursions and bail at some limit, because I don't trust all the edge cases.
 fn slice_path_impl(
-    path: Path,
+    mut path: Path,
     line: Line,
     acc: &mut Vec<Path>,
     hit_buf: &mut Vec<Hit>,
@@ -309,10 +309,13 @@ fn slice_path_impl(
     }));
 
     if hit_buf.len() <= 1 || recurse == MAX_RECURSE {
+        if let Some(hit) = hit_buf.first() {
+            path.split_segment_at_point(hit.seg, hit.intersection.segment_t);
+        }
         if recurse == MAX_RECURSE {
             log::info!("slice_path hit recurse limit");
         }
-        acc.push(path.to_owned());
+        acc.push(path);
         return;
     }
 
@@ -331,10 +334,10 @@ fn slice_path_impl(
     // stash where on the line the last hit we're using is;
     // we will resume from here afterwards.
     //
-    // we add an amount of `t` equal to half a design-space unit between slice segments.
+    // we add an amount of `t` equal to a design-space unit between slice segments.
     // this hopefully means we won't cut a line, and then immediately cut one of the
     // new segments.
-    let slice_ep = 0.5 / line.arclen(1e-6);
+    let slice_ep = 1.0 / line.arclen(1e-6);
     let next_line_start_t = end.intersection.line_t + slice_ep;
 
     // order the points based on the order they appear in the source path;
@@ -417,39 +420,8 @@ fn split_path_at_intersections(path: &Path, start: Hit, end: Hit) -> (Path, Path
 
 /// set tangent handles, set correct parent ids, and construct the path
 fn finalize_path(mut points: Vec<PathPoint>, parent_id: usize, closed: bool) -> Path {
-    let len = points.len();
-
-    // a closure for calculating indices
-    let prev_and_next_idx = |idx: usize| {
-        let prev = (idx + len).saturating_sub(1) % len;
-        let next = (idx + 1) % len;
-        (prev, next)
-    };
-
-    // now convert any tangent-like on-curve points to be tangent points.
-    let mut idx = 0;
-    while idx < len {
-        let mut pt = points[idx];
-        if pt.is_on_curve() {
-            let (prev, next) = prev_and_next_idx(idx);
-            let prev = points[prev];
-            let next = points[next];
-            if !prev.is_on_curve() && !next.is_on_curve() {
-                let prev_angle = (prev.point.to_raw() - pt.point.to_raw()).atan2();
-                let next_angle = (pt.point.to_raw() - next.point.to_raw()).atan2();
-                let delta_angle = (prev_angle - next_angle).abs();
-                // if the angle between the control points and the on-curve
-                // point are within ~a degree of each other, consider it a tangent point.
-                if delta_angle <= 0.018 {
-                    pt.typ = PointType::OnCurveSmooth;
-                }
-            }
-        }
-        pt.id.parent = parent_id;
-        points[idx] = pt;
-        idx += 1;
-    }
-
+    crate::path::mark_tangent_handles(&mut points);
+    points.iter_mut().for_each(|p| p.id.parent = parent_id);
     if closed {
         points.rotate_left(1);
     }
