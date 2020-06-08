@@ -17,4 +17,4 @@ svg = "0.8.0"
 chrono = "0.4"
 
 [patch.crates-io]
-kurbo = { git = "https://github.com/linebender/kurbo.git", rev = "af1d76be", features = ["druid"] }
+kurbo = { git = "https://github.com/linebender/kurbo.git", rev = "430da12", features = ["druid"] }

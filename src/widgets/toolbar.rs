@@ -3,7 +3,7 @@
 use druid::kurbo::{Affine, BezPath, Circle, Line, Shape, Vec2};
 use druid::widget::prelude::*;
 use druid::widget::{Painter, WidgetExt};
-use druid::{Color, Data, HotKey, KeyEvent, Rect, WidgetPod};
+use druid::{Color, Data, HotKey, KeyEvent, Rect, SysMods, WidgetPod};
 
 use crate::consts;
 use crate::tools::ToolId;
@@ -231,13 +231,19 @@ impl Default for Toolbar {
             hotkey: HotKey::new(None, "u"),
         };
 
+        let ellipse = ToolbarItem {
+            name: "Ellipse",
+            icon: constrain_path(ellipse_path()),
+            hotkey: HotKey::new(SysMods::Shift, "u"),
+        };
+
         let knife = ToolbarItem {
             name: "Knife",
             icon: constrain_path(knife_path()),
             hotkey: HotKey::new(None, "e"),
         };
 
-        Toolbar::new(vec![select, pen, knife, preview, rectangle])
+        Toolbar::new(vec![select, pen, knife, preview, rectangle, ellipse])
     }
 }
 
@@ -364,6 +370,25 @@ fn knife_path() -> BezPath {
     bez.curve_to((74.0, 261.0), (100.0, 289.0), (100.0, 311.0));
     bez.curve_to((100.0, 333.0), (71.0, 361.0), (50.0, 361.0));
     bez.curve_to((29.0, 361.0), (0.0, 340.0), (0.0, 311.0));
+    bez.close_path();
+    bez
+}
+
+fn ellipse_path() -> BezPath {
+    let mut bez = BezPath::new();
+
+    bez.move_to((73.0, 0.0));
+    bez.curve_to((33.0, 0.0), (0.0, 49.0), (0.0, 109.0));
+    bez.curve_to((0.0, 170.0), (33.0, 219.0), (73.0, 219.0));
+    bez.curve_to((113.0, 219.0), (146.0, 170.0), (146.0, 109.0));
+    bez.curve_to((146.0, 49.0), (113.0, 0.0), (73.0, 0.0));
+    bez.close_path();
+
+    bez.move_to((243.0, 109.0));
+    bez.curve_to((243.0, 79.0), (196.0, 54.0), (137.0, 54.0));
+    bez.curve_to((78.0, 54.0), (31.0, 79.0), (31.0, 109.0));
+    bez.curve_to((31.0, 140.0), (78.0, 165.0), (137.0, 165.0));
+    bez.curve_to((196.0, 165.0), (243.0, 140.0), (243.0, 109.0));
     bez.close_path();
     bez
 }
