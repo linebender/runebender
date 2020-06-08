@@ -977,7 +977,7 @@ dependencies = [
 [[package]]
 name = "kurbo"
 version = "0.6.2"
-source = "git+https://github.com/linebender/kurbo.git?rev=af1d76be#af1d76be5a0a5f0f9cc60dc1a5ce3c72cd9d47f5"
+source = "git+https://github.com/linebender/kurbo.git?rev=430da12#430da12893b93a9b4887d1f0dcd7c7ee805f5d88"
 dependencies = [
  "arrayvec",
 ]

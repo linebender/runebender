@@ -3,11 +3,10 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use super::design_space::{DPoint, DVec2, ViewPort};
-use druid::kurbo::{BezPath, CubicBez, Line, ParamCurve, PathSeg as KurboPathSeg, Point, Vec2};
+use druid::kurbo::{
+    BezPath, CubicBez, Line, ParamCurve, PathEl, PathSeg as KurboPathSeg, Point, Vec2,
+};
 use druid::Data;
-
-#[cfg(test)]
-use druid::kurbo::PathEl;
 
 const RESERVED_ID_COUNT: usize = 5;
 const GUIDE_TYPE_ID: usize = 1;
@@ -181,14 +180,13 @@ impl Path {
     ///
     /// - on the first 'segment' of the bezier will be used.
     /// - we don't currently support quadratics.
-    #[cfg(test)]
     pub(crate) fn from_bezpath(
         path: impl IntoIterator<Item = PathEl>,
     ) -> Result<Self, &'static str> {
         let path_id = next_id();
         let mut els = path.into_iter();
         let mut points = Vec::new();
-        let mut closed = false;
+        let mut explicit_close = false;
 
         let start_point = match els.next() {
             Some(PathEl::MoveTo(pt)) => pt,
@@ -211,11 +209,22 @@ impl Path {
                 }
                 PathEl::QuadTo(..) => return Err("quads not currently supported"),
                 PathEl::ClosePath => {
-                    closed = true;
+                    explicit_close = true;
                     break;
                 }
             }
         }
+
+        let closed = if points.len() > 1
+            && points.first().map(|p| p.point) == points.last().map(|p| p.point)
+        {
+            points.pop();
+            true
+        } else {
+            explicit_close
+        };
+
+        mark_tangent_handles(&mut points);
 
         if closed {
             points.rotate_left(1);
