@@ -58,13 +58,21 @@ pub struct GlyphPlus {
     units_per_em: f64,
 }
 
-//TODO: this is currently just used for editing font attributes, and isn't propogated
-//FIXME: use this as source of truth, synch back to UFO
-#[derive(Clone, Default, Data, Lens)]
+#[derive(Clone, Data, Lens)]
 pub struct SimpleFontInfo {
     metrics: FontMetrics,
-    pub family_name: String,
-    pub style_name: String,
+    pub family_name: Arc<str>,
+    pub style_name: Arc<str>,
+}
+
+impl Default for SimpleFontInfo {
+    fn default() -> Self {
+        SimpleFontInfo {
+            metrics: Default::default(),
+            family_name: "".into(),
+            style_name: "".into(),
+        }
+    }
 }
 
 /// Things in `FontInfo` that are relevant while editing or drawing.
@@ -354,10 +362,10 @@ impl FontObject {
             let font_info = self.ufo.font_info.get_or_insert_with(Default::default);
             // we don't want to set anything that hasn't changed.
             if existing_info.family_name != info.family_name {
-                font_info.family_name = Some(info.family_name.clone());
+                font_info.family_name = Some(info.family_name.to_string());
             }
             if existing_info.style_name != info.style_name {
-                font_info.style_name = Some(info.style_name.clone());
+                font_info.style_name = Some(info.style_name.to_string());
             }
             if existing_info.metrics.units_per_em != info.metrics.units_per_em {
                 font_info.units_per_em = info.metrics.units_per_em.try_into().ok();
@@ -408,14 +416,14 @@ impl SimpleFontInfo {
                 .ufo
                 .font_info
                 .as_ref()
-                .and_then(|f| f.family_name.clone())
-                .unwrap_or_else(|| "Untitled".to_string()),
+                .and_then(|f| f.family_name.as_ref().map(|s| s.as_str().into()))
+                .unwrap_or_else(|| "Untitled".into()),
             style_name: font
                 .ufo
                 .font_info
                 .as_ref()
-                .and_then(|f| f.style_name.clone())
-                .unwrap_or_else(|| "Regular".to_string()),
+                .and_then(|f| f.style_name.as_ref().map(|s| s.as_str().into()))
+                .unwrap_or_else(|| "Regular".into()),
             metrics: font
                 .ufo
                 .font_info

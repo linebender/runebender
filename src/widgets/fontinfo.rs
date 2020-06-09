@@ -6,16 +6,25 @@ use druid::widget::prelude::*;
 use druid::widget::{Button, CrossAxisAlignment, Flex, Label};
 use druid::{Color, LensExt, WidgetExt};
 
+use norad::GlyphName;
+
 use crate::data::{FontMetrics, SimpleFontInfo, Workspace};
 use crate::widgets::{EditableLabel, ModalHost};
+
+fn glyphname_label() -> EditableLabel<GlyphName> {
+    EditableLabel::new(
+        |data: &GlyphName, _: &_| data.to_string(),
+        |s| Some(s.into()),
+    )
+}
 
 pub fn font_info() -> impl Widget<Workspace> {
     Flex::column()
         .with_child(
             Flex::row()
-                .with_child(EditableLabel::parse().lens(SimpleFontInfo::family_name))
+                .with_child(glyphname_label().lens(SimpleFontInfo::family_name))
                 .with_spacer(8.0)
-                .with_child(EditableLabel::parse().lens(SimpleFontInfo::style_name)),
+                .with_child(glyphname_label().lens(SimpleFontInfo::style_name)),
         )
         .with_spacer(8.0)
         .with_child(
