@@ -6,11 +6,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use druid::kurbo::{Affine, BezPath, Point, Rect, Size};
+use druid::kurbo::{BezPath, Point, Rect, Size};
 use druid::{Data, Lens, WindowId};
 use norad::glyph::{Contour, ContourPoint, Glyph, GlyphName, PointType};
 use norad::{FontInfo, Ufo};
 
+use crate::bez_cache::BezCache;
 use crate::edit_session::{EditSession, SessionId};
 
 /// This is by convention.
@@ -36,6 +37,8 @@ pub struct Workspace {
     pub open_glyphs: Arc<HashMap<GlyphName, WindowId>>,
     pub sessions: Arc<HashMap<SessionId, Arc<EditSession>>>,
     session_map: Arc<HashMap<GlyphName, SessionId>>,
+    // really just a store of the fully resolved Beziers of all glyphs.
+    cache: BezCache,
     pub info: SimpleFontInfo,
 }
 
@@ -103,6 +106,23 @@ impl Workspace {
         };
         self.font = obj.into();
         self.info = SimpleFontInfo::from_font(&self.font);
+        self.build_path_cache();
+    }
+
+    fn build_path_cache(&mut self) {
+        let Workspace {
+            font,
+            cache,
+            sessions,
+            ..
+        } = self;
+        cache.reset(&font.ufo, &|name| {
+            sessions
+                .values()
+                .find(|sesh| sesh.name == *name)
+                .map(|sesh| &sesh.glyph)
+                .or_else(|| font.ufo.get_glyph(name))
+        });
     }
 
     pub fn save(&mut self) -> Result<(), Box<dyn Error>> {
@@ -141,39 +161,28 @@ impl Workspace {
             })
     }
 
-    /// Given a glyph name, a `Ufo`, and an optional cache, returns the fully resolved
-    /// (including all sub components) `BezPath` for this glyph.
-    pub fn get_bezier(&self, name: &GlyphName) -> Option<Arc<BezPath>> {
-        let glyph = self
-            .session_map
-            .get(name)
-            .and_then(|name| self.sessions.get(name).map(|s| &s.glyph))
-            .or_else(|| self.font.ufo.get_glyph(name))?;
-        let path = path_for_glyph(glyph)?;
-        Some(self.resolve_components(glyph, path))
+    pub(crate) fn get_bezier(&self, name: &GlyphName) -> Option<Arc<BezPath>> {
+        self.cache.get(name)
     }
 
-    /// takes a glyph outline and appends the outlines of any components,
-    /// resolving them as necessary, and caching the results.
-    fn resolve_components(&self, glyph: &Glyph, mut bez: BezPath) -> Arc<BezPath> {
-        for comp in glyph
-            .outline
-            .as_ref()
-            .iter()
-            .flat_map(|o| o.components.iter())
-        {
-            match self.get_bezier(&comp.base) {
-                Some(comp_path) => {
-                    let affine: Affine = comp.transform.clone().into();
-                    for comp_elem in (affine * &*comp_path).elements() {
-                        bez.push(*comp_elem);
-                    }
-                }
-                None => log::warn!("missing component {} in glyph {}", comp.base, glyph.name),
-            }
+    /// After a glyph is edited this rebuilds the affected beziers.
+    pub(crate) fn invalidate_path(&mut self, name: &GlyphName) {
+        let Workspace {
+            font,
+            cache,
+            sessions,
+            ..
+        } = self;
+        let to_inval = cache.glyphs_containing_component(name).to_vec();
+        for name in std::iter::once(name).chain(to_inval.iter()) {
+            cache.rebuild(&name, &|name| {
+                sessions
+                    .values()
+                    .find(|sesh| sesh.name == *name)
+                    .map(|sesh| &sesh.glyph)
+                    .or_else(|| font.ufo.get_glyph(name))
+            });
         }
-
-        Arc::new(bez)
     }
 
     /// Returns the upm for this font.
@@ -475,7 +484,7 @@ pub mod lenses {
         /// Workspace -> EditorState
         pub struct EditorState(pub SessionId);
 
-        /// GlyphSet_ -> GlyphPlus
+        /// Workspace -> GlyphPlus
         pub struct Glyph(pub GlyphName_);
 
         /// GlyphPlus => GlyphName_
@@ -521,7 +530,9 @@ pub mod lenses {
                     .map(|s| s.same(&glyph.session))
                     .unwrap_or(true)
                 {
+                    let name = glyph.session.name.clone();
                     Arc::make_mut(&mut data.sessions).insert(self.0, glyph.session);
+                    data.invalidate_path(&name);
                 }
                 v
             }
@@ -703,9 +714,10 @@ pub mod lenses {
     }
 }
 
+//FIXME: put this in some `GlyphExt` trait or something
 /// Convert this glyph's path from the UFO representation into a `kurbo::BezPath`
 /// (which we know how to draw.)
-fn path_for_glyph(glyph: &Glyph) -> Option<BezPath> {
+pub(crate) fn path_for_glyph(glyph: &Glyph) -> Option<BezPath> {
     /// An outline can have multiple contours, which correspond to subpaths
     fn add_contour(path: &mut BezPath, contour: &Contour) {
         let mut close: Option<&ContourPoint> = None;
