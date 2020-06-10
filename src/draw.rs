@@ -297,11 +297,11 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
     }
 
     fn draw_component(&mut self, component: &Component, font: &Workspace, color: Color) {
-        if let Some(bez) = font.get_bezier(&component.base) {
-            let mut bez = Arc::try_unwrap(bez).expect("just created, guaranteed unique");
+        if let Some(mut bez) = font.get_bezier(&component.base) {
+            let bez = Arc::make_mut(&mut bez);
             bez.apply_affine(component.transform);
             bez.apply_affine(self.space.affine());
-            self.fill(bez, &color);
+            self.fill(&*bez, &color);
         }
     }
 }
