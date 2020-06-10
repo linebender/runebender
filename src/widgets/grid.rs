@@ -10,7 +10,7 @@ use druid::{
 };
 
 use crate::app_delegate::EDIT_GLYPH;
-use crate::data::{lenses, GlyphPlus, Workspace};
+use crate::data::{lenses, GridGlyph, Workspace};
 use crate::theme;
 use crate::widgets::Maybe;
 
@@ -27,7 +27,7 @@ impl GlyphGrid {
         for key in data.font.ufo.iter_names() {
             let widget = Maybe::or_empty(|| GridInner);
             self.children.push(WidgetPod::new(
-                LensWrap::new(widget, lenses::app_state::Glyph(key)).boxed(),
+                LensWrap::new(widget, lenses::app_state::GridGlyph(key)).boxed(),
             ));
         }
     }
@@ -107,11 +107,14 @@ impl Widget<Workspace> for GlyphGrid {
     }
 
     fn update(&mut self, ctx: &mut UpdateCtx, old: &Workspace, new: &Workspace, env: &Env) {
+        //eprintln!("grid update generation {}, {}", old.cache.generation.get(), new.cache.generation.get());
         if !old.font.same(&new.font) {
+            //eprintln!("old font changed");
             self.update_children(new);
             ctx.children_changed();
             ctx.request_paint();
         } else {
+            //eprintln!("cache same {}", old.cache.same(&new.cache));
             for child in &mut self.children {
                 child.update(ctx, new, env);
             }
@@ -128,12 +131,12 @@ impl GlyphGrid {
 #[derive(Debug, Clone, Copy)]
 struct GridInner;
 
-impl Widget<GlyphPlus> for GridInner {
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &GlyphPlus, env: &Env) {
-        let path = data.get_bezier();
+impl Widget<GridGlyph> for GridInner {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &GridGlyph, env: &Env) {
+        let path = data.outline.clone();
         let bb = path.bounding_box();
         let geom = Rect::ZERO.with_size(ctx.size());
-        let scale = geom.height() as f64 / data.upm();
+        let scale = geom.height() as f64 / data.upm;
         let scale = scale * 0.85; // some margins around glyphs
         let scaled_width = bb.width() * scale as f64;
         let l_pad = ((geom.width() as f64 - scaled_width) / 2.).round();
@@ -153,7 +156,7 @@ impl Widget<GlyphPlus> for GridInner {
             let rounded = selection_rect.to_rounded_rect(5.0);
             ctx.fill(rounded, &hl_color);
         }
-        let glyph_color = if data.is_placeholder_glyph() {
+        let glyph_color = if data.is_placeholder {
             env.get(theme::PLACEHOLDER_GLYPH_COLOR)
         } else {
             env.get(theme::GLYPH_COLOR)
@@ -164,7 +167,7 @@ impl Widget<GlyphPlus> for GridInner {
         let font_size = env.get(theme::GLYPH_LIST_LABEL_TEXT_SIZE);
         let text_color = env.get(theme::GLYPH_COLOR);
 
-        let text = get_text_layout(&mut ctx.text(), &data.glyph.name, env);
+        let text = get_text_layout(&mut ctx.text(), &data.name, env);
         let xpos = geom.x0 + (geom.width() - text.width()) * 0.5;
         let ypos = geom.y0 + geom.height() - font_size * 0.25;
         let pos = (xpos, ypos);
@@ -177,13 +180,13 @@ impl Widget<GlyphPlus> for GridInner {
         &mut self,
         _ctx: &mut LayoutCtx,
         bc: &BoxConstraints,
-        _d: &GlyphPlus,
+        _d: &GridGlyph,
         _env: &Env,
     ) -> Size {
         bc.max()
     }
 
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut GlyphPlus, _env: &Env) {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut GridGlyph, _env: &Env) {
         match event {
             Event::MouseDown(m) => {
                 ctx.set_active(true);
@@ -191,7 +194,7 @@ impl Widget<GlyphPlus> for GridInner {
                 if m.count == 1 {
                     data.is_selected = true;
                 } else if m.count == 2 {
-                    ctx.submit_command(EDIT_GLYPH.with(data.glyph.name.clone()), None);
+                    ctx.submit_command(EDIT_GLYPH.with(data.name.clone()), None);
                 }
             }
             Event::MouseUp(_) => {
@@ -204,13 +207,13 @@ impl Widget<GlyphPlus> for GridInner {
         }
     }
 
-    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, _: &GlyphPlus, _: &Env) {
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, _: &GridGlyph, _: &Env) {
         if let LifeCycle::HotChanged(_) = event {
             ctx.request_paint();
         }
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, old: &GlyphPlus, new: &GlyphPlus, _env: &Env) {
+    fn update(&mut self, ctx: &mut UpdateCtx, old: &GridGlyph, new: &GridGlyph, _env: &Env) {
         if !old.same(new) {
             ctx.request_paint();
         }

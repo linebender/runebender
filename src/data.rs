@@ -38,7 +38,7 @@ pub struct Workspace {
     pub sessions: Arc<HashMap<SessionId, Arc<EditSession>>>,
     session_map: Arc<HashMap<GlyphName, SessionId>>,
     // really just a store of the fully resolved Beziers of all glyphs.
-    cache: BezCache,
+    cache: Arc<BezCache>,
     pub info: SimpleFontInfo,
 }
 
@@ -50,6 +50,19 @@ pub struct FontObject {
     placeholder: Arc<BezPath>,
 }
 
+/// The data type for a grid square.
+///
+/// Unlike GlyphPlus, this doesn't have a reference to the glyph itself,
+/// which is expensive to find in large glyphsets.
+#[derive(Debug, Clone, Data, Lens)]
+pub(crate) struct GridGlyph {
+    pub name: GlyphName,
+    pub outline: Arc<BezPath>,
+    pub is_placeholder: bool,
+    pub is_selected: bool,
+    pub upm: f64,
+}
+
 /// A glyph, plus access to the main UFO in order to resolve components in that
 /// glyph.
 #[derive(Clone, Data, Lens)]
@@ -57,7 +70,6 @@ pub struct GlyphPlus {
     pub glyph: Arc<Glyph>,
     outline: Arc<BezPath>,
     is_placeholder: bool,
-    pub is_selected: bool,
     units_per_em: f64,
 }
 
@@ -116,7 +128,8 @@ impl Workspace {
             sessions,
             ..
         } = self;
-        cache.reset(&font.ufo, &|name| {
+
+        Arc::make_mut(cache).reset(&font.ufo, &|name| {
             sessions
                 .values()
                 .find(|sesh| sesh.name == *name)
@@ -175,7 +188,7 @@ impl Workspace {
         } = self;
         let to_inval = cache.glyphs_containing_component(name).to_vec();
         for name in std::iter::once(name).chain(to_inval.iter()) {
-            cache.rebuild(&name, &|name| {
+            Arc::make_mut(cache).rebuild(&name, &|name| {
                 sessions
                     .values()
                     .find(|sesh| sesh.name == *name)
@@ -479,7 +492,9 @@ pub mod lenses {
         use druid::{Data, Lens};
         use norad::GlyphName as GlyphName_;
 
-        use super::super::{EditorState as EditorState_, GlyphPlus, SessionId, Workspace};
+        use super::super::{
+            EditorState as EditorState_, GlyphPlus, GridGlyph as GridGlyph_, SessionId, Workspace,
+        };
 
         /// Workspace -> EditorState
         pub struct EditorState(pub SessionId);
@@ -489,6 +504,9 @@ pub mod lenses {
 
         /// GlyphPlus => GlyphName_
         pub struct GlyphName;
+
+        /// Workspace -> GridGlyph
+        pub struct GridGlyph(pub GlyphName_);
 
         /// GlyphPlus -> char
         pub struct Codepoint;
@@ -542,13 +560,11 @@ pub mod lenses {
             fn with<V, F: FnOnce(&Option<GlyphPlus>) -> V>(&self, data: &Workspace, f: F) -> V {
                 let glyph = data.font.ufo.get_glyph(&self.0).map(|g| {
                     let outline = data.get_bezier(&g.name);
-                    let is_selected = data.selected.as_ref() == Some(&self.0);
                     GlyphPlus {
                         glyph: Arc::clone(g),
                         is_placeholder: outline.is_none(),
                         outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
                         units_per_em: data.units_per_em(),
-                        is_selected,
                     }
                 });
                 f(&glyph)
@@ -565,14 +581,46 @@ pub mod lenses {
                 let mut glyph = data.font.ufo.get_glyph(&self.0).map(|glyph| {
                     let outline = data.get_bezier(&glyph.name);
                     let is_placeholder = outline.is_none();
-                    let is_selected = data.selected.as_ref() == Some(&self.0);
                     GlyphPlus {
                         glyph: Arc::clone(glyph),
                         outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
                         units_per_em: data.units_per_em(),
                         is_placeholder,
-                        is_selected,
                     }
+                });
+                let r = f(&mut glyph);
+                r
+            }
+        }
+
+        impl Lens<Workspace, Option<GridGlyph_>> for GridGlyph {
+            fn with<V, F: FnOnce(&Option<GridGlyph_>) -> V>(&self, data: &Workspace, f: F) -> V {
+                let outline = data.get_bezier(&self.0);
+
+                let is_selected = data.selected.as_ref() == Some(&self.0);
+                let glyph = Some(GridGlyph_ {
+                    name: self.0.clone(),
+                    is_placeholder: outline.is_none(),
+                    outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
+                    upm: data.units_per_em(),
+                    is_selected,
+                });
+                f(&glyph)
+            }
+
+            fn with_mut<V, F: FnOnce(&mut Option<GridGlyph_>) -> V>(
+                &self,
+                data: &mut Workspace,
+                f: F,
+            ) -> V {
+                let outline = data.get_bezier(&self.0);
+                let is_selected = data.selected.as_ref() == Some(&self.0);
+                let mut glyph = Some(GridGlyph_ {
+                    name: self.0.clone(),
+                    is_placeholder: outline.is_none(),
+                    outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
+                    upm: data.units_per_em(),
+                    is_selected,
                 });
                 let r = f(&mut glyph);
                 // we track selections by having the grid item set this flag,
@@ -619,13 +667,11 @@ pub mod lenses {
                         .expect("missing glyph in lens");
                     let outline = data.get_bezier(&glyph.name);
                     let is_placeholder = outline.is_none();
-                    let is_selected = data.selected.as_ref() == Some(&name);
                     GlyphPlus {
                         glyph: Arc::clone(glyph),
                         outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
                         units_per_em: data.units_per_em(),
                         is_placeholder,
-                        is_selected,
                     }
                 });
                 f(&selected)
@@ -644,13 +690,11 @@ pub mod lenses {
                         .expect("missing glyph in lens");
                     let outline = data.get_bezier(&glyph.name);
                     let is_placeholder = outline.is_none();
-                    let is_selected = data.selected.as_ref() == Some(&name);
                     GlyphPlus {
                         glyph: Arc::clone(glyph),
                         outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
                         units_per_em: data.units_per_em(),
                         is_placeholder,
-                        is_selected,
                     }
                 });
                 let r = f(&mut selected);
