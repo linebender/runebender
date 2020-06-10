@@ -7,6 +7,7 @@ extern crate serde_derive;
 extern crate lopdf;
 
 mod app_delegate;
+mod bez_cache;
 mod clipboard;
 mod component;
 mod consts;
