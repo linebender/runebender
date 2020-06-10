@@ -36,6 +36,7 @@ struct PreCache {
     store: [Option<(GlyphName, Arc<BezPath>)>; PRE_CACHE_SIZE],
     len: usize,
 }
+
 impl PreCache {
     fn is_full(&self) -> bool {
         self.len == PRE_CACHE_SIZE
@@ -47,8 +48,12 @@ impl PreCache {
     }
 
     fn get(&self, key: &GlyphName) -> Option<Arc<BezPath>> {
-        self.idx_for_key(key)
-            .map(|idx| self.store[idx].as_ref().unwrap().1.clone())
+        self.store
+            .iter()
+            .flatten()
+            .find(|item| &item.0 == key)
+            .map(|(_, bez)| bez)
+            .cloned()
     }
 
     fn remove(&mut self, key: &GlyphName) {
