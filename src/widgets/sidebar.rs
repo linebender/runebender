@@ -10,7 +10,7 @@ use druid::widget::{Controller, Flex, Label, SizedBox, WidgetExt};
 
 use norad::GlyphName;
 
-use crate::data::{lenses, GlyphPlus, Workspace};
+use crate::data::{lenses, SelectedGlyph, Workspace};
 use crate::theme;
 use crate::widgets::{EditableLabel, Maybe};
 
@@ -23,7 +23,7 @@ pub struct Sidebar {
     selected_glyph: WidgetPod<Workspace, Box<dyn Widget<Workspace>>>,
 }
 
-fn selected_glyph_widget() -> impl Widget<GlyphPlus> {
+fn selected_glyph_widget() -> impl Widget<SelectedGlyph> {
     Flex::column()
         .with_child(
             EditableLabel::new(
@@ -52,7 +52,7 @@ fn selected_glyph_widget() -> impl Widget<GlyphPlus> {
             )
             .lens(lenses::app_state::Codepoint),
         )
-        .with_flex_child(SelectedGlyph::new(), 1.0)
+        .with_flex_child(GlyphPainter::new(), 1.0)
         .with_child(
             EditableLabel::parse()
                 .fix_width(45.)
@@ -143,29 +143,36 @@ impl Widget<Workspace> for Sidebar {
 }
 
 // currently just paints the glyph shape
-struct SelectedGlyph {}
+struct GlyphPainter;
 
-impl SelectedGlyph {
+impl GlyphPainter {
     pub fn new() -> Self {
-        SelectedGlyph {}
+        GlyphPainter
     }
 }
 
-impl Widget<GlyphPlus> for SelectedGlyph {
-    fn event(&mut self, _ctx: &mut EventCtx, _event: &Event, _data: &mut GlyphPlus, _env: &Env) {}
+impl Widget<SelectedGlyph> for GlyphPainter {
+    fn event(
+        &mut self,
+        _ctx: &mut EventCtx,
+        _event: &Event,
+        _data: &mut SelectedGlyph,
+        _env: &Env,
+    ) {
+    }
     fn lifecycle(
         &mut self,
         _ctx: &mut LifeCycleCtx,
         _event: &LifeCycle,
-        _data: &GlyphPlus,
+        _data: &SelectedGlyph,
         _env: &Env,
     ) {
     }
     fn update(
         &mut self,
         _ctx: &mut UpdateCtx,
-        _old_data: &GlyphPlus,
-        _data: &GlyphPlus,
+        _old_data: &SelectedGlyph,
+        _data: &SelectedGlyph,
         _env: &Env,
     ) {
     }
@@ -173,14 +180,14 @@ impl Widget<GlyphPlus> for SelectedGlyph {
         &mut self,
         _ctx: &mut LayoutCtx,
         bc: &BoxConstraints,
-        _data: &GlyphPlus,
+        _data: &SelectedGlyph,
         _env: &Env,
     ) -> Size {
         let width = bc.max().width;
         bc.constrain(Size::new(width, SELECTED_GLYPH_HEIGHT))
     }
 
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &GlyphPlus, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &SelectedGlyph, env: &Env) {
         let advance = data
             .glyph
             .advance

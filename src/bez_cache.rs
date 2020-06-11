@@ -3,7 +3,6 @@
 //! this is used to invalidate glyphs appropriately when components change
 
 use std::borrow::Cow;
-//use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -151,7 +150,7 @@ impl BezCache {
         self.rebuild_without_inval(name, glyph_getter)
     }
 
-    pub fn rebuild_without_inval<'a, F>(
+    fn rebuild_without_inval<'a, F>(
         &mut self,
         name: &GlyphName,
         glyph_getter: &'a F,
