@@ -973,8 +973,7 @@ dependencies = [
 [[package]]
 name = "norad"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac8c4dca7597da13cf6d97474df77cc0e820c6729e66a15b6e4f338c493566d5"
+source = "git+https://github.com/linebender/norad.git?rev=46789c4d#46789c4d14ceb87084a85f230b33425445c9737f"
 dependencies = [
  "druid",
  "plist",

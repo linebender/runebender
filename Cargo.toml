@@ -6,7 +6,7 @@ license = "Apache-2.0"
 edition = "2018"
 
 [dependencies]
-norad = { version = "0.2.0", features = ["druid", "rayon"] }
+norad = { version = "0.2.0", git = "https://github.com/linebender/norad.git", rev = "46789c4d", features = ["druid", "rayon"] }
 druid = "0.6"
 log = "0.4.8"
 plist = "1.0"
