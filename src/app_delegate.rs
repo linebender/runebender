@@ -46,6 +46,11 @@ impl AppDelegate<AppState> for Delegate {
                 log::error!("saving failed: '{}'", e);
             }
             false
+        } else if cmd.is(consts::cmd::TOGGLE_COORDINATE_HOVER) {
+            let current_val = data.workspace.settings().show_coordinate_on_hover;
+            data.workspace.settings_mut().show_coordinate_on_hover = !current_val;
+            ctx.submit_command(consts::cmd::REBUILD_MENUS, None);
+            false
         } else if cmd.is(consts::cmd::NEW_GLYPH) {
             let new_glyph_name = data.workspace.add_new_glyph();
             data.workspace.selected = Some(new_glyph_name);

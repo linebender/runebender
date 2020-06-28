@@ -112,6 +112,7 @@ fn get_initial_state() -> AppState {
     };
 
     let mut workspace = Workspace::default();
+    workspace.settings_mut().show_coordinate_on_hover = true;
     workspace.set_file(font_file, path);
     AppState { workspace }
 }

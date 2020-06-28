@@ -43,7 +43,7 @@ pub(crate) fn make_menu(data: &AppState) -> MenuDesc<AppState> {
 
     menu.append(file_menu(data))
         .append(edit_menu())
-        .append(view_menu())
+        .append(view_menu(data))
         .append(glyph_menu(data))
         .append(tools_menu())
 }
@@ -121,7 +121,7 @@ fn edit_menu<T: Data>() -> MenuDesc<T> {
         )
 }
 
-fn view_menu<T: Data>() -> MenuDesc<T> {
+fn view_menu(data: &AppState) -> MenuDesc<AppState> {
     MenuDesc::new(LocalizedString::new("menu-view-menu").with_placeholder("View"))
         .append(
             MenuItem::new(
@@ -144,6 +144,16 @@ fn view_menu<T: Data>() -> MenuDesc<T> {
             )
             .hotkey(SysMods::Cmd, "0"),
         )
+        .append_separator()
+        .append(
+            MenuItem::new(
+                LocalizedString::new("menu-item-show-coord-on-hover")
+                    .with_placeholder("Show Coordinate On Hover"),
+                consts::cmd::TOGGLE_COORDINATE_HOVER,
+            )
+            .selected_if(|| data.workspace.settings().show_coordinate_on_hover),
+        )
+        .append_separator()
 }
 
 fn glyph_menu(data: &AppState) -> MenuDesc<AppState> {

@@ -1,3 +1,4 @@
+use std::cell::Ref;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -7,7 +8,7 @@ use norad::glyph::Outline;
 use norad::{Glyph, GlyphName};
 
 use crate::component::Component;
-use crate::data::Workspace;
+use crate::data::{Settings, SharedSettings, Workspace};
 use crate::design_space::{DPoint, DVec2, ViewPort};
 use crate::guides::Guide;
 use crate::path::{EntityId, Path, PathPoint};
@@ -46,6 +47,7 @@ pub struct EditSession {
     quadrant: Quadrant,
     /// A string describing the current tool
     pub tool_desc: Arc<str>,
+    pub settings: SharedSettings,
 }
 
 /// when selecting multiple points, which coordinate value do we display?
@@ -113,7 +115,12 @@ impl EditSession {
             tool_desc: Arc::from("Select"),
             quadrant: Quadrant::Center,
             work_bounds,
+            settings: glyphs.shared_settings.clone(),
         }
+    }
+
+    pub fn settings(&self) -> Ref<Settings> {
+        self.settings.borrow()
     }
 
     /// Construct a bezier of the paths in this glyph, ignoring components.
@@ -171,19 +178,18 @@ impl EditSession {
         &'a self,
         point: Point,
         max_dist: Option<f64>,
-    ) -> impl Iterator<Item = EntityId> + 'a {
+    ) -> impl Iterator<Item = (EntityId, f64)> + 'a {
         let max_dist = max_dist.unwrap_or(MIN_CLICK_DISTANCE);
         self.paths
             .iter()
             .flat_map(|p| p.points().iter())
-            .filter(move |p| p.screen_dist(self.viewport, point) <= max_dist)
-            .map(|p| p.id)
+            .map(move |pt| (pt.id, pt.screen_dist(self.viewport, point)))
             .chain(
                 self.guides
                     .iter()
-                    .filter(move |g| g.screen_dist(self.viewport, point) <= max_dist)
-                    .map(|g| g.id),
+                    .map(move |pt| (pt.id, pt.screen_dist(self.viewport, point))),
             )
+            .filter(move |(_, dist)| *dist <= max_dist)
     }
 
     /// Return the index of the path that is currently drawing. To be currently
