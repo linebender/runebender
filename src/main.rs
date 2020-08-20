@@ -64,10 +64,11 @@ fn make_ui() -> impl Widget<AppState> {
         format!("{} {}", data.info.family_name, data.info.style_name)
     });
 
-    let button = Button::new("(edit)").on_click(|ctx, _data, _env| {
-        let cmd = ModalHost::make_modal_command(crate::widgets::font_info);
-        ctx.submit_command(cmd, None);
-    });
+    let button = Button::new(LocalizedString::new("button-edit").with_placeholder("(edit)"))
+        .on_click(|ctx, _data, _env| {
+            let cmd = ModalHost::make_modal_command(crate::widgets::font_info);
+            ctx.submit_command(cmd, None);
+        });
 
     let main_view = Flex::column()
         .with_child(
