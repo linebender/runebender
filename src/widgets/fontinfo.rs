@@ -4,7 +4,7 @@
 
 use druid::widget::prelude::*;
 use druid::widget::{Button, CrossAxisAlignment, Flex, Label};
-use druid::{Color, LensExt, WidgetExt};
+use druid::{Color, LensExt, LocalizedString, WidgetExt};
 
 use norad::GlyphName;
 
@@ -29,7 +29,7 @@ pub fn font_info() -> impl Widget<Workspace> {
         .with_spacer(8.0)
         .with_child(
             Flex::row()
-                .with_child(Label::new("Cap height:"))
+                .with_child(Label::new(LocalizedString::new("font-info-cap-height").with_placeholder("Cap height:")))
                 .with_spacer(8.0)
                 .with_child(
                     option_f64_editlabel()
@@ -38,7 +38,7 @@ pub fn font_info() -> impl Widget<Workspace> {
         )
         .with_child(
             Flex::row()
-                .with_child(Label::new("x-height:"))
+                .with_child(Label::new(LocalizedString::new("font-info-x-height").with_placeholder("x-height:")))
                 .with_spacer(8.0)
                 .with_child(
                     option_f64_editlabel()
@@ -47,7 +47,7 @@ pub fn font_info() -> impl Widget<Workspace> {
         )
         .with_child(
             Flex::row()
-                .with_child(Label::new("ascender:"))
+                .with_child(Label::new(LocalizedString::new("font-info-ascender").with_placeholder("ascender:")))
                 .with_spacer(8.0)
                 .with_child(
                     option_f64_editlabel()
@@ -56,7 +56,7 @@ pub fn font_info() -> impl Widget<Workspace> {
         )
         .with_child(
             Flex::row()
-                .with_child(Label::new("descender:").center())
+                .with_child(Label::new(LocalizedString::new("font-info-descender").with_placeholder("descender:")).center())
                 .with_spacer(8.0)
                 .with_child(
                     option_f64_editlabel()
@@ -65,7 +65,7 @@ pub fn font_info() -> impl Widget<Workspace> {
         )
         .with_flex_spacer(1.0)
         .with_child(
-            Button::new("Done")
+            Button::new(LocalizedString::new("button-done").with_placeholder("Done"))
                 .on_click(|ctx, _, _| ctx.submit_command(ModalHost::DISMISS_MODAL, None)),
         )
         .cross_axis_alignment(CrossAxisAlignment::End)
