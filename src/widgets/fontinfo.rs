@@ -29,7 +29,9 @@ pub fn font_info() -> impl Widget<Workspace> {
         .with_spacer(8.0)
         .with_child(
             Flex::row()
-                .with_child(Label::new(LocalizedString::new("font-info-cap-height").with_placeholder("Cap height:")))
+                .with_child(Label::new(
+                    LocalizedString::new("font-info-cap-height").with_placeholder("Cap height:"),
+                ))
                 .with_spacer(8.0)
                 .with_child(
                     option_f64_editlabel()
@@ -38,7 +40,9 @@ pub fn font_info() -> impl Widget<Workspace> {
         )
         .with_child(
             Flex::row()
-                .with_child(Label::new(LocalizedString::new("font-info-x-height").with_placeholder("x-height:")))
+                .with_child(Label::new(
+                    LocalizedString::new("font-info-x-height").with_placeholder("x-height:"),
+                ))
                 .with_spacer(8.0)
                 .with_child(
                     option_f64_editlabel()
@@ -47,7 +51,9 @@ pub fn font_info() -> impl Widget<Workspace> {
         )
         .with_child(
             Flex::row()
-                .with_child(Label::new(LocalizedString::new("font-info-ascender").with_placeholder("ascender:")))
+                .with_child(Label::new(
+                    LocalizedString::new("font-info-ascender").with_placeholder("ascender:"),
+                ))
                 .with_spacer(8.0)
                 .with_child(
                     option_f64_editlabel()
@@ -56,7 +62,12 @@ pub fn font_info() -> impl Widget<Workspace> {
         )
         .with_child(
             Flex::row()
-                .with_child(Label::new(LocalizedString::new("font-info-descender").with_placeholder("descender:")).center())
+                .with_child(
+                    Label::new(
+                        LocalizedString::new("font-info-descender").with_placeholder("descender:"),
+                    )
+                    .center(),
+                )
                 .with_spacer(8.0)
                 .with_child(
                     option_f64_editlabel()
