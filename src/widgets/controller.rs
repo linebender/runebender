@@ -2,8 +2,7 @@
 
 use druid::widget::{prelude::*, Controller};
 use druid::{
-    Command, Env, Event, EventCtx, InternalLifeCycle, LensExt, Rect, UpdateCtx, Widget, WidgetExt,
-    WidgetPod,
+    Env, Event, EventCtx, InternalLifeCycle, LensExt, Rect, UpdateCtx, Widget, WidgetExt, WidgetPod,
 };
 
 use crate::consts;
@@ -78,8 +77,8 @@ impl<W: Widget<EditorState>> Widget<EditorState> for EditorController<W> {
         // and so won't get the key event.
         if let Event::KeyDown(k) = event {
             if let Some(new_tool) = self.toolbar.widget().inner().tool_for_keypress(k) {
-                let cmd = Command::new(consts::cmd::SET_TOOL, new_tool);
-                ctx.submit_command(cmd, None);
+                let cmd = consts::cmd::SET_TOOL.with(new_tool);
+                ctx.submit_command(cmd);
                 ctx.set_handled();
                 return;
             }
@@ -103,7 +102,7 @@ impl<W: Widget<EditorState>> Widget<EditorState> for EditorController<W> {
         //take focus back again so that it can handle keyboard input.
         if matches!(event, LifeCycle::Internal(InternalLifeCycle::RouteFocusChanged { new, .. }) if new.is_none())
         {
-            ctx.submit_command(crate::consts::cmd::TAKE_FOCUS, None);
+            ctx.submit_command(crate::consts::cmd::TAKE_FOCUS);
         }
         self.toolbar.lifecycle(ctx, event, &(), env);
         self.coord_panel.lifecycle(ctx, event, data, env);

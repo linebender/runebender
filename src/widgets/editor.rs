@@ -5,7 +5,7 @@ use std::sync::Arc;
 use druid::kurbo::{Rect, Size};
 use druid::{
     Application, BoxConstraints, Clipboard, ClipboardFormat, Command, ContextMenu, Data, Env,
-    Event, EventCtx, KeyCode, LayoutCtx, LifeCycle, LifeCycleCtx, PaintCtx, UpdateCtx, Widget,
+    Event, EventCtx, KbKey, LayoutCtx, LifeCycle, LifeCycleCtx, PaintCtx, UpdateCtx, Widget,
 };
 
 use crate::consts::{self, CANVAS_SIZE};
@@ -214,7 +214,7 @@ impl Widget<EditorState> for Editor {
         draw::draw_session(
             ctx,
             data.session.viewport,
-            ctx.region().to_rect(),
+            ctx.region().bounding_box(),
             &data.metrics,
             &data.session,
             &data.font,
@@ -263,7 +263,7 @@ impl Widget<EditorState> for Editor {
                     edit
                 }
             }
-            Event::KeyDown(k) if k.key_code == KeyCode::Escape => {
+            Event::KeyDown(k) if k.key == KbKey::Escape => {
                 data.session_mut().clear_selection();
                 None
             }

@@ -1,9 +1,8 @@
 //! The rectangle shape tool
 
-use druid::kurbo::Vec2;
-use druid::piet::{FontBuilder, PietTextLayout, Text, TextLayout, TextLayoutBuilder};
 use druid::{
-    Color, Env, EventCtx, KeyCode, KeyEvent, MouseEvent, PaintCtx, Point, Rect, RenderContext,
+    Color, Env, EventCtx, KbKey, KeyEvent, MouseEvent, PaintCtx, Point, Rect, RenderContext,
+    TextLayout,
 };
 
 use crate::design_space::DPoint;
@@ -13,10 +12,23 @@ use crate::path::{Path, PathPoint};
 use crate::tools::{EditType, Tool};
 
 /// The state of the rectangle tool.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct Rectangle {
     gesture: GestureState,
     shift_locked: bool,
+    coord_text: TextLayout,
+}
+
+impl Default for Rectangle {
+    fn default() -> Self {
+        let mut layout = TextLayout::new("");
+        layout.set_font(crate::theme::UI_DETAIL_FONT);
+        Rectangle {
+            gesture: Default::default(),
+            shift_locked: false,
+            coord_text: layout,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -53,15 +65,6 @@ impl Rectangle {
             data.viewport.to_screen(current),
         ))
     }
-
-    fn label_text(&self, ctx: &mut PaintCtx) -> Option<PietTextLayout> {
-        let (start, current) = self.pts_for_rect()?;
-        let size = start - current;
-        let mut text = ctx.text();
-        let font = text.new_font_by_name("Helvetica", 10.0).build().unwrap();
-        let label_text = format!("{}, {}", size.x.abs(), size.y.abs());
-        text.new_text_layout(&font, &label_text, None).build().ok()
-    }
 }
 
 impl Tool for Rectangle {
@@ -76,7 +79,7 @@ impl Tool for Rectangle {
         _: &mut EditSession,
         _: &Env,
     ) -> Option<EditType> {
-        if key.key_code == KeyCode::LeftShift || key.key_code == KeyCode::RightShift {
+        if key.key == KbKey::Shift {
             self.shift_locked = true;
             ctx.request_paint();
         }
@@ -90,7 +93,7 @@ impl Tool for Rectangle {
         _: &mut EditSession,
         _: &Env,
     ) -> Option<EditType> {
-        if key.key_code == KeyCode::LeftShift || key.key_code == KeyCode::RightShift {
+        if key.key == KbKey::Shift {
             self.shift_locked = false;
             ctx.request_paint();
         }
@@ -119,23 +122,26 @@ impl Tool for Rectangle {
         }
     }
 
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &EditSession, _env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &EditSession, env: &Env) {
         const LABEL_PADDING: f64 = 4.0;
         if let Some(rect) = self.current_drag_rect(data) {
             ctx.stroke(rect, &Color::BLACK, 1.0);
-            let text = self.label_text(ctx).unwrap();
-            let width = text.width();
-            let height = text.line_metric(0).map(|m| m.height).unwrap_or_default();
-            let ascent = text.line_metric(0).map(|m| m.baseline).unwrap_or_default();
-            let text_x = rect.x1 - width - LABEL_PADDING;
+            let (start, current) = self.pts_for_rect().unwrap();
+            let size = start - current;
+            let label_text = format!("{}, {}", size.x.abs(), size.y.abs());
+            self.coord_text.set_text(label_text);
+            self.coord_text.rebuild_if_needed(ctx.text(), env);
+            let text_size = self.coord_text.size();
+
+            let text_x = rect.x1 - text_size.width - LABEL_PADDING;
             let text_y = rect.y1 + LABEL_PADDING;
             let text_pos = Point::new(text_x, text_y);
 
-            let rect = Rect::from_origin_size(text_pos, (width, height))
+            let rect = Rect::from_origin_size(text_pos, text_size)
                 .inset(2.0)
                 .to_rounded_rect(2.0);
             ctx.fill(rect, &Color::WHITE.with_alpha(0.5));
-            ctx.draw_text(&text, text_pos + Vec2::new(0., ascent), &Color::BLACK);
+            self.coord_text.draw(ctx, text_pos);
         }
     }
 }
@@ -149,7 +155,7 @@ impl MouseDelegate<EditSession> for Rectangle {
         if event.count == 1 {
             let pt = data.viewport.from_screen(event.pos);
             self.gesture = GestureState::Down(pt);
-            self.shift_locked = event.mods.shift;
+            self.shift_locked = event.mods.shift();
         }
     }
 

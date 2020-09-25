@@ -2,8 +2,8 @@
 
 use druid::kurbo::Line;
 use druid::{
-    Affine, BoxConstraints, Color, Command, Data, Env, Event, EventCtx, LayoutCtx, LifeCycle,
-    LifeCycleCtx, PaintCtx, Rect, RenderContext, Size, UpdateCtx, Widget, WidgetPod,
+    Affine, BoxConstraints, Color, Data, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx,
+    PaintCtx, Rect, RenderContext, Size, UpdateCtx, Widget, WidgetPod,
 };
 
 use druid::widget::{Controller, Flex, Label, SizedBox, WidgetExt};
@@ -239,8 +239,8 @@ impl<W: Widget<GlyphName>> Controller<GlyphName, W> for RenameController {
                 old: pre_data,
                 new: data.clone(),
             };
-            let cmd = Command::new(crate::consts::cmd::RENAME_GLYPH, args);
-            ctx.submit_command(cmd, None);
+            let cmd = crate::consts::cmd::RENAME_GLYPH.with(args);
+            ctx.submit_command(cmd);
         }
     }
 }

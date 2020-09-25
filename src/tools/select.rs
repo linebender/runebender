@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use druid::kurbo::{Point, Rect, Vec2};
 use druid::piet::{Color, RenderContext};
-use druid::{Data, Env, EventCtx, HotKey, KeyCode, KeyEvent, MouseEvent, PaintCtx, RawMods};
+use druid::{Data, Env, EventCtx, HotKey, KbKey, KeyEvent, MouseEvent, PaintCtx, RawMods};
 
 use crate::design_space::{DPoint, DVec2};
 use crate::edit_session::EditSession;
@@ -60,22 +60,21 @@ impl Tool for Select {
         _: &Env,
     ) -> Option<EditType> {
         assert!(self.this_edit_type.is_none());
-        use KeyCode::*;
         match event {
-            e if e.key_code == ArrowLeft
-                || e.key_code == ArrowDown
-                || e.key_code == ArrowUp
-                || e.key_code == ArrowRight =>
+            e if e.key == KbKey::ArrowLeft
+                || e.key == KbKey::ArrowDown
+                || e.key == KbKey::ArrowUp
+                || e.key == KbKey::ArrowRight =>
             {
                 self.nudge(data, event);
             }
-            e if e.key_code == Backspace => {
+            e if e.key == KbKey::Backspace => {
                 data.delete_selection();
                 self.this_edit_type = Some(EditType::Normal);
             }
-            e if HotKey::new(None, KeyCode::Tab).matches(e) => data.select_next(),
+            e if HotKey::new(None, KbKey::Tab).matches(e) => data.select_next(),
             //TODO: add Shift to SysMods
-            e if HotKey::new(RawMods::Shift, KeyCode::Tab).matches(e) => data.select_prev(),
+            e if HotKey::new(RawMods::Shift, KbKey::Tab).matches(e) => data.select_prev(),
             _ => return None,
         }
         self.this_edit_type.take()
@@ -105,17 +104,17 @@ impl Tool for Select {
 
 impl Select {
     fn nudge(&mut self, data: &mut EditSession, event: &KeyEvent) {
-        let (mut nudge, edit_type) = match event.key_code {
-            KeyCode::ArrowLeft => (Vec2::new(-1.0, 0.), EditType::NudgeLeft),
-            KeyCode::ArrowRight => (Vec2::new(1.0, 0.), EditType::NudgeRight),
-            KeyCode::ArrowUp => (Vec2::new(0.0, 1.0), EditType::NudgeUp),
-            KeyCode::ArrowDown => (Vec2::new(0.0, -1.0), EditType::NudgeDown),
+        let (mut nudge, edit_type) = match event.key {
+            KbKey::ArrowLeft => (Vec2::new(-1.0, 0.), EditType::NudgeLeft),
+            KbKey::ArrowRight => (Vec2::new(1.0, 0.), EditType::NudgeRight),
+            KbKey::ArrowUp => (Vec2::new(0.0, 1.0), EditType::NudgeUp),
+            KbKey::ArrowDown => (Vec2::new(0.0, -1.0), EditType::NudgeDown),
             _ => unreachable!(),
         };
 
-        if event.mods.meta {
+        if event.mods.meta() {
             nudge *= 100.;
-        } else if event.mods.shift {
+        } else if event.mods.shift() {
             nudge *= 10.;
         }
 
@@ -139,7 +138,7 @@ impl MouseDelegate<EditSession> for Select {
         if event.count == 1 {
             let sel = data.iter_items_near_point(event.pos, None).next();
             if let Some(point_id) = sel {
-                if !event.mods.shift {
+                if !event.mods.shift() {
                     // when clicking a point, if it is not selected we set it as the selection,
                     // otherwise we keep the selection intact for a drag.
                     if !data.selection.contains(&point_id) {
@@ -149,7 +148,7 @@ impl MouseDelegate<EditSession> for Select {
                 } else if !data.selection_mut().remove(&point_id) {
                     data.selection_mut().insert(point_id);
                 }
-            } else if !event.mods.shift {
+            } else if !event.mods.shift() {
                 data.selection_mut().clear();
             }
         } else if event.count == 2 {
@@ -169,7 +168,7 @@ impl MouseDelegate<EditSession> for Select {
                     self.this_edit_type = Some(EditType::Normal);
                 }
                 _ => {
-                    data.select_path(event.pos, event.mods.shift);
+                    data.select_path(event.pos, event.mods.shift());
                 }
             }
         }
@@ -203,7 +202,7 @@ impl MouseDelegate<EditSession> for Select {
                 ref mut rect,
             } => {
                 *rect = Rect::from_points(drag.current.pos, drag.start.pos);
-                update_selection_for_drag(data, previous, *rect, drag.current.mods.shift);
+                update_selection_for_drag(data, previous, *rect, drag.current.mods.shift());
             }
             DragState::Move {
                 ref mut last_used_pos,

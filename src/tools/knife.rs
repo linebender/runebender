@@ -2,7 +2,7 @@
 
 use druid::kurbo::{Line, LineIntersection, ParamCurve, ParamCurveArclen};
 use druid::piet::StrokeStyle;
-use druid::{Color, Env, EventCtx, KeyCode, KeyEvent, MouseEvent, PaintCtx, Point, RenderContext};
+use druid::{Color, Env, EventCtx, KbKey, KeyEvent, MouseEvent, PaintCtx, Point, RenderContext};
 
 use crate::design_space::DPoint;
 use crate::edit_session::EditSession;
@@ -122,7 +122,7 @@ impl Tool for Knife {
         data: &mut EditSession,
         _: &Env,
     ) -> Option<EditType> {
-        if key.key_code == KeyCode::LeftShift || key.key_code == KeyCode::RightShift {
+        if key.key == KbKey::Shift {
             self.shift_locked = true;
             self.update_intersections(data);
             ctx.request_paint();
@@ -137,7 +137,7 @@ impl Tool for Knife {
         data: &mut EditSession,
         _: &Env,
     ) -> Option<EditType> {
-        if key.key_code == KeyCode::LeftShift || key.key_code == KeyCode::RightShift {
+        if key.key == KbKey::Shift {
             self.shift_locked = false;
             self.update_intersections(data);
             ctx.request_paint();
@@ -208,7 +208,7 @@ impl MouseDelegate<EditSession> for Knife {
                 start: pt,
                 current: pt,
             };
-            self.shift_locked = event.mods.shift;
+            self.shift_locked = event.mods.shift();
         }
     }
 

@@ -3,7 +3,7 @@
 // this share a lot of code with the rectangle tool :shrug:
 
 use druid::kurbo::{PathEl, Shape};
-use druid::{Color, Env, EventCtx, KeyCode, KeyEvent, PaintCtx, Rect, RenderContext};
+use druid::{Color, Env, EventCtx, KbKey, KeyEvent, PaintCtx, Rect, RenderContext};
 
 use crate::design_space::DPoint;
 use crate::edit_session::EditSession;
@@ -65,7 +65,7 @@ impl Tool for Ellipse {
         _: &mut EditSession,
         _: &Env,
     ) -> Option<EditType> {
-        if key.key_code == KeyCode::LeftShift || key.key_code == KeyCode::RightShift {
+        if key.key == KbKey::Shift {
             self.shift_locked = true;
             ctx.request_paint();
         }
@@ -79,7 +79,7 @@ impl Tool for Ellipse {
         _: &mut EditSession,
         _: &Env,
     ) -> Option<EditType> {
-        if key.key_code == KeyCode::LeftShift || key.key_code == KeyCode::RightShift {
+        if key.key == KbKey::Shift {
             self.shift_locked = false;
             ctx.request_paint();
         }
@@ -140,7 +140,7 @@ impl MouseDelegate<EditSession> for Ellipse {
         let start = data.viewport.from_screen(event.start.pos);
         let current = data.viewport.from_screen(event.current.pos);
         self.gesture = GestureState::Begun { start, current };
-        self.shift_locked = event.current.mods.shift;
+        self.shift_locked = event.current.mods.shift();
     }
 
     fn left_drag_changed(&mut self, drag: Drag, data: &mut EditSession) {

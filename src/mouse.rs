@@ -49,7 +49,7 @@
 //! ```
 
 use druid::kurbo::Point;
-use druid::{KeyModifiers, MouseButton, MouseButtons, MouseEvent};
+use druid::{Modifiers, MouseButton, MouseButtons, MouseEvent};
 use std::mem;
 
 const DEFAULT_MIN_DRAG_DISTANCE: f64 = 10.0;
@@ -178,7 +178,7 @@ impl std::default::Default for Mouse {
             state: MouseState::Up(MouseEvent {
                 pos: Point::ZERO,
                 window_pos: Point::ZERO,
-                mods: KeyModifiers::default(),
+                mods: Modifiers::default(),
                 count: 0,
                 button: MouseButton::None,
                 buttons: MouseButtons::default(),
