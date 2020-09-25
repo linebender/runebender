@@ -35,12 +35,12 @@ impl AppDelegate<AppState> for Delegate {
                 Ok(ufo) => data.workspace.set_file(ufo, info.path().to_owned()),
                 Err(e) => log::error!("failed to open file {:?}: '{:?}'", info.path(), e),
             };
-            ctx.submit_command(consts::cmd::REBUILD_MENUS, None);
+            ctx.submit_command(consts::cmd::REBUILD_MENUS);
             false
         } else if let Some(info) = cmd.get(druid::commands::SAVE_FILE) {
             if let Some(path) = info.as_ref().map(|info| info.path()) {
                 Arc::make_mut(&mut data.workspace.font).path = Some(path.into());
-                ctx.submit_command(consts::cmd::REBUILD_MENUS, None);
+                ctx.submit_command(consts::cmd::REBUILD_MENUS);
             }
             if let Err(e) = data.workspace.save() {
                 log::error!("saving failed: '{}'", e);
@@ -61,7 +61,7 @@ impl AppDelegate<AppState> for Delegate {
         } else if let Some(payload) = cmd.get(EDIT_GLYPH) {
             match data.workspace.open_glyphs.get(payload).to_owned() {
                 Some(id) => {
-                    ctx.submit_command(druid::commands::SHOW_WINDOW, *id);
+                    ctx.submit_command(druid::commands::SHOW_WINDOW.to(*id));
                 }
                 None => {
                     let session = data.workspace.get_or_create_session(&payload);

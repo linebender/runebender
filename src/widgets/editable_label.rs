@@ -19,7 +19,7 @@
 use druid::text::EditAction;
 use druid::widget::prelude::*;
 use druid::widget::{Label, LabelText, TextBox};
-use druid::{Command, Data, HotKey, KeyCode, Selector};
+use druid::{Data, HotKey, KbKey, Selector};
 
 // we send this to ourselves if another widget takes focus, in order
 // to validate and move out of editing mode
@@ -95,8 +95,9 @@ impl<T: Data> EditableLabel<T> {
                 ctx.request_focus();
             }
             ctx.submit_command(
-                Command::new(TextBox::PERFORM_EDIT, EditAction::SelectAll),
-                ctx.widget_id(),
+                TextBox::PERFORM_EDIT
+                    .with(EditAction::SelectAll)
+                    .to(ctx.widget_id()),
             );
             // our content isn't valid
             // ideally we would flash the background or something
@@ -122,11 +123,11 @@ impl<T: Data> Widget<T> for EditableLabel<T> {
             match event {
                 Event::Command(cmd) if cmd.is(COMPLETE_EDITING) => self.complete(ctx, data),
                 Event::Command(cmd) if cmd.is(CANCEL_EDITING) => self.cancel(ctx),
-                Event::KeyDown(k_e) if HotKey::new(None, KeyCode::Return).matches(k_e) => {
+                Event::KeyDown(k_e) if HotKey::new(None, KbKey::Enter).matches(k_e) => {
                     ctx.set_handled();
                     self.complete(ctx, data);
                 }
-                Event::KeyDown(k_e) if HotKey::new(None, KeyCode::Escape).matches(k_e) => {
+                Event::KeyDown(k_e) if HotKey::new(None, KbKey::Escape).matches(k_e) => {
                     ctx.set_handled();
                     self.cancel(ctx);
                 }
@@ -151,7 +152,7 @@ impl<T: Data> Widget<T> for EditableLabel<T> {
         if let LifeCycle::FocusChanged(focus) = event {
             // if the user focuses elsewhere, we need to reset ourselves
             if !focus {
-                ctx.submit_command(COMPLETE_EDITING, ctx.widget_id());
+                ctx.submit_command(COMPLETE_EDITING.to(ctx.widget_id()));
             } else if !self.editing {
                 self.editing = true;
                 self.buffer = self.label.text().to_string();

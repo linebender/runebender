@@ -1,7 +1,7 @@
 use druid::kurbo::{Point, Rect, Size, Vec2};
 use druid::widget::prelude::*;
 use druid::widget::Scroll;
-use druid::{Color, Command, KeyCode};
+use druid::{Color, Command, KbKey};
 
 use crate::consts::CANVAS_SIZE;
 use crate::data::EditorState;
@@ -131,9 +131,11 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
         }
     }
 
-    fn after_zoom_changed(&mut self, ctx: &mut EventCtx, env: &Env) {
-        self.child
-            .reset_scrollbar_fade(|d| ctx.request_timer(d), env);
+    fn after_zoom_changed(&mut self, ctx: &mut EventCtx, _env: &Env) {
+        //FIXME: this no longer exists in druid; we should rewrite this widget
+        //using the druid 'scroll component' stuff, maybe?
+        //self.child
+        //.reset_scrollbar_fade(|d| ctx.request_timer(d), env);
         ctx.request_layout();
         ctx.set_handled();
     }
@@ -175,18 +177,20 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
                 self.set_initial_viewport(data, *size);
                 ctx.request_layout();
             }
-            Event::KeyDown(k) if !k.is_repeat && k.key_code == KeyCode::Space => {
-                let cmd = Command::new(cmd::TOGGLE_PREVIEW_TOOL, true);
-                ctx.submit_command(cmd, None);
+            Event::KeyDown(k)
+                if !k.repeat && matches!(&k.key, KbKey::Character(s) if s.as_str() == " ") =>
+            {
+                let cmd = cmd::TOGGLE_PREVIEW_TOOL.with(true);
+                ctx.submit_command(cmd);
             }
-            Event::KeyUp(k) if k.key_code == KeyCode::Space => {
-                let cmd = Command::new(cmd::TOGGLE_PREVIEW_TOOL, false);
-                ctx.submit_command(cmd, None);
+            Event::KeyUp(k) if matches!(&k.key, KbKey::Character(s) if s.as_str() == " ") => {
+                let cmd = cmd::TOGGLE_PREVIEW_TOOL.with(false);
+                ctx.submit_command(cmd);
             }
             Event::MouseMove(mouse) => {
                 self.mouse = mouse.pos;
             }
-            Event::Wheel(wheel) if wheel.mods.meta => {
+            Event::Wheel(wheel) if wheel.mods.meta() => {
                 self.wheel_zoom(data, wheel.wheel_delta, ctx.size(), None);
                 self.after_zoom_changed(ctx, env);
                 return;

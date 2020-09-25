@@ -1,13 +1,11 @@
 //! The top-level widget for the main glyph list window.
 
 use druid::kurbo::{Affine, Line, Rect, Shape, Size};
-use druid::piet::{
-    FontBuilder, PietText, PietTextLayout, RenderContext, Text, TextLayout, TextLayoutBuilder,
-};
-use druid::{
-    BoxConstraints, Data, Env, Event, EventCtx, Insets, LayoutCtx, LensWrap, LifeCycle,
-    LifeCycleCtx, PaintCtx, UpdateCtx, Widget, WidgetExt, WidgetPod,
-};
+//use druid::piet::{
+//FontBuilder, PietText, PietTextLayout, RenderContext, Text, TextLayout, TextLayoutBuilder,
+//};
+use druid::widget::prelude::*;
+use druid::{Data, Insets, TextLayout, WidgetExt, WidgetPod};
 
 use crate::app_delegate::EDIT_GLYPH;
 use crate::data::{lenses, GridGlyph, Workspace};
@@ -27,7 +25,7 @@ impl GlyphGrid {
         for key in data.font.ufo.iter_names() {
             let widget = Maybe::or_empty(|| GridInner);
             self.children.push(WidgetPod::new(
-                LensWrap::new(widget, lenses::app_state::GridGlyph(key)).boxed(),
+                widget.lens(lenses::app_state::GridGlyph(key)).boxed(),
             ));
         }
     }
@@ -164,16 +162,17 @@ impl Widget<GridGlyph> for GridInner {
 
         ctx.render_ctx.fill(affine * &*path, &glyph_color);
 
-        let font_size = env.get(theme::GLYPH_LIST_LABEL_TEXT_SIZE);
-        let text_color = env.get(theme::GLYPH_COLOR);
+        //TODO: reuse layout
+        let mut layout = TextLayout::new(data.name.clone());
+        layout.set_text_size(theme::GLYPH_LIST_LABEL_TEXT_SIZE);
+        layout.set_text_color(theme::GLYPH_COLOR);
+        layout.rebuild_if_needed(ctx.text(), env);
+        let text_size = layout.size();
 
-        let text = get_text_layout(&mut ctx.text(), &data.name, env);
-        let xpos = geom.x0 + (geom.width() - text.width()) * 0.5;
-        let ypos = geom.y0 + geom.height() - font_size * 0.25;
-        let pos = (xpos, ypos);
+        let xpos = geom.x0 + (geom.width() - text_size.width) / 2.0;
+        let ypos = geom.max_y() - text_size.height;
 
-        // draw the text
-        ctx.render_ctx.draw_text(&text, pos, &text_color)
+        layout.draw(ctx, (xpos, ypos));
     }
 
     fn layout(
@@ -194,7 +193,7 @@ impl Widget<GridGlyph> for GridInner {
                 if m.count == 1 {
                     data.is_selected = true;
                 } else if m.count == 2 {
-                    ctx.submit_command(EDIT_GLYPH.with(data.name.clone()), None);
+                    ctx.submit_command(EDIT_GLYPH.with(data.name.clone()));
                 }
             }
             Event::MouseUp(_) => {
@@ -218,18 +217,4 @@ impl Widget<GridGlyph> for GridInner {
             ctx.request_paint();
         }
     }
-}
-
-fn get_text_layout(text_ctx: &mut PietText, text: &str, env: &Env) -> PietTextLayout {
-    let font_name = env.get(theme::FONT_NAME);
-    let font_size = env.get(theme::GLYPH_LIST_LABEL_TEXT_SIZE);
-    // TODO: caching of both the format and the layout
-    let font = text_ctx
-        .new_font_by_name(font_name, font_size)
-        .build()
-        .unwrap();
-    text_ctx
-        .new_text_layout(&font, text, std::f64::INFINITY)
-        .build()
-        .unwrap()
 }

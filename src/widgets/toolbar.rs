@@ -93,7 +93,7 @@ impl<T: Data> Widget<T> for Toolbar {
 
             if is_selected && i != self.selected {
                 let tool = self.items[i].name;
-                ctx.submit_command(consts::cmd::SET_TOOL.with(tool), None);
+                ctx.submit_command(consts::cmd::SET_TOOL.with(tool));
             }
         }
 

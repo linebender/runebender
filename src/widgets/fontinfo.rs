@@ -65,8 +65,7 @@ pub fn font_info() -> impl Widget<Workspace> {
         )
         .with_flex_spacer(1.0)
         .with_child(
-            Button::new("Done")
-                .on_click(|ctx, _, _| ctx.submit_command(ModalHost::DISMISS_MODAL, None)),
+            Button::new("Done").on_click(|ctx, _, _| ctx.submit_command(ModalHost::DISMISS_MODAL)),
         )
         .cross_axis_alignment(CrossAxisAlignment::End)
         .fix_height(300.)

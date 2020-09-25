@@ -28,7 +28,7 @@ impl MouseDelegate<EditSession> for Pen {
                     path.start_point().to_screen(vport)
                 }
                 // lock to nearest vertical or horizontal axis if shift is pressed
-                Some(path) if event.mods.shift => {
+                Some(path) if event.mods.shift() => {
                     let last_point = path.points().last().unwrap().to_screen(vport);
                     axis_locked_point(event.pos, last_point)
                 }
@@ -60,7 +60,7 @@ impl MouseDelegate<EditSession> for Pen {
 
     fn left_drag_changed(&mut self, drag: Drag, data: &mut EditSession) {
         let Drag { start, current, .. } = drag;
-        let handle_point = if current.mods.shift {
+        let handle_point = if current.mods.shift() {
             axis_locked_point(current.pos, start.pos)
         } else {
             current.pos

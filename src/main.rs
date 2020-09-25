@@ -66,7 +66,7 @@ fn make_ui() -> impl Widget<AppState> {
 
     let button = Button::new("(edit)").on_click(|ctx, _data, _env| {
         let cmd = ModalHost::make_modal_command(crate::widgets::font_info);
-        ctx.submit_command(cmd, None);
+        ctx.submit_command(cmd);
     });
 
     let main_view = Flex::column()
