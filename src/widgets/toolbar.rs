@@ -243,7 +243,15 @@ impl Default for Toolbar {
             hotkey: HotKey::new(None, "e"),
         };
 
-        Toolbar::new(vec![select, pen, knife, preview, rectangle, ellipse])
+        let measure = ToolbarItem {
+            name: "Measure",
+            icon: constrain_path(measure_path()),
+            hotkey: HotKey::new(None, "m"),
+        };
+
+        Toolbar::new(vec![
+            select, pen, knife, preview, measure, rectangle, ellipse,
+        ])
     }
 }
 
@@ -389,6 +397,18 @@ fn ellipse_path() -> BezPath {
     bez.curve_to((78.0, 54.0), (31.0, 79.0), (31.0, 109.0));
     bez.curve_to((31.0, 140.0), (78.0, 165.0), (137.0, 165.0));
     bez.curve_to((196.0, 165.0), (243.0, 140.0), (243.0, 109.0));
+    bez.close_path();
+    bez
+}
+
+fn measure_path() -> BezPath {
+    let mut bez = BezPath::new();
+
+    // TODO: design icon
+    bez.move_to((0.0, 0.0));
+    bez.line_to((200.0, 0.0));
+    bez.line_to((200.0, 20.0));
+    bez.line_to((0.0, 20.0));
     bez.close_path();
     bez
 }
