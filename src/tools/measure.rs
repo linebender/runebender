@@ -40,7 +40,9 @@ fn draw_info_bubble(ctx: &mut PaintCtx, pos: Point, label: impl Into<String>) {
 }
 
 fn atan_to_angle(atan: f64) -> f64 {
-    if !atan.is_finite() { return 0.0; }
+    if !atan.is_finite() {
+        return 0.0;
+    }
     let mut angle = atan * (-180.0 / std::f64::consts::PI);
     if angle < -90.0 {
         angle += 360.0;
