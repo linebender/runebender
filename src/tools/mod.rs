@@ -2,6 +2,7 @@
 
 mod ellipse;
 mod knife;
+mod measure;
 mod pen;
 mod preview;
 mod rectangle;
@@ -9,6 +10,7 @@ mod select;
 
 pub use ellipse::Ellipse;
 pub use knife::Knife;
+pub use measure::Measure;
 pub use pen::Pen;
 pub use preview::Preview;
 pub use rectangle::Rectangle;
@@ -121,6 +123,7 @@ pub fn tool_for_id(id: ToolId) -> Option<Box<dyn Tool>> {
         "Rectangle" => Some(Box::new(Rectangle::default())),
         "Ellipse" => Some(Box::new(Ellipse::default())),
         "Knife" => Some(Box::new(Knife::default())),
+        "Measure" => Some(Box::new(Measure::default())),
         _ => None,
     }
 }
