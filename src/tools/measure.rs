@@ -68,6 +68,7 @@ fn format_pt(pt: DPoint) -> String {
 }
 
 impl Measure {
+    #[allow(clippy::float_cmp)]
     fn compute_measurement(&self, data: &EditSession, design_line: Line) -> Vec<f64> {
         // We scale the intersections to fixed point to make them easier to sort.
         const T_SCALE: f64 = (1u64 << 63) as f64;
