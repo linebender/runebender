@@ -239,11 +239,7 @@ impl Path {
             !src.points.is_empty(),
             "non empty points list should already be checked"
         );
-        let closed = if let NoradPType::Move = src.points[0].typ {
-            false
-        } else {
-            true
-        };
+        let closed = !matches!(src.points[0].typ, NoradPType::Move);
 
         let path_id = next_id();
 

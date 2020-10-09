@@ -294,10 +294,6 @@ impl DragState {
     }
 
     fn is_move(&self) -> bool {
-        if let DragState::Move { .. } = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, DragState::Move { .. })
     }
 }
