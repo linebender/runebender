@@ -82,7 +82,7 @@ impl Measure {
                 }
             }
         }
-        intersections.sort();
+        intersections.sort_unstable();
 
         // Fuzzy deduplication
         let thresh = MEASURE_FUZZY_TOLERANCE / (design_line.p1 - design_line.p0).hypot();

@@ -132,7 +132,7 @@ impl<T: Data> Widget<T> for ModalHost<T> {
 }
 
 fn is_user_input(event: &Event) -> bool {
-    match event {
+    matches!(event,
         Event::MouseUp(_)
         | Event::MouseDown(_)
         | Event::MouseMove(_)
@@ -140,7 +140,5 @@ fn is_user_input(event: &Event) -> bool {
         | Event::KeyDown(_)
         | Event::Paste(_)
         | Event::Wheel(_)
-        | Event::Zoom(_) => true,
-        _ => false,
-    }
+        | Event::Zoom(_))
 }

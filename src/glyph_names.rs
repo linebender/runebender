@@ -30,10 +30,8 @@ pub fn glyph_name_for_glyph(glyph: &str) -> Option<&'static str> {
 }
 
 fn is_valid_glyph_name(name: &str) -> bool {
-    name.chars().all(|c| match c {
-        'a'..='z' | 'A'..='Z' | '0'..='9' | '.' | '_' => true,
-        _ => false,
-    })
+    name.chars()
+        .all(|c| matches!(c, 'a'..='z' | 'A'..='Z' | '0'..='9' | '.' | '_'))
 }
 
 pub fn validate_and_standardize_name(name: &str) -> Result<String, IllegalName> {
