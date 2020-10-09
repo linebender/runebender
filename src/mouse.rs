@@ -52,7 +52,7 @@ use druid::kurbo::Point;
 use druid::{Modifiers, MouseButton, MouseButtons, MouseEvent};
 use std::mem;
 
-const DEFAULT_MIN_DRAG_DISTANCE: f64 = 10.0;
+const DEFAULT_MIN_DRAG_DISTANCE: f64 = 2.0;
 
 /// Handles raw mouse events, parsing them into gestures that it forwards
 /// to a delegate.

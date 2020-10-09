@@ -8,7 +8,7 @@ use druid::{Data, Env, EventCtx, HotKey, KbKey, KeyEvent, MouseEvent, PaintCtx, 
 use crate::design_space::{DPoint, DVec2};
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
-use crate::path::EntityId;
+use crate::path::{EntityId, PathSeg};
 use crate::tools::{EditType, Tool, ToolId};
 
 const SELECTION_RECT_BG_COLOR: Color = Color::rgba8(0xDD, 0xDD, 0xDD, 0x55);
@@ -136,23 +136,44 @@ impl MouseDelegate<EditSession> for Select {
 
     fn left_down(&mut self, event: &MouseEvent, data: &mut EditSession) {
         if event.count == 1 {
-            let sel = data.iter_items_near_point(event.pos, None).next();
+            let sel = data.hit_test_all(event.pos, None);
             if let Some(point_id) = sel {
                 if !event.mods.shift() {
                     // when clicking a point, if it is not selected we set it as the selection,
                     // otherwise we keep the selection intact for a drag.
                     if !data.selection.contains(&point_id) {
-                        data.selection_mut().clear();
-                        data.selection_mut().insert(point_id);
+                        data.set_selection_one(point_id);
                     }
                 } else if !data.selection_mut().remove(&point_id) {
                     data.selection_mut().insert(point_id);
+                }
+            } else if let Some((seg, _t)) = data.hit_test_segments(event.pos, None) {
+                // TODO: make these non-draggable.
+                if event.mods.alt() && matches!(seg, PathSeg::Line(..)) {
+                    let path = data.path_for_point_mut(seg.start_id()).unwrap();
+                    self.this_edit_type = Some(EditType::Normal);
+                    path.upgrade_line_seg(seg);
+                    return;
+                }
+                let ids = seg.ids();
+                let sel = data.selection_mut();
+                if !event.mods.shift() {
+                    if !ids.iter().all(|id| sel.contains(id)) {
+                        sel.clear();
+                        sel.extend(&ids);
+                    }
+                } else if ids.iter().all(|id| sel.contains(id)) {
+                    for id in &ids {
+                        sel.remove(id);
+                    }
+                } else {
+                    sel.extend(&ids);
                 }
             } else if !event.mods.shift() {
                 data.selection_mut().clear();
             }
         } else if event.count == 2 {
-            let sel = data.iter_items_near_point(event.pos, None).next();
+            let sel = data.hit_test_all(event.pos, None);
             match sel {
                 Some(id)
                     if data
@@ -180,9 +201,8 @@ impl MouseDelegate<EditSession> for Select {
 
     fn left_drag_began(&mut self, drag: Drag, data: &mut EditSession) {
         // if we're starting a rectangular selection, we save the previous selection
-        let is_dragging_item = data
-            .iter_items_near_point(drag.start.pos, None)
-            .any(|_| true);
+        let sel = data.hit_test_all(drag.start.pos, None);
+        let is_dragging_item = sel.is_some();
         self.drag = if is_dragging_item {
             DragState::Move {
                 last_used_pos: data.viewport.from_screen(drag.start.pos),

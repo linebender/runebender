@@ -86,6 +86,10 @@ impl DPoint {
     pub(super) fn to_raw(self) -> Point {
         Point::new(self.x, self.y)
     }
+
+    pub fn lerp(self, other: DPoint, t: f64) -> DPoint {
+        DPoint::from_raw(self.to_raw().lerp(other.to_raw(), t))
+    }
 }
 
 impl DVec2 {

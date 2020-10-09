@@ -1,9 +1,9 @@
 //! The bezier pen tool.
 
 use druid::kurbo::Point;
-use druid::{Env, EventCtx, MouseEvent};
+use druid::{Env, EventCtx, KbKey, KeyEvent, MouseEvent};
 
-use crate::edit_session::{EditSession, MIN_CLICK_DISTANCE};
+use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
 use crate::tools::{EditType, Tool, ToolId};
 
@@ -11,6 +11,7 @@ use crate::tools::{EditType, Tool, ToolId};
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Pen {
     this_edit_type: Option<EditType>,
+    is_draggable: bool,
 }
 
 impl MouseDelegate<EditSession> for Pen {
@@ -19,14 +20,39 @@ impl MouseDelegate<EditSession> for Pen {
     }
 
     fn left_down(&mut self, event: &MouseEvent, data: &mut EditSession) {
+        self.is_draggable = false;
         let vport = data.viewport;
         if event.count == 1 {
-            let point = match data.active_path() {
-                Some(path)
-                    if path.start_point().screen_dist(vport, event.pos) < MIN_CLICK_DISTANCE =>
-                {
-                    path.start_point().to_screen(vport)
+            let hit = data.hit_test_filtered(event.pos, None, |p| p.is_on_curve());
+            if let Some(hit) = hit {
+                if let Some(path) = data.active_path() {
+                    if path.start_point().id == hit && !path.is_closed() {
+                        if let Some(path) = data.active_path_mut() {
+                            let start = path.start_point().id;
+                            self.this_edit_type = Some(EditType::Normal);
+                            path.close();
+                            data.set_selection_one(start);
+                            self.is_draggable = true;
+                            return;
+                        }
+                    }
                 }
+                // TODO: more stuff when clicking on points
+                // If selection is empty, and point is endpoint of open path,
+                // select that point.
+                // Otherwise maybe cut path at that point?
+                return;
+            }
+
+            // Handle clicking on segment (split).
+            if let Some((seg, t)) = data.hit_test_segments(event.pos, None) {
+                self.this_edit_type = Some(EditType::Normal);
+                let path = data.path_for_point_mut(seg.start_id()).unwrap();
+                path.split_segment_at_point(seg, t);
+                return;
+            }
+
+            let point = match data.active_path() {
                 // lock to nearest vertical or horizontal axis if shift is pressed
                 Some(path) if event.mods.shift() => {
                     let last_point = path.points().last().unwrap().to_screen(vport);
@@ -37,7 +63,10 @@ impl MouseDelegate<EditSession> for Pen {
 
             self.this_edit_type = Some(EditType::Normal);
             data.add_point(point);
+            self.is_draggable = true;
         } else if event.count == 2 {
+            // This is not what Glyphs does; rather, it sets the currently active
+            // point to non-smooth.
             data.selection_mut().clear();
         }
     }
@@ -48,17 +77,12 @@ impl MouseDelegate<EditSession> for Pen {
                 path.clear_trailing();
             }
         }
-
-        if data
-            .active_path_mut()
-            .map(|p| p.is_closed())
-            .unwrap_or(false)
-        {
-            data.selection_mut().clear();
-        }
     }
 
     fn left_drag_changed(&mut self, drag: Drag, data: &mut EditSession) {
+        if !self.is_draggable {
+            return;
+        }
         let Drag { start, current, .. } = drag;
         let handle_point = if current.mods.shift() {
             axis_locked_point(current.pos, start.pos)
@@ -69,7 +93,9 @@ impl MouseDelegate<EditSession> for Pen {
         self.this_edit_type = Some(EditType::Drag);
     }
 
-    fn left_drag_began(&mut self, _: Drag, _: &mut EditSession) {
+    fn left_drag_ended(&mut self, _: Drag, _: &mut EditSession) {
+        // TODO: this logic needs rework. A click-drag sequence should be a single
+        // undo group.
         self.this_edit_type = Some(EditType::DragUp);
     }
 }
@@ -85,6 +111,26 @@ impl Tool for Pen {
     ) -> Option<EditType> {
         assert!(self.this_edit_type.is_none());
         mouse.mouse_event(event, data, self);
+        self.this_edit_type.take()
+    }
+
+    fn key_down(
+        &mut self,
+        event: &KeyEvent,
+        _ctx: &mut EventCtx,
+        data: &mut EditSession,
+        _: &Env,
+    ) -> Option<EditType> {
+        assert!(self.this_edit_type.is_none());
+        match event {
+            e if e.key == KbKey::Backspace => {
+                data.delete_selection();
+                self.this_edit_type = Some(EditType::Normal);
+            }
+            // TODO: should support nudging; basically a lot of this should
+            // be shared with selection.
+            _ => return None,
+        }
         self.this_edit_type.take()
     }
 
