@@ -519,7 +519,7 @@ mod tests {
         let mut path = Path::new(DPoint::new(10., 10.));
         path.append_point(DPoint::new(0., 0.));
         path.append_point(DPoint::new(20., 0.));
-        path.append_point(DPoint::new(10., 10.0));
+        path.close();
 
         let line = Line::new((3., 6.), (8., -2.));
         let mut out = Vec::new();
