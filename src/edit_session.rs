@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use druid::kurbo::{BezPath, Point, Rect, Shape, Size};
+use druid::kurbo::{BezPath, ParamCurveNearest, Point, Rect, Shape, Size};
 use druid::{Data, Lens};
 use norad::glyph::Outline;
 use norad::{Glyph, GlyphName};
@@ -10,12 +10,15 @@ use crate::component::Component;
 use crate::data::Workspace;
 use crate::design_space::{DPoint, DVec2, ViewPort};
 use crate::guides::Guide;
-use crate::path::{EntityId, Path, PathPoint};
+use crate::path::{EntityId, Path, PathPoint, PathSeg};
 
 /// Minimum distance in screen units that a click must occur to be considered
 /// on a point?
 //TODO: this doesn't feel very robust; items themselves should have hitzones?
 pub const MIN_CLICK_DISTANCE: f64 = 10.0;
+/// Amount of bias penalizing on-curve points; we want to break ties in favor
+/// of off-curve.
+pub const ON_CURVE_PENALTY: f64 = MIN_CLICK_DISTANCE / 2.0;
 
 /// A unique identifier for a session. A session keeps the same identifier
 /// even if the name of the glyph changes.
@@ -153,6 +156,12 @@ impl EditSession {
         Arc::make_mut(&mut self.selection)
     }
 
+    pub fn set_selection_one(&mut self, id: EntityId) {
+        let selection = self.selection_mut();
+        selection.clear();
+        selection.insert(id);
+    }
+
     pub fn paths_mut(&mut self) -> &mut Vec<Path> {
         Arc::make_mut(&mut self.paths)
     }
@@ -165,6 +174,8 @@ impl EditSession {
         self.paths.iter().flat_map(|p| p.points().iter())
     }
 
+    // Replaced by hit test methods.
+    /*
     /// For hit testing; iterates 'clickable items' (right now just points
     /// and guides) near a given point.
     pub fn iter_items_near_point<'a>(
@@ -184,6 +195,78 @@ impl EditSession {
                     .filter(move |g| g.screen_dist(self.viewport, point) <= max_dist)
                     .map(|g| g.id),
             )
+    }
+    */
+
+    /// Find the best hit, considering all items.
+    pub fn hit_test_all(&self, point: Point, max_dist: Option<f64>) -> Option<EntityId> {
+        if let Some(hit) = self.hit_test_filtered(point, max_dist, |_| true) {
+            return Some(hit);
+        }
+        let max_dist = max_dist.unwrap_or(MIN_CLICK_DISTANCE);
+        let mut best = None;
+        for g in &*self.guides {
+            let dist = g.screen_dist(self.viewport, point);
+            if dist < max_dist && best.map(|(d, _id)| dist < d).unwrap_or(true) {
+                best = Some((dist, g.id))
+            }
+        }
+        best.map(|(_dist, id)| id)
+    }
+
+    /// Hit test a point against points.
+    ///
+    /// This method finds the closest point, but applies a penalty to prioritize
+    /// off-curve points.
+    ///
+    /// A more sophisticated approach would be to reward on-curve points that are
+    /// not already selected, but penalize them if they are selected. That would
+    /// require a way to plumb in selection info.
+    pub fn hit_test_filtered(
+        &self,
+        point: Point,
+        max_dist: Option<f64>,
+        mut f: impl FnMut(&PathPoint) -> bool,
+    ) -> Option<EntityId> {
+        let max_dist = max_dist.unwrap_or(MIN_CLICK_DISTANCE);
+        let mut best = None;
+        for p in self.iter_points() {
+            if f(p) {
+                let dist = p.screen_dist(self.viewport, point);
+                let score = dist
+                    + if p.is_on_curve() {
+                        ON_CURVE_PENALTY
+                    } else {
+                        0.0
+                    };
+                if dist < max_dist && best.map(|(s, _id)| score < s).unwrap_or(true) {
+                    best = Some((score, p.id))
+                }
+            }
+        }
+        best.map(|(_score, id)| id)
+    }
+
+    /// Hit test a point against the path segments.
+    pub fn hit_test_segments(&self, point: Point, max_dist: Option<f64>) -> Option<(PathSeg, f64)> {
+        let max_dist = max_dist.unwrap_or(MIN_CLICK_DISTANCE);
+        let dpt = self.viewport.from_screen(point);
+        let mut best = None;
+        for path in &*self.paths {
+            for seg in path.iter_segments() {
+                let kurbo_seg = seg.to_kurbo();
+                let (t, d2) = kurbo_seg.nearest(dpt.to_raw(), 0.1);
+                if best.map(|(_seg, _t, d)| d2 < d).unwrap_or(true) {
+                    best = Some((seg, t, d2));
+                }
+            }
+        }
+        if let Some((seg, t, d2)) = best {
+            if d2 * self.viewport.zoom.powi(2) < max_dist.powi(2) {
+                return Some((seg, t));
+            }
+        }
+        None
     }
 
     /// Return the index of the path that is currently drawing. To be currently
@@ -228,8 +311,7 @@ impl EditSession {
         let point = path.points()[0].id;
 
         self.paths_mut().push(path);
-        self.clear_selection();
-        self.selection_mut().insert(point);
+        self.set_selection_one(point);
     }
 
     pub fn paste_paths(&mut self, paths: Vec<Path>) {
@@ -240,13 +322,16 @@ impl EditSession {
     }
 
     pub fn add_point(&mut self, point: Point) {
-        if self.active_path_idx().is_none() {
+        if self
+            .active_path_idx()
+            .map(|ix| self.paths[ix].is_closed())
+            .unwrap_or(true)
+        {
             self.new_path(point);
         } else {
             let point = self.viewport.from_screen(point);
             let new_point = self.active_path_mut().unwrap().append_point(point);
-            self.selection_mut().clear();
-            self.selection_mut().insert(new_point);
+            self.set_selection_one(new_point);
         }
     }
 

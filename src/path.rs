@@ -408,12 +408,8 @@ impl Path {
     /// Appends a point. Called when the user clicks. This point is always a corner;
     /// if the user drags it will be converted to a curve then.
     ///
-    /// Returns the id of the newly added point, or the start/end point if this
-    /// closes the path.
+    /// Returns the id of the newly added point.
     pub fn append_point(&mut self, point: DPoint) -> EntityId {
-        if !self.closed && point == self.points[0].point {
-            return self.close();
-        }
         let new = PathPoint::on_curve(self.id, point);
         self.points_mut().push(new);
         new.id
@@ -487,9 +483,7 @@ impl Path {
 
         // that angle is in the opposite direction, so flip it
         let norm_angle = raw_angle.normalize() * -1.0;
-        let handle_len = (self.points[bcp2].point - self.points[on_curve].point)
-            .hypot()
-            .abs();
+        let handle_len = (self.points[bcp2].point - self.points[on_curve].point).hypot();
 
         let new_handle_offset = DVec2::from_raw(norm_angle * handle_len);
         let new_pos = self.points[on_curve].point + new_handle_offset;
@@ -629,15 +623,28 @@ impl Path {
     }
 
     /// If the user drags after mousedown, we convert the last point to a curve.
+    ///
+    /// TODO: So this doesn't quite match the Glyphs logic. There, the "trailing"
+    /// state is not stored in the path, but seems to be transitory to the pen tool
+    /// (selecting a different tool and back to pen seems to clear it). And, it
+    /// seems to be used only when the active point is not smooth (which includes
+    /// the start point). Otherwise, if the point before `prev` is off-curve, `p1`
+    /// is synthesized from mirroring that point. Then the 1/3 lerp is used as a
+    /// fallback.
+    ///
+    /// This is pretty similar to the current behavior though.
     fn convert_last_to_curve(&mut self, handle: DPoint) {
         assert!(!self.points.is_empty());
         if self.points.len() > 1 {
             let mut prev = self.points_mut().pop().unwrap();
             prev.typ = PointType::OnCurveSmooth;
-            let p1 = self
-                .trailing
-                .take()
-                .unwrap_or(self.points.last().unwrap().point);
+            let p1 = self.trailing.take().unwrap_or_else(|| {
+                self.points
+                    .last()
+                    .unwrap()
+                    .point
+                    .lerp(prev.point, 1.0 / 3.0)
+            });
             let p2 = prev.point - (handle - prev.point);
             let pts = &[
                 PathPoint::off_curve(self.id, p1),
@@ -664,7 +671,7 @@ impl Path {
 
     // in an open path, the first point is essentially a `move_to` command.
     // 'closing' the path means moving this point to the end of the list.
-    fn close(&mut self) -> EntityId {
+    pub fn close(&mut self) -> EntityId {
         assert!(!self.closed);
         self.points_mut().rotate_left(1);
         self.closed = true;
@@ -714,32 +721,43 @@ impl Path {
             PathSeg::Cubic(..) => (2, 5),
         };
 
-        let pre_seg = seg.subsegment(0.0..t);
+        let mut pre_seg = seg.subsegment(0.0..t);
+        if let PathSeg::Cubic(_, _, _, p3) = &mut pre_seg {
+            p3.typ = PointType::OnCurveSmooth;
+        }
         let post_seg = seg.subsegment(t..1.0);
-        let mut insert_idx = self
-            .points
-            .iter()
-            .position(|p| p.id == seg.start_id())
-            .unwrap();
+        let mut insert_idx = self.idx_for_point(seg.start_id()).unwrap();
         insert_idx = self.next_idx(insert_idx);
         //let mut to_replace = points_to_insert;
-        let mut iter = pre_seg
+        let iter = pre_seg
             .into_iter()
             .skip(1)
             .chain(post_seg.into_iter().skip(1));
         let self_id = self.id();
         let points = self.points_mut();
-        for i in 0..points_to_insert {
-            let mut next_pt = iter.next().unwrap();
-            next_pt.id.parent = self_id;
-            if i < existing_control_pts {
-                points[insert_idx] = next_pt;
-            } else {
-                points.insert(insert_idx, next_pt);
-            }
-            insert_idx += 1;
-        }
-        mark_tangent_handles(points);
+        points.splice(
+            insert_idx..insert_idx + existing_control_pts,
+            iter.take(points_to_insert).map(|mut next_pt| {
+                next_pt.id.parent = self_id;
+                next_pt
+            }),
+        );
+    }
+
+    /// Upgrade a line segment to a cubic bezier.
+    pub(crate) fn upgrade_line_seg(&mut self, seg: PathSeg) {
+        let start_idx = self.idx_for_point(seg.start_id()).unwrap();
+        let insert_idx = self.next_idx(start_idx);
+        let points = self.points_mut();
+        let p0 = points[start_idx].point;
+        let p3 = points[insert_idx].point;
+        let p1 = p0.lerp(p3, 1.0 / 3.0);
+        let p2 = p0.lerp(p3, 2.0 / 3.0);
+        let path = seg.start_id().parent;
+        points.splice(
+            insert_idx..insert_idx,
+            [p1, p2].iter().map(|p| PathPoint::off_curve(path, *p)),
+        );
     }
 }
 
@@ -791,6 +809,13 @@ impl PathSeg {
         match self {
             PathSeg::Line(_, p2) => p2.id,
             PathSeg::Cubic(.., p2) => p2.id,
+        }
+    }
+
+    pub(crate) fn ids(&self) -> Vec<EntityId> {
+        match self {
+            PathSeg::Line(p1, p2) => vec![p1.id, p2.id],
+            PathSeg::Cubic(p1, p2, p3, p4) => vec![p1.id, p2.id, p3.id, p4.id],
         }
     }
 
