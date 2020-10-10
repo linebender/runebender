@@ -319,7 +319,7 @@ checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
 [[package]]
 name = "druid"
 version = "0.6.0"
-source = "git+https://github.com/linebender/druid.git?rev=788d3438#788d3438dfbf2cf847904353204089fb3f92a36c"
+source = "git+https://github.com/linebender/druid.git?rev=93620d1#93620d1bb5f39583b82bdf0c5fd4ff676cd03807"
 dependencies = [
  "console_log",
  "druid-derive",
@@ -339,7 +339,7 @@ dependencies = [
 [[package]]
 name = "druid-derive"
 version = "0.3.1"
-source = "git+https://github.com/linebender/druid.git?rev=788d3438#788d3438dfbf2cf847904353204089fb3f92a36c"
+source = "git+https://github.com/linebender/druid.git?rev=93620d1#93620d1bb5f39583b82bdf0c5fd4ff676cd03807"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -349,7 +349,7 @@ dependencies = [
 [[package]]
 name = "druid-shell"
 version = "0.6.0"
-source = "git+https://github.com/linebender/druid.git?rev=788d3438#788d3438dfbf2cf847904353204089fb3f92a36c"
+source = "git+https://github.com/linebender/druid.git?rev=93620d1#93620d1bb5f39583b82bdf0c5fd4ff676cd03807"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -359,6 +359,7 @@ dependencies = [
  "core-graphics",
  "foreign-types",
  "gdk",
+ "gdk-pixbuf",
  "gdk-sys",
  "gio",
  "glib",
@@ -373,6 +374,7 @@ dependencies = [
  "log",
  "objc",
  "piet-common",
+ "scopeguard",
  "time 0.2.22",
  "wasm-bindgen",
  "web-sys",
@@ -1145,18 +1147,18 @@ dependencies = [
 
 [[package]]
 name = "piet"
-version = "0.2.0-pre4"
+version = "0.2.0-pre5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02ec0a227cffb4c468fb082e7e64491bbee586bd53f1ebcdb8de6bc3a3f4d119"
+checksum = "41dc88caa7ccaa1c1d53027f9664541c2e25bc215f711bbf3a37c7b76e08107e"
 dependencies = [
  "kurbo",
 ]
 
 [[package]]
 name = "piet-cairo"
-version = "0.2.0-pre4"
+version = "0.2.0-pre5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3d7e3de2465c3f74e9e263940d46bd6ac8750fe54ae551852b2e7cc06e9cd20"
+checksum = "9ba3568ecdc1e9fee37f81382ff4732212d37da877e6f3ffa85137098538356f"
 dependencies = [
  "cairo-rs",
  "piet",
@@ -1166,9 +1168,9 @@ dependencies = [
 
 [[package]]
 name = "piet-common"
-version = "0.2.0-pre4"
+version = "0.2.0-pre5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0313f4b1aaa502096840cfc69f2486b2fb2cf54c55ea9d8683025d817a725365"
+checksum = "2ca8a570ed73009daa4118d5296106a89f4bb7133f989208200714f735ab6fd4"
 dependencies = [
  "cairo-rs",
  "cairo-sys-rs",
@@ -1185,9 +1187,9 @@ dependencies = [
 
 [[package]]
 name = "piet-coregraphics"
-version = "0.2.0-pre4"
+version = "0.2.0-pre5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16a4c56f36eab5364e4b15f519696e9c84c020ca687362a94d5d91d25ca30885"
+checksum = "235ce5a811a2b80aaa3cce285fc37f33e7ceb0f5386043565be5458341a6132a"
 dependencies = [
  "core-foundation",
  "core-foundation-sys",
@@ -1200,9 +1202,9 @@ dependencies = [
 
 [[package]]
 name = "piet-direct2d"
-version = "0.2.0-pre4"
+version = "0.2.0-pre5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba5ba077c472c0ea2ceafffbfae45b85e25e5111aef5c6bf7c2246c6db475f02"
+checksum = "91cbf9d7a33cd261bdac060149f456f0fb10ed0502b800ffbfa84e4b83fbfcc8"
 dependencies = [
  "associative-cache",
  "dwrote",
@@ -1214,9 +1216,9 @@ dependencies = [
 
 [[package]]
 name = "piet-web"
-version = "0.2.0-pre4"
+version = "0.2.0-pre5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f71e381210e85093f700e74b36836a49702945853721af2c0f0ff56b34beb89d"
+checksum = "4c5154285aedf517ad733560cf9f5f73ae1f67655ab7d41d00b32888e351693f"
 dependencies = [
  "js-sys",
  "piet",

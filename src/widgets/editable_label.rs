@@ -39,7 +39,7 @@ pub struct EditableLabel<T> {
     buffer: String,
     placeholder: String,
     editing: bool,
-    text_box: TextBox,
+    text_box: TextBox<String>,
     on_completion: Box<dyn Fn(&str) -> Option<T>>,
 }
 
