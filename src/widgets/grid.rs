@@ -1,5 +1,7 @@
 //! The top-level widget for the main glyph list window.
 
+use std::sync::Arc;
+
 use druid::kurbo::{Affine, Line, Rect, Shape, Size};
 //use druid::piet::{
 //FontBuilder, PietText, PietTextLayout, RenderContext, Text, TextLayout, TextLayoutBuilder,
@@ -163,7 +165,7 @@ impl Widget<GridGlyph> for GridInner {
         ctx.render_ctx.fill(affine * &*path, &glyph_color);
 
         //TODO: reuse layout
-        let mut layout = TextLayout::new(data.name.clone());
+        let mut layout: TextLayout<Arc<str>> = TextLayout::from_text(data.name.clone());
         layout.set_text_size(theme::GLYPH_LIST_LABEL_TEXT_SIZE);
         layout.set_text_color(theme::GLYPH_COLOR);
         layout.rebuild_if_needed(ctx.text(), env);

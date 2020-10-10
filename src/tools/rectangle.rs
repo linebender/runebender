@@ -16,12 +16,12 @@ use crate::tools::{EditType, Tool};
 pub struct Rectangle {
     gesture: GestureState,
     shift_locked: bool,
-    coord_text: TextLayout,
+    coord_text: TextLayout<String>,
 }
 
 impl Default for Rectangle {
     fn default() -> Self {
-        let mut layout = TextLayout::new("");
+        let mut layout = TextLayout::new();
         layout.set_font(crate::theme::UI_DETAIL_FONT);
         Rectangle {
             gesture: Default::default(),
