@@ -451,18 +451,35 @@ impl Path {
     /// Returns the index for the on_curve point and the 'other' handle
     /// for an offcurve point, if it exists.
     fn tangent_handle(&self, idx: usize) -> Option<(usize, usize)> {
+        if let Some((on_curve, Some(bcp2))) = self.tangent_handle_opt(idx) {
+            Some((on_curve, bcp2))
+        } else {
+            None
+        }
+    }
+
+    /// Return the index for the on_curve point, and the optional 'other' handle.
+    fn tangent_handle_opt(&self, idx: usize) -> Option<(usize, Option<usize>)> {
         assert!(!self.points[idx].is_on_curve());
         let prev = self.prev_idx(idx);
         let next = self.next_idx(idx);
-        if self.points[prev].typ == PointType::OnCurveSmooth {
+        if self.points[prev].typ.is_on_curve() {
             let prev2 = self.prev_idx(prev);
-            if !self.points[prev2].is_on_curve() {
-                return Some((prev, prev2));
+            if self.points[prev].typ == PointType::OnCurveSmooth
+                && !self.points[prev2].is_on_curve()
+            {
+                return Some((prev, Some(prev2)));
+            } else {
+                return Some((prev, None));
             }
-        } else if self.points[next].typ == PointType::OnCurveSmooth {
+        } else if self.points[next].typ.is_on_curve() {
             let next2 = self.next_idx(next);
-            if !self.points[next2].is_on_curve() {
-                return Some((next, next2));
+            if self.points[next].typ == PointType::OnCurveSmooth
+                && !self.points[next2].is_on_curve()
+            {
+                return Some((next, Some(next2)));
+            } else {
+                return Some((next, None));
             }
         }
         None
@@ -484,6 +501,20 @@ impl Path {
         let new_handle_offset = DVec2::from_raw(norm_angle * handle_len);
         let new_pos = self.points[on_curve].point + new_handle_offset;
         self.points_mut()[bcp2].point = new_pos;
+    }
+
+    pub fn update_handle(&mut self, point: EntityId, mut dpt: DPoint, is_locked: bool) {
+        if let Some(bcp1) = self.idx_for_point(point) {
+            if let Some((on_curve, bcp2)) = self.tangent_handle_opt(bcp1) {
+                if is_locked {
+                    dpt = axis_locked_point(dpt, self.points[on_curve].point);
+                }
+                self.points_mut()[bcp1].point = dpt;
+                if let Some(bcp2) = bcp2 {
+                    self.adjust_handle_angle(bcp1, on_curve, bcp2);
+                }
+            }
+        }
     }
 
     pub fn debug_print_points(&self) {
@@ -790,6 +821,16 @@ pub(crate) fn mark_tangent_handles(points: &mut [PathPoint]) {
         //pt.id.parent = parent_id;
         points[idx] = pt;
         idx += 1;
+    }
+}
+
+/// Lock the smallest axis of `point` (from `prev`) to that axis on `prev`.
+fn axis_locked_point(point: DPoint, prev: DPoint) -> DPoint {
+    let dxy = prev - point;
+    if dxy.x.abs() > dxy.y.abs() {
+        DPoint::new(point.x, prev.y)
+    } else {
+        DPoint::new(prev.x, point.y)
     }
 }
 

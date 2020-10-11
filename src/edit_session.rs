@@ -466,6 +466,14 @@ impl EditSession {
         }
     }
 
+    pub(crate) fn update_handle(&mut self, point: Point, is_locked: bool) {
+        let dpoint = self.viewport.from_screen(point);
+        let id = *self.selection.iter().next().unwrap();
+        if let Some(path) = self.path_for_point_mut(id) {
+            path.update_handle(id, dpoint, is_locked);
+        }
+    }
+
     pub(crate) fn add_guide(&mut self, point: Point) {
         // if one or two points are selected, use them. else use argument point.
         let guide = match self.selection.len() {
