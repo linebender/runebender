@@ -44,6 +44,7 @@ pub(crate) fn make_menu(data: &AppState) -> MenuDesc<AppState> {
         .append(edit_menu())
         .append(view_menu())
         .append(glyph_menu(data))
+        .append(paths_menu())
         .append(tools_menu())
 }
 
@@ -110,7 +111,7 @@ fn edit_menu<T: Data>() -> MenuDesc<T> {
                 LocalizedString::new("menu-item-deselect-all").with_placeholder("Deselect All"),
                 consts::cmd::DESELECT_ALL,
             )
-            .hotkey(SysMods::CmdShift, "A"),
+            .hotkey(SysMods::AltCmd, "A"),
         )
 }
 
@@ -164,6 +165,16 @@ fn glyph_menu(data: &AppState) -> MenuDesc<AppState> {
             .hotkey(SysMods::CmdShift, "C")
             .disabled(),
         )
+}
+
+fn paths_menu<T: Data>() -> MenuDesc<T> {
+    MenuDesc::new(LocalizedString::new("menu-paths-menu").with_placeholder("Paths")).append(
+        MenuItem::new(
+            LocalizedString::new("menu-item-align-selection").with_placeholder("Align Selection"),
+            consts::cmd::ALIGN_SELECTION,
+        )
+        .hotkey(SysMods::CmdShift, "A"),
+    )
 }
 
 fn tools_menu<T: Data>() -> MenuDesc<T> {

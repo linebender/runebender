@@ -696,6 +696,17 @@ impl Path {
         self.trailing = Some(handle);
     }
 
+    pub(crate) fn align_point(&mut self, point: EntityId, val: f64, set_x: bool) {
+        if let Some(idx) = self.idx_for_point(point) {
+            let points = self.points_mut();
+            if set_x {
+                points[idx].point.x = val;
+            } else {
+                points[idx].point.y = val;
+            }
+        }
+    }
+
     // in an open path, the first point is essentially a `move_to` command.
     // 'closing' the path means moving this point to the end of the list.
     pub fn close(&mut self) -> EntityId {

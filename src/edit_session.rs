@@ -474,6 +474,26 @@ impl EditSession {
         }
     }
 
+    pub(crate) fn align_selection(&mut self) {
+        let bbox = self.selection_dpoint_bbox();
+        // TODO: is_empty() would be cleaner but hasn't landed yet
+        if bbox.area() == 0.0 {
+            return;
+        }
+        let (val, set_x) = if bbox.width() < bbox.height() {
+            (0.5 * (bbox.x0 + bbox.x1), true)
+        } else {
+            (0.5 * (bbox.y0 + bbox.y1), false)
+        };
+        // make borrow checker happy; we could state-split the paths instead, but meh
+        let ids: Vec<EntityId> = self.selection.iter().copied().collect();
+        for id in ids {
+            if let Some(path) = self.path_for_point_mut(id) {
+                path.align_point(id, val, set_x);
+            }
+        }
+    }
+
     pub(crate) fn add_guide(&mut self, point: Point) {
         // if one or two points are selected, use them. else use argument point.
         let guide = match self.selection.len() {
