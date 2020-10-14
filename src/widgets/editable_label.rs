@@ -18,14 +18,17 @@
 
 use druid::text::EditAction;
 use druid::widget::prelude::*;
-use druid::widget::{Label, LabelText, TextBox};
-use druid::{Data, HotKey, KbKey, Selector};
+use druid::widget::{LabelText, TextBox};
+use druid::{Data, HotKey, Insets, KbKey, Selector};
 
 // we send this to ourselves if another widget takes focus, in order
 // to validate and move out of editing mode
 //const LOST_FOCUS: Selector = Selector::new("druid.builtin.EditableLabel-lost-focus");
 const CANCEL_EDITING: Selector = Selector::new("druid.builtin.EditableLabel-cancel-editing");
 const COMPLETE_EDITING: Selector = Selector::new("druid.builtin.EditableLabel-complete-editing");
+
+/// These are just taken from the druid TextBox widget
+const TEXT_INSETS: Insets = Insets::new(4.0, 2.0, 0.0, 2.0);
 
 /// A label with text that can be edited.
 ///
@@ -35,9 +38,9 @@ const COMPLETE_EDITING: Selector = Selector::new("druid.builtin.EditableLabel-co
 ///
 /// Editing can be abandoned by pressing <esc>.
 pub struct EditableLabel<T> {
-    label: Label<T>,
+    label: LabelText<T>,
+    old_buffer: String,
     buffer: String,
-    placeholder: String,
     editing: bool,
     text_box: TextBox<String>,
     on_completion: Box<dyn Fn(&str) -> Option<T>>,
@@ -67,9 +70,9 @@ impl<T: Data> EditableLabel<T> {
         on_completion: impl Fn(&str) -> Option<T> + 'static,
     ) -> Self {
         EditableLabel {
-            label: Label::new(text),
+            label: text.into(),
             buffer: String::new(),
-            placeholder: String::new(),
+            old_buffer: String::new(),
             text_box: TextBox::new(),
             editing: false,
             on_completion: Box::new(on_completion),
@@ -77,7 +80,7 @@ impl<T: Data> EditableLabel<T> {
     }
 
     pub fn with_placeholder(mut self, text: impl Into<String>) -> Self {
-        self.placeholder = text.into();
+        self.text_box = self.text_box.with_placeholder(text);
         self
     }
 
@@ -112,7 +115,6 @@ impl<T: Data> EditableLabel<T> {
 
     fn begin(&mut self, ctx: &mut EventCtx) {
         self.editing = true;
-        self.buffer = self.label.text().to_string();
         ctx.request_layout();
     }
 }
@@ -136,6 +138,7 @@ impl<T: Data> Widget<T> for EditableLabel<T> {
                     ctx.request_paint();
                 }
             }
+            ctx.request_update();
         } else if let Event::MouseDown(_) = event {
             self.begin(ctx);
             self.text_box.event(ctx, event, &mut self.buffer, env);
@@ -144,9 +147,10 @@ impl<T: Data> Widget<T> for EditableLabel<T> {
 
     fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
         if let LifeCycle::WidgetAdded = event {
-            self.buffer = self.label.text().to_string();
+            self.label.resolve(data, env);
+            self.buffer = self.label.display_text().to_string();
+            self.old_buffer = self.buffer.clone();
         }
-        self.label.lifecycle(ctx, event, data, env);
         self.text_box.lifecycle(ctx, event, &self.buffer, env);
 
         if let LifeCycle::FocusChanged(focus) = event {
@@ -155,40 +159,50 @@ impl<T: Data> Widget<T> for EditableLabel<T> {
                 ctx.submit_command(COMPLETE_EDITING.to(ctx.widget_id()));
             } else if !self.editing {
                 self.editing = true;
-                self.buffer = self.label.text().to_string();
+                self.label.resolve(data, env);
+                self.buffer = self.label.display_text().to_string();
                 ctx.request_layout();
             }
         }
     }
 
     fn update(&mut self, ctx: &mut UpdateCtx, old_data: &T, data: &T, env: &Env) {
-        // what should this do? If we're editing, does it cancel our editing? No.
-        if !self.editing {
-            self.label.update(ctx, old_data, data, env);
-        } else {
-            self.editing = false;
-            ctx.request_layout();
+        // if we're editing, the only data changes possible are from external
+        // sources, since we don't mutate the data until editing completes;
+        // so in this case, we want to use the new data, and cancel editing.
+        if !data.same(old_data) {
+            ctx.submit_command(CANCEL_EDITING.to(ctx.widget_id()));
         }
-        // we don't update the textbox because we don't bother keeping the old
-        // data. If the implementation of textbox changes, though, we would break?
+
+        let in_edit_mode = self.editing && data.same(old_data);
+        if in_edit_mode {
+            self.text_box
+                .update(ctx, &self.old_buffer, &self.buffer, env);
+        } else {
+            self.label.resolve(data, env);
+            let data_changed = self.label.display_text().as_ref() != self.buffer.as_str();
+            if data_changed {
+                let new_text = self.label.display_text().to_string();
+                self.text_box.update(ctx, &self.buffer, &new_text, env);
+                self.old_buffer = std::mem::replace(&mut self.buffer, new_text);
+                ctx.request_layout();
+            } else if ctx.env_changed() {
+                self.text_box.update(ctx, &self.buffer, &self.buffer, env);
+                ctx.request_layout();
+            }
+        }
     }
 
-    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
-        let textbox_size = self.text_box.layout(ctx, bc, &self.buffer, env);
-        let label_constraints = BoxConstraints::new(textbox_size, bc.max());
-        if self.editing {
-            textbox_size
-        } else {
-            // label should be at least as large as textbox
-            self.label.layout(ctx, &label_constraints, data, env)
-        }
+    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, _data: &T, env: &Env) -> Size {
+        self.text_box.layout(ctx, bc, &self.buffer, env)
     }
 
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &T, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, _data: &T, env: &Env) {
         if self.editing {
             self.text_box.paint(ctx, &self.buffer, env);
         } else {
-            self.label.paint(ctx, data, env);
+            let text_pos = (TEXT_INSETS.x0, TEXT_INSETS.y0);
+            self.text_box.editor().layout().draw(ctx, text_pos);
         }
     }
 }
