@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use druid::{
-    AppDelegate, Command, DelegateCtx, Env, Selector, Target, Widget, WindowDesc, WindowId,
+    AppDelegate, Command, DelegateCtx, Env, Handled, Selector, Target, Widget, WindowDesc, WindowId,
 };
 
 use druid::kurbo::Size;
@@ -29,14 +29,14 @@ impl AppDelegate<AppState> for Delegate {
         cmd: &Command,
         data: &mut AppState,
         _env: &Env,
-    ) -> bool {
+    ) -> Handled {
         if let Some(info) = cmd.get(druid::commands::OPEN_FILE) {
             match Ufo::load(info.path()) {
                 Ok(ufo) => data.workspace.set_file(ufo, info.path().to_owned()),
                 Err(e) => log::error!("failed to open file {:?}: '{:?}'", info.path(), e),
             };
             ctx.submit_command(consts::cmd::REBUILD_MENUS);
-            false
+            Handled::Yes
         } else if let Some(info) = cmd.get(druid::commands::SAVE_FILE) {
             if let Some(path) = info.as_ref().map(|info| info.path()) {
                 Arc::make_mut(&mut data.workspace.font).path = Some(path.into());
@@ -45,19 +45,19 @@ impl AppDelegate<AppState> for Delegate {
             if let Err(e) = data.workspace.save() {
                 log::error!("saving failed: '{}'", e);
             }
-            false
+            Handled::Yes
         } else if cmd.is(consts::cmd::NEW_GLYPH) {
             let new_glyph_name = data.workspace.add_new_glyph();
             data.workspace.selected = Some(new_glyph_name);
-            false
+            Handled::Yes
         } else if cmd.is(consts::cmd::DELETE_SELECTED_GLYPH) {
             data.workspace.delete_selected_glyph();
-            false
+            Handled::Yes
         } else if let Some(consts::cmd::RenameGlyphArgs { old, new }) =
             cmd.get(consts::cmd::RENAME_GLYPH)
         {
             data.workspace.rename_glyph(old.clone(), new.clone());
-            false
+            Handled::Yes
         } else if let Some(payload) = cmd.get(EDIT_GLYPH) {
             match data.workspace.open_glyphs.get(payload).to_owned() {
                 Some(id) => {
@@ -83,9 +83,9 @@ impl AppDelegate<AppState> for Delegate {
                     Arc::make_mut(&mut data.workspace.open_glyphs).insert(payload.clone(), id);
                 }
             }
-            false
+            Handled::Yes
         } else {
-            true
+            Handled::No
         }
     }
 

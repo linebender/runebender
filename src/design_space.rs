@@ -93,6 +93,8 @@ impl DPoint {
 }
 
 impl DVec2 {
+    pub const ZERO: DVec2 = DVec2 { x: 0.0, y: 0.0 };
+
     fn new(x: f64, y: f64) -> DVec2 {
         assert!(x.is_finite() && y.is_finite() && x.fract() == 0. && y.fract() == 0.);
         DVec2 { x, y }
@@ -113,6 +115,15 @@ impl DVec2 {
     #[inline]
     pub fn hypot(self) -> f64 {
         self.to_raw().hypot()
+    }
+
+    /// The vector snapped to the closest axis.
+    pub fn axis_locked(self) -> DVec2 {
+        if self.x.abs() > self.y.abs() {
+            DVec2::new(self.x, 0.0)
+        } else {
+            DVec2::new(0.0, self.y)
+        }
     }
 }
 

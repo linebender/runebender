@@ -5,11 +5,14 @@ use druid::kurbo::{Point, Rect, Vec2};
 use druid::piet::{Color, RenderContext};
 use druid::{Data, Env, EventCtx, HotKey, KbKey, KeyEvent, MouseEvent, PaintCtx, RawMods};
 
-use crate::design_space::{DPoint, DVec2};
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
 use crate::path::{EntityId, PathSeg};
 use crate::tools::{EditType, Tool, ToolId};
+use crate::{
+    design_space::{DPoint, DVec2},
+    path::PointType,
+};
 
 const SELECTION_RECT_BG_COLOR: Color = Color::rgba8(0xDD, 0xDD, 0xDD, 0x55);
 const SELECTION_RECT_STROKE_COLOR: Color = Color::rgb8(0x53, 0x8B, 0xBB);
@@ -23,8 +26,11 @@ enum DragState {
     },
     /// State for a drag that is moving a selected object.
     Move {
-        last_used_pos: DPoint,
+        drag_start: DPoint,
+        delta: DVec2,
     },
+    /// State for a drag that is moving an off-curve point.
+    MoveHandle,
     None,
 }
 
@@ -204,8 +210,18 @@ impl MouseDelegate<EditSession> for Select {
         let sel = data.hit_test_all(drag.start.pos, None);
         let is_dragging_item = sel.is_some();
         self.drag = if is_dragging_item {
-            DragState::Move {
-                last_used_pos: data.viewport.from_screen(drag.start.pos),
+            let is_dragging_handle = data.selection.len() == 1
+                && data
+                    .path_point_for_id(*data.selection.iter().next().unwrap())
+                    .map(|pt| pt.typ == PointType::OffCurve)
+                    .unwrap_or(false);
+            if is_dragging_handle {
+                DragState::MoveHandle
+            } else {
+                DragState::Move {
+                    drag_start: data.viewport.from_screen(drag.start.pos),
+                    delta: DVec2::ZERO,
+                }
             }
         } else {
             DragState::Select {
@@ -224,15 +240,21 @@ impl MouseDelegate<EditSession> for Select {
                 *rect = Rect::from_points(drag.current.pos, drag.start.pos);
                 update_selection_for_drag(data, previous, *rect, drag.current.mods.shift());
             }
-            DragState::Move {
-                ref mut last_used_pos,
-            } => {
+            DragState::Move { drag_start, delta } => {
                 let drag_pos = data.viewport.from_screen(drag.current.pos);
-                let drag_delta = drag_pos - *last_used_pos;
+                let mut new_delta = drag_pos - *drag_start;
+                if drag.current.mods.shift() {
+                    new_delta = new_delta.axis_locked();
+                }
+                let drag_delta = new_delta - *delta;
+                // TODO: constrain drag when shift is pressed
                 if drag_delta.hypot() > 0. {
                     data.nudge_selection(drag_delta);
-                    *last_used_pos = drag_pos;
+                    *delta = new_delta;
                 }
+            }
+            DragState::MoveHandle => {
+                data.update_handle(drag.current.pos, drag.current.mods.shift());
             }
             DragState::None => unreachable!("invalid state"),
         }
