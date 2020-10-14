@@ -47,6 +47,9 @@ pub mod cmd {
     /// sent by the 'add component' menu item
     pub const ADD_COMPONENT: Selector = Selector::new("runebender.add-component");
 
+    /// sent by 'align selection' menu item in Paths menu
+    pub const ALIGN_SELECTION: Selector = Selector::new("runebender.align-selection");
+
     /// Sent when a new tool has been selected.
     ///
     /// The payload must be a `ToolId`.

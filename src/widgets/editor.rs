@@ -187,6 +187,10 @@ impl Editor {
                     data.session_mut().viewport = saved_viewport;
                 }
             }
+            c if c.is(consts::cmd::ALIGN_SELECTION) => {
+                data.session_mut().align_selection();
+                return (true, Some(EditType::Normal));
+            }
             // all unhandled commands:
             _ => return (false, None),
         }
