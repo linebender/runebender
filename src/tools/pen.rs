@@ -1,11 +1,10 @@
 //! The bezier pen tool.
 
-use druid::kurbo::Point;
 use druid::{Env, EventCtx, KbKey, KeyEvent, MouseEvent};
 
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
-use crate::tools::{EditType, Tool, ToolId};
+use crate::tools::{axis_locked_point, EditType, Tool, ToolId};
 
 /// The state of the pen.
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -136,16 +135,5 @@ impl Tool for Pen {
 
     fn name(&self) -> ToolId {
         "Pen"
-    }
-}
-
-/// Lock the smallest axis of `point` (from `prev`) to that axis on `prev`.
-/// (aka shift + click)
-fn axis_locked_point(point: Point, prev: Point) -> Point {
-    let dxy = prev - point;
-    if dxy.x.abs() > dxy.y.abs() {
-        Point::new(point.x, prev.y)
-    } else {
-        Point::new(prev.x, point.y)
     }
 }

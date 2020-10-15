@@ -485,6 +485,7 @@ impl EditSession {
         } else {
             (0.5 * (bbox.y0 + bbox.y1), false)
         };
+        let val = val.round();
         // make borrow checker happy; we could state-split the paths instead, but meh
         let ids: Vec<EntityId> = self.selection.iter().copied().collect();
         for id in ids {
