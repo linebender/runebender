@@ -4,7 +4,7 @@ use druid::{Env, EventCtx, KbKey, KeyEvent, MouseEvent};
 
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
-use crate::tools::{axis_locked_point, EditType, Tool, ToolId};
+use crate::tools::{EditType, Tool, ToolId};
 
 /// The state of the pen.
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -55,7 +55,7 @@ impl MouseDelegate<EditSession> for Pen {
                 // lock to nearest vertical or horizontal axis if shift is pressed
                 Some(path) if event.mods.shift() => {
                     let last_point = path.points().last().unwrap().to_screen(vport);
-                    axis_locked_point(event.pos, last_point)
+                    super::axis_locked_point(event.pos, last_point)
                 }
                 _ => event.pos,
             };
@@ -84,7 +84,7 @@ impl MouseDelegate<EditSession> for Pen {
         }
         let Drag { start, current, .. } = drag;
         let handle_point = if current.mods.shift() {
-            axis_locked_point(current.pos, start.pos)
+            super::axis_locked_point(current.pos, start.pos)
         } else {
             current.pos
         };

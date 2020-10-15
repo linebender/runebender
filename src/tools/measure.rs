@@ -5,7 +5,7 @@ use druid::{Data, Env, EventCtx, PaintCtx};
 use crate::design_space::DPoint;
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
-use crate::tools::{axis_locked_point, EditType, Tool};
+use crate::tools::{EditType, Tool};
 
 #[derive(Default)]
 pub struct Measure {
@@ -210,7 +210,7 @@ impl MouseDelegate<EditSession> for Measure {
         if let Some(line) = &mut self.line {
             let mut pos = drag.current.pos;
             if drag.current.mods.shift() {
-                pos = axis_locked_point(pos, drag.start.pos);
+                pos = super::axis_locked_point(pos, drag.start.pos);
             }
             line.p1 = pos;
         }
