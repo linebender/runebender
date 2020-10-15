@@ -208,7 +208,11 @@ impl MouseDelegate<EditSession> for Measure {
 
     fn left_drag_changed(&mut self, drag: Drag, _data: &mut EditSession) {
         if let Some(line) = &mut self.line {
-            line.p1 = drag.current.pos;
+            let mut pos = drag.current.pos;
+            if drag.current.mods.shift() {
+                pos = super::axis_locked_point(pos, drag.start.pos);
+            }
+            line.p1 = pos;
         }
     }
 }

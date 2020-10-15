@@ -18,6 +18,7 @@ pub use select::Select;
 
 use crate::edit_session::EditSession;
 use crate::mouse::{Mouse, TaggedEvent};
+use druid::kurbo::Point;
 use druid::{Env, EventCtx, KeyEvent, PaintCtx};
 
 /// Something to pass around instead of a Box<dyn Tool>
@@ -138,5 +139,16 @@ impl EditType {
             (EditType::Drag, EditType::Drag) => false,
             _ => true,
         }
+    }
+}
+
+/// Lock the smallest axis of `point` (from `prev`) to that axis on `prev`.
+/// (aka shift + click)
+fn axis_locked_point(point: Point, prev: Point) -> Point {
+    let dxy = prev - point;
+    if dxy.x.abs() > dxy.y.abs() {
+        Point::new(point.x, prev.y)
+    } else {
+        Point::new(prev.x, point.y)
     }
 }
