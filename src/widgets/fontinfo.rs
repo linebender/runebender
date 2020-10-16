@@ -9,6 +9,7 @@ use druid::{Color, LensExt, WidgetExt};
 use norad::GlyphName;
 
 use crate::data::{FontMetrics, SimpleFontInfo, Workspace};
+use crate::theme;
 use crate::widgets::{EditableLabel, ModalHost};
 
 fn glyphname_label() -> EditableLabel<GlyphName> {
@@ -23,14 +24,14 @@ pub fn font_info() -> impl Widget<Workspace> {
         .with_child(
             Flex::row()
                 .with_child(glyphname_label().lens(SimpleFontInfo::family_name))
-                .with_spacer(8.0)
+                .with_default_spacer()
                 .with_child(glyphname_label().lens(SimpleFontInfo::style_name)),
         )
-        .with_spacer(8.0)
+        .with_default_spacer()
         .with_child(
             Flex::row()
-                .with_child(Label::new("Cap height:"))
-                .with_spacer(8.0)
+                .with_child(Label::new("Cap height:").with_text_color(theme::SECONDARY_TEXT_COLOR))
+                .with_default_spacer()
                 .with_child(
                     option_f64_editlabel()
                         .lens(SimpleFontInfo::metrics.then(FontMetrics::cap_height)),
@@ -38,8 +39,8 @@ pub fn font_info() -> impl Widget<Workspace> {
         )
         .with_child(
             Flex::row()
-                .with_child(Label::new("x-height:"))
-                .with_spacer(8.0)
+                .with_child(Label::new("x-height:").with_text_color(theme::SECONDARY_TEXT_COLOR))
+                .with_default_spacer()
                 .with_child(
                     option_f64_editlabel()
                         .lens(SimpleFontInfo::metrics.then(FontMetrics::x_height)),
@@ -47,8 +48,8 @@ pub fn font_info() -> impl Widget<Workspace> {
         )
         .with_child(
             Flex::row()
-                .with_child(Label::new("ascender:"))
-                .with_spacer(8.0)
+                .with_child(Label::new("Ascender:").with_text_color(theme::SECONDARY_TEXT_COLOR))
+                .with_default_spacer()
                 .with_child(
                     option_f64_editlabel()
                         .lens(SimpleFontInfo::metrics.then(FontMetrics::ascender)),
@@ -56,8 +57,12 @@ pub fn font_info() -> impl Widget<Workspace> {
         )
         .with_child(
             Flex::row()
-                .with_child(Label::new("descender:").center())
-                .with_spacer(8.0)
+                .with_child(
+                    Label::new("Descender:")
+                        .with_text_color(theme::SECONDARY_TEXT_COLOR)
+                        .center(),
+                )
+                .with_default_spacer()
                 .with_child(
                     option_f64_editlabel()
                         .lens(SimpleFontInfo::metrics.then(FontMetrics::descender)),
