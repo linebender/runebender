@@ -1,7 +1,6 @@
-use druid::kurbo::{Point, Rect, Size, Vec2};
 use druid::widget::prelude::*;
 use druid::widget::Scroll;
-use druid::{Color, Command, KbKey};
+use druid::{Color, Command, KbKey, Point, Vec2};
 
 use crate::consts::CANVAS_SIZE;
 use crate::data::EditorState;
@@ -112,7 +111,7 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
             1.0
         };
 
-        let canvas_rect = Rect::ZERO.with_size(CANVAS_SIZE);
+        let canvas_rect = CANVAS_SIZE.to_rect();
         let work_offset = canvas_rect.center() - content_region.center();
         data.session_mut().viewport.set_offset(work_offset);
         data.session_mut().viewport.zoom = new_zoom;
@@ -120,7 +119,7 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
 
     fn handle_zoom_cmd(&mut self, cmd: &Command, view_size: Size, data: &mut EditorState) {
         use crate::consts::cmd;
-        let view_center = Rect::ZERO.with_size(view_size).center().to_vec2();
+        let view_center = view_size.to_rect().center().to_vec2();
         if cmd.is(cmd::ZOOM_IN) {
             self.wheel_zoom(data, Vec2::new(50.0, 0.), view_size, Some(view_center))
         } else if cmd.is(cmd::ZOOM_OUT) {

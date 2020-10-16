@@ -16,8 +16,6 @@ use crate::widgets::{EditableLabel, Maybe};
 
 const SELECTED_GLYPH_BOTTOM_PADDING: f64 = 10.0;
 const SELECTED_GLYPH_HEIGHT: f64 = 220.0;
-const SECONDARY_LABEL_COLOR: Color = Color::grey8(0x88);
-const SECONDARY_TEXT_SIZE: f64 = 12.0;
 
 pub struct Sidebar {
     selected_glyph: WidgetPod<Workspace, Box<dyn Widget<Workspace>>>,
@@ -41,13 +39,13 @@ fn selected_glyph_widget() -> impl Widget<SelectedGlyph> {
             Maybe::new(
                 || {
                     Label::dynamic(|d: &char, _| format!("{} (U+{:04X})", d, *d as u32))
-                        .with_text_color(SECONDARY_LABEL_COLOR)
-                        .with_text_size(SECONDARY_TEXT_SIZE)
+                        .with_text_color(theme::SECONDARY_TEXT_COLOR)
+                        .with_font(theme::UI_DETAIL_FONT)
                 },
                 || {
                     Label::new("____")
-                        .with_text_color(SECONDARY_LABEL_COLOR)
-                        .with_text_size(SECONDARY_TEXT_SIZE)
+                        .with_text_color(theme::SECONDARY_TEXT_COLOR)
+                        .with_font(theme::UI_DETAIL_FONT)
                 },
             )
             .lens(lenses::app_state::Codepoint),
@@ -62,14 +60,14 @@ fn selected_glyph_widget() -> impl Widget<SelectedGlyph> {
             Flex::row()
                 .with_child(
                     Label::new("kern group")
-                        .with_text_color(SECONDARY_LABEL_COLOR)
-                        .with_text_size(SECONDARY_TEXT_SIZE),
+                        .with_text_color(theme::SECONDARY_TEXT_COLOR)
+                        .with_font(theme::UI_DETAIL_FONT),
                 )
                 .with_flex_spacer(1.0)
                 .with_child(
                     Label::new("kern group")
-                        .with_text_color(SECONDARY_LABEL_COLOR)
-                        .with_text_size(SECONDARY_TEXT_SIZE),
+                        .with_text_color(theme::SECONDARY_TEXT_COLOR)
+                        .with_font(theme::UI_DETAIL_FONT),
                 )
                 .padding((8.0, 0.0)),
         )
@@ -130,7 +128,7 @@ impl Widget<Workspace> for Sidebar {
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &Workspace, env: &Env) {
-        let rect = Rect::ZERO.with_size(ctx.size());
+        let rect = ctx.size().to_rect();
         ctx.fill(rect, &env.get(theme::SIDEBAR_BACKGROUND));
 
         self.selected_glyph.paint(ctx, data, env);
@@ -196,7 +194,7 @@ impl Widget<SelectedGlyph> for GlyphPainter {
             .unwrap_or(data.upm() * 0.5);
 
         let path = data.get_bezier();
-        let geom = Rect::ZERO.with_size(ctx.size());
+        let geom = ctx.size().to_rect();
         let scale = geom.height() as f64 / data.upm();
         let scaled_width = advance * scale as f64;
         let l_pad = ((geom.width() as f64 - scaled_width) / 2.).round();
@@ -206,7 +204,7 @@ impl Widget<SelectedGlyph> for GlyphPainter {
         let glyph_color = if data.is_placeholder_glyph() {
             env.get(theme::PLACEHOLDER_GLYPH_COLOR)
         } else {
-            env.get(theme::GLYPH_COLOR)
+            env.get(theme::PRIMARY_TEXT_COLOR)
         };
 
         ctx.fill(affine * &*path, &glyph_color);
