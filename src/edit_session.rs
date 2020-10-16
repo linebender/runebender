@@ -494,6 +494,22 @@ impl EditSession {
         }
     }
 
+    pub(crate) fn reverse_contours(&mut self) {
+        let mut path_ixs = BTreeSet::new();
+        for entity in &*self.selection {
+            if let Some(path_ix) = self.paths.iter().position(|p| p == entity) {
+                path_ixs.insert(path_ix);
+            }
+        }
+        if path_ixs.is_empty() {
+            path_ixs.extend(0..self.paths.len());
+        }
+        let paths = self.paths_mut();
+        for ix in path_ixs {
+            paths[ix].reverse_contour();
+        }
+    }
+
     pub(crate) fn add_guide(&mut self, point: Point) {
         // if one or two points are selected, use them. else use argument point.
         let guide = match self.selection.len() {
@@ -533,6 +549,7 @@ impl EditSession {
         let mut glyph = Glyph::new_named("");
         glyph.name = self.name.clone();
         glyph.advance = self.glyph.advance.clone();
+        glyph.codepoints = self.glyph.codepoints.clone();
 
         let contours: Vec<_> = self.paths.iter().map(Path::to_norad).collect();
         let components: Vec<_> = self.components.iter().map(Component::to_norad).collect();
@@ -546,7 +563,6 @@ impl EditSession {
         if !guidelines.is_empty() {
             glyph.guidelines = Some(guidelines);
         }
-        // codepoints
         glyph
     }
 }

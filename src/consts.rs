@@ -51,6 +51,9 @@ pub mod cmd {
     /// sent by 'align selection' menu item in Paths menu
     pub const ALIGN_SELECTION: Selector = Selector::new("runebender.align-selection");
 
+    // sent by 'reverse contours' menu item in Paths menu
+    pub const REVERSE_CONTOURS: Selector = Selector::new("runebender.reverse-contours");
+
     /// Sent when a new tool has been selected.
     ///
     /// The payload must be a `ToolId`.

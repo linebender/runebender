@@ -168,13 +168,20 @@ fn glyph_menu(data: &AppState) -> MenuDesc<AppState> {
 }
 
 fn paths_menu<T: Data>() -> MenuDesc<T> {
-    MenuDesc::new(LocalizedString::new("menu-paths-menu").with_placeholder("Paths")).append(
-        MenuItem::new(
-            LocalizedString::new("menu-item-align-selection").with_placeholder("Align Selection"),
-            consts::cmd::ALIGN_SELECTION,
+    MenuDesc::new(LocalizedString::new("menu-paths-menu").with_placeholder("Paths"))
+        .append(MenuItem::new(
+            LocalizedString::new("menu-item-reverse-contours").with_placeholder("Reverse Contours"),
+            consts::cmd::REVERSE_CONTOURS,
+            // TODO: hotkey on mac should be ctrl-alt-cmd R, but what about non-mac?
+        ))
+        .append(
+            MenuItem::new(
+                LocalizedString::new("menu-item-align-selection")
+                    .with_placeholder("Align Selection"),
+                consts::cmd::ALIGN_SELECTION,
+            )
+            .hotkey(SysMods::CmdShift, "A"),
         )
-        .hotkey(SysMods::CmdShift, "A"),
-    )
 }
 
 fn tools_menu<T: Data>() -> MenuDesc<T> {

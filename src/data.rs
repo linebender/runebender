@@ -834,7 +834,7 @@ fn backup_ufo_at_path(path: &Path) -> Result<Option<PathBuf>, std::io::Error> {
     }
 
     let backup_date = chrono::Local::now();
-    let date_str = backup_date.format("%Y-%m-%d_%H&%%S.ufo");
+    let date_str = backup_date.format("%Y-%m-%d_%H&%M%S.ufo");
     backup_dir.push(date_str.to_string());
     if backup_dir.exists() {
         fs::remove_dir_all(&backup_dir)?;
