@@ -19,7 +19,7 @@
 use druid::text::EditAction;
 use druid::widget::prelude::*;
 use druid::widget::{LabelText, TextBox};
-use druid::{Data, HotKey, Insets, KbKey, Selector};
+use druid::{Color, Data, FontDescriptor, HotKey, Insets, KbKey, KeyOrValue, Selector};
 
 // we send this to ourselves if another widget takes focus, in order
 // to validate and move out of editing mode
@@ -79,8 +79,34 @@ impl<T: Data> EditableLabel<T> {
         }
     }
 
+    /// Builder-style method to set the placeholder text.
     pub fn with_placeholder(mut self, text: impl Into<String>) -> Self {
         self.text_box = self.text_box.with_placeholder(text);
+        self
+    }
+
+    /// Builder-style method for setting the font.
+    ///
+    /// The argument can be a [`FontDescriptor`] or a [`Key<FontDescriptor>`]
+    /// that refers to a font defined in the [`Env`].
+    ///
+    /// [`Env`]: ../struct.Env.html
+    /// [`FontDescriptor`]: ../struct.FontDescriptor.html
+    /// [`Key<FontDescriptor>`]: ../struct.Key.html
+    pub fn with_font(mut self, font: impl Into<KeyOrValue<FontDescriptor>>) -> Self {
+        self.text_box.set_font(font);
+        self
+    }
+
+    /// Builder-style method to override the text size.
+    pub fn with_text_size(mut self, size: f64) -> Self {
+        self.text_box.set_text_size(size);
+        self
+    }
+
+    /// Builder-style method to set  the text color.
+    pub fn with_text_color(mut self, color: impl Into<KeyOrValue<Color>>) -> Self {
+        self.text_box.set_text_color(color);
         self
     }
 
