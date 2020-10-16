@@ -25,7 +25,7 @@ impl GlyphGrid {
     fn update_children(&mut self, data: &Workspace) {
         self.children.clear();
         for key in data.font.ufo.iter_names() {
-            let widget = Maybe::or_empty(|| GridInner);
+            let widget = Maybe::or_empty(GridInner::new);
             self.children.push(WidgetPod::new(
                 widget.lens(lenses::app_state::GridGlyph(key)).boxed(),
             ));
@@ -128,8 +128,18 @@ impl GlyphGrid {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct GridInner;
+#[derive(Debug, Clone)]
+struct GridInner {
+    text: TextLayout<Arc<str>>,
+}
+
+impl GridInner {
+    fn new() -> Self {
+        GridInner {
+            text: TextLayout::new(),
+        }
+    }
+}
 
 impl Widget<GridGlyph> for GridInner {
     fn paint(&mut self, ctx: &mut PaintCtx, data: &GridGlyph, env: &Env) {
@@ -164,26 +174,22 @@ impl Widget<GridGlyph> for GridInner {
 
         ctx.render_ctx.fill(affine * &*path, &glyph_color);
 
-        //TODO: reuse layout
-        let mut layout: TextLayout<Arc<str>> = TextLayout::from_text(data.name.clone());
-        layout.set_font(theme::UI_DETAIL_FONT);
-        layout.set_text_color(theme::PRIMARY_TEXT_COLOR);
-        layout.rebuild_if_needed(ctx.text(), env);
-        let text_size = layout.size();
+        let text_size = self.text.size();
 
         let xpos = geom.x0 + (geom.width() - text_size.width) / 2.0;
         let ypos = geom.max_y() - text_size.height;
 
-        layout.draw(ctx, (xpos, ypos));
+        self.text.draw(ctx, (xpos, ypos));
     }
 
     fn layout(
         &mut self,
-        _ctx: &mut LayoutCtx,
+        ctx: &mut LayoutCtx,
         bc: &BoxConstraints,
-        _d: &GridGlyph,
-        _env: &Env,
+        _: &GridGlyph,
+        env: &Env,
     ) -> Size {
+        self.text.rebuild_if_needed(ctx.text(), env);
         bc.max()
     }
 
@@ -208,15 +214,37 @@ impl Widget<GridGlyph> for GridInner {
         }
     }
 
-    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, _: &GridGlyph, _: &Env) {
-        if let LifeCycle::HotChanged(_) = event {
-            ctx.request_paint();
+    fn lifecycle(
+        &mut self,
+        ctx: &mut LifeCycleCtx,
+        event: &LifeCycle,
+        data: &GridGlyph,
+        env: &Env,
+    ) {
+        match event {
+            LifeCycle::HotChanged(_) => ctx.request_paint(),
+            LifeCycle::WidgetAdded => {
+                self.text.set_text(data.name.clone());
+                self.text.set_font(theme::UI_DETAIL_FONT);
+                self.text.set_text_color(theme::PRIMARY_TEXT_COLOR);
+                self.text.rebuild_if_needed(ctx.text(), env);
+            }
+            _ => (),
         }
     }
 
     fn update(&mut self, ctx: &mut UpdateCtx, old: &GridGlyph, new: &GridGlyph, _env: &Env) {
         if !old.same(new) {
             ctx.request_paint();
+            // I don't know if our name can change? but if it can we need to rebuild our text
+            // object.
+            if !old.name.same(&new.name) {
+                self.text.set_text(new.name.clone());
+                ctx.request_layout();
+            }
+        }
+        if self.text.needs_rebuild_after_update(ctx) {
+            ctx.request_layout();
         }
     }
 }
