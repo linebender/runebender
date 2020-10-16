@@ -2,11 +2,8 @@
 
 use std::sync::Arc;
 
-use druid::kurbo::{Rect, Size};
-use druid::{
-    Application, BoxConstraints, Clipboard, ClipboardFormat, Command, ContextMenu, Data, Env,
-    Event, EventCtx, KbKey, LayoutCtx, LifeCycle, LifeCycleCtx, PaintCtx, UpdateCtx, Widget,
-};
+use druid::widget::prelude::*;
+use druid::{Application, Clipboard, ClipboardFormat, Color, Command, ContextMenu, Data, KbKey};
 
 use crate::consts::{self, CANVAS_SIZE};
 use crate::data::EditorState;
@@ -57,8 +54,6 @@ impl Editor {
             let menu = crate::menus::make_context_menu(data, m.pos);
             let menu = ContextMenu::new(menu, m.window_pos);
             ctx.show_context_menu(menu);
-            //let cmd = Command::new(druid::commands::SHOW_CONTEXT_MENU, menu);
-            //ctx.submit_command(cmd, None);
         }
         None
     }
@@ -210,9 +205,7 @@ impl Editor {
 
 impl Widget<EditorState> for Editor {
     fn paint(&mut self, ctx: &mut PaintCtx, data: &EditorState, env: &Env) {
-        use druid::piet::{Color, RenderContext};
-        let rect =
-            Rect::ZERO.with_size((CANVAS_SIZE.to_vec2() * data.session.viewport.zoom).to_size());
+        let rect = (CANVAS_SIZE * data.session.viewport.zoom).to_rect();
         ctx.fill(rect, &Color::WHITE);
 
         draw::draw_session(

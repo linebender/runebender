@@ -135,7 +135,7 @@ impl Widget<GridGlyph> for GridInner {
     fn paint(&mut self, ctx: &mut PaintCtx, data: &GridGlyph, env: &Env) {
         let path = data.outline.clone();
         let bb = path.bounding_box();
-        let geom = Rect::ZERO.with_size(ctx.size());
+        let geom = ctx.size().to_rect();
         let scale = geom.height() as f64 / data.upm;
         let scale = scale * 0.85; // some margins around glyphs
         let scaled_width = bb.width() * scale as f64;
@@ -159,15 +159,15 @@ impl Widget<GridGlyph> for GridInner {
         let glyph_color = if data.is_placeholder {
             env.get(theme::PLACEHOLDER_GLYPH_COLOR)
         } else {
-            env.get(theme::GLYPH_COLOR)
+            env.get(theme::PRIMARY_TEXT_COLOR)
         };
 
         ctx.render_ctx.fill(affine * &*path, &glyph_color);
 
         //TODO: reuse layout
         let mut layout: TextLayout<Arc<str>> = TextLayout::from_text(data.name.clone());
-        layout.set_text_size(theme::GLYPH_LIST_LABEL_TEXT_SIZE);
-        layout.set_text_color(theme::GLYPH_COLOR);
+        layout.set_font(theme::UI_DETAIL_FONT);
+        layout.set_text_color(theme::PRIMARY_TEXT_COLOR);
         layout.rebuild_if_needed(ctx.text(), env);
         let text_size = layout.size();
 
