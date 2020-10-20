@@ -18,7 +18,8 @@ use norad::Glyph;
 const PATH_COLOR: Color = Color::rgb8(0x00, 0x00, 0x00);
 const METRICS_COLOR: Color = Color::rgb8(0xA0, 0xA0, 0xA0);
 const GUIDE_COLOR: Color = Color::rgb8(0xFC, 0x54, 0x93);
-const SELECTED_GUIDE_COLOR: Color = Color::rgb8(0xFE, 0xED, 0xED);
+const SELECTED_GUIDE_COLOR: Color = Color::rgb8(0xFE, 0xCD, 0xCD);
+const SELECTED_LINE_SEGMENT_COLOR: Color = Color::rgb8(0x93, 0xc6, 0xf4);
 const SMOOTH_POINT_COLOR: Color = Color::rgb8(0x_41, 0x8E, 0x22);
 const CORNER_POINT_COLOR: Color = Color::rgb8(0x0b, 0x2b, 0xdb);
 const OFF_CURVE_POINT_COLOR: Color = Color::rgb8(0xbb, 0xbb, 0xbb);
@@ -166,6 +167,18 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
                 let p2 = p2 + vec * 5000.;
                 Line::new(p1, p2)
             }
+        }
+    }
+
+    fn draw_selected_segments(&mut self, path: &Path, sels: &BTreeSet<EntityId>) {
+        //FIXME: this is less efficient than it could be; we create and
+        //check all segments of all paths, and we could at least just keep track
+        //of whether a path contained *any* selected points, and short-circuit.
+        for segment in path.segments_for_points(sels) {
+            let seg = backport_pathseg_affine_mul(segment.to_kurbo(), self.space.affine());
+            //FIXME: PathSeg is a shape in kurbo > 0.7.0
+            let bez = bezpath_from_seg(seg);
+            self.stroke(&bez, &SELECTED_LINE_SEGMENT_COLOR, 3.0);
         }
     }
 
@@ -414,6 +427,10 @@ pub(crate) fn draw_session(
     draw_ctx.draw_guides(&session.guides, &session.selection);
 
     for path in session.paths.iter() {
+        if session.selection.len() > 1 {
+            // for a segment to be selected at least two points must be selected
+            draw_ctx.draw_selected_segments(path, &session.selection);
+        }
         let bez = space.affine() * path.bezier();
         draw_ctx.draw_path(&bez);
         draw_ctx.draw_control_point_lines(path);
@@ -498,3 +515,32 @@ fn make_arrow() -> BezPath {
 
 //s.abs() == 4.0
 //}
+
+//temp fix until `PathSeg` impls `Shape`
+fn bezpath_from_seg(seg: PathSeg) -> BezPath {
+    let mut path = BezPath::new();
+    match seg {
+        PathSeg::Line(line) => {
+            path.move_to(line.p0);
+            path.line_to(line.p1);
+        }
+        PathSeg::Quad(line) => {
+            path.move_to(line.p0);
+            path.quad_to(line.p1, line.p2);
+        }
+        PathSeg::Cubic(line) => {
+            path.move_to(line.p0);
+            path.curve_to(line.p1, line.p2, line.p3);
+        }
+    }
+    path
+}
+
+// temp fix pending a kurbo release
+fn backport_pathseg_affine_mul(seg: PathSeg, affine: Affine) -> PathSeg {
+    match seg {
+        PathSeg::Line(line) => PathSeg::Line(affine * line),
+        PathSeg::Quad(quad) => PathSeg::Quad(affine * quad),
+        PathSeg::Cubic(cubic) => PathSeg::Cubic(affine * cubic),
+    }
+}
