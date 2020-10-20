@@ -27,13 +27,7 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
     }
 
     /// Updates zoom based on a delta from a scroll wheel
-    fn wheel_zoom(
-        &mut self,
-        data: &mut EditorState,
-        delta: Vec2,
-        size: Size,
-        fixed_point: Option<Vec2>,
-    ) {
+    fn wheel_zoom(&mut self, data: &mut EditorState, delta: Vec2, fixed_point: Option<Vec2>) {
         let last_zoom = data.session.viewport.zoom;
         let delta = most_significant_axis(delta);
         // we want to zoom in smaller units at smaller scales
@@ -45,24 +39,18 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
         }
 
         let next_zoom = (last_zoom + delta).min(MAX_ZOOM).max(MIN_ZOOM);
-        self.set_zoom(data, next_zoom, size, fixed_point)
+        self.set_zoom(data, next_zoom, fixed_point)
     }
 
-    fn pinch_zoom(&mut self, data: &mut EditorState, delta: f64, size: Size) {
+    fn pinch_zoom(&mut self, data: &mut EditorState, delta: f64) {
         let next_zoom = (data.session.viewport.zoom + delta)
             .min(MAX_ZOOM)
             .max(MIN_ZOOM);
-        self.set_zoom(data, next_zoom, size, None)
+        self.set_zoom(data, next_zoom, None)
     }
 
     /// Set the zoom multiplier directly.
-    fn set_zoom(
-        &mut self,
-        data: &mut EditorState,
-        new_zoom: f64,
-        size: Size,
-        fixed_point: Option<Vec2>,
-    ) {
+    fn set_zoom(&mut self, data: &mut EditorState, new_zoom: f64, fixed_point: Option<Vec2>) {
         let fixed_point = fixed_point.unwrap_or_else(|| self.mouse.to_vec2());
         let delta_zoom = new_zoom / data.session.viewport.zoom;
         // prevents jitter when we're near our max or min zoom levels
@@ -74,7 +62,7 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
         let scroll_off = self.child.offset() + fixed_point;
         let next_off = scroll_off * delta_zoom;
         let delta_off = next_off - scroll_off;
-        self.child.scroll(delta_off, size);
+        self.child.scroll_by(delta_off);
         data.session_mut().viewport.zoom = new_zoom;
     }
 
@@ -95,7 +83,7 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
 
         let off = Vec2::new(x_off - bonus_x, y_off - bonus_y);
         let delta_off = off - self.child.offset();
-        self.child.scroll(delta_off, view_size);
+        self.child.scroll_by(delta_off);
     }
 
     /// set the initial zoom and offset, so that the work is positioned in the center
@@ -119,13 +107,14 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
 
     fn handle_zoom_cmd(&mut self, cmd: &Command, view_size: Size, data: &mut EditorState) {
         use crate::consts::cmd;
+        const ZOOM_DELTA: Vec2 = Vec2::new(50.0, 0.0);
         let view_center = view_size.to_rect().center().to_vec2();
         if cmd.is(cmd::ZOOM_IN) {
-            self.wheel_zoom(data, Vec2::new(50.0, 0.), view_size, Some(view_center))
+            self.wheel_zoom(data, ZOOM_DELTA, Some(view_center))
         } else if cmd.is(cmd::ZOOM_OUT) {
-            self.wheel_zoom(data, Vec2::new(-50.0, 0.), view_size, Some(view_center))
+            self.wheel_zoom(data, -ZOOM_DELTA, Some(view_center))
         } else if cmd.is(cmd::ZOOM_DEFAULT) {
-            self.set_zoom(data, 1.0, view_size, None);
+            self.set_zoom(data, 1.0, None);
             self.needs_center_after_layout = true;
         }
     }
@@ -190,12 +179,12 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
                 self.mouse = mouse.pos;
             }
             Event::Wheel(wheel) if wheel.mods.meta() => {
-                self.wheel_zoom(data, wheel.wheel_delta, ctx.size(), None);
+                self.wheel_zoom(data, wheel.wheel_delta, None);
                 self.after_zoom_changed(ctx, env);
                 return;
             }
             Event::Zoom(delta) => {
-                self.pinch_zoom(data, *delta, ctx.size());
+                self.pinch_zoom(data, *delta);
                 self.after_zoom_changed(ctx, env);
                 return;
             }
