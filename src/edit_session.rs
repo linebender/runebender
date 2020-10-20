@@ -301,6 +301,10 @@ impl EditSession {
             .and_then(|path| path.path_point_for_id(id))
     }
 
+    pub fn path_for_point(&self, point: EntityId) -> Option<&Path> {
+        self.paths.iter().find(|p| **p == point)
+    }
+
     pub fn path_for_point_mut(&mut self, point: EntityId) -> Option<&mut Path> {
         self.paths_mut().iter_mut().find(|p| **p == point)
     }

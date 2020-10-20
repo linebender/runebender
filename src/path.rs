@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -370,6 +370,16 @@ impl Path {
         let mut bez = BezPath::new();
         self.append_to_bezier(&mut bez);
         bez
+    }
+
+    /// Iterate the segments of this path where both the start and end
+    /// of the segment are in the set.
+    pub(crate) fn segments_for_points<'a>(
+        &'a self,
+        points: &'a BTreeSet<EntityId>,
+    ) -> impl Iterator<Item = PathSeg> + 'a {
+        self.iter_segments()
+            .filter(move |seg| points.contains(&seg.start_id()) && points.contains(&seg.end_id()))
     }
 
     pub(crate) fn append_to_bezier(&self, bez: &mut BezPath) {
