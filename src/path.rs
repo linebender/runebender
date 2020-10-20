@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use super::design_space::{DPoint, DVec2, ViewPort};
 use druid::kurbo::{
-    BezPath, CubicBez, Line, ParamCurve, PathEl, PathSeg as KurboPathSeg, Point, Vec2,
+    Affine, BezPath, CubicBez, Line, ParamCurve, PathEl, PathSeg as KurboPathSeg, Point, Vec2,
 };
 use druid::Data;
 
@@ -411,31 +411,33 @@ impl Path {
         new.id
     }
 
-    pub fn nudge_points(&mut self, points: &[EntityId], v: DVec2) {
-        let mut to_nudge = HashSet::new();
-        for point in points {
-            let idx = match self.points.iter().position(|p| p.id == *point) {
-                Some(idx) => idx,
-                None => continue,
-            };
-            to_nudge.insert(idx);
-            if self.points[idx].is_on_curve() {
-                let prev = self.prev_idx(idx);
-                let next = self.next_idx(idx);
-                if !self.points[prev].is_on_curve() {
-                    to_nudge.insert(prev);
-                }
-                if !self.points[next].is_on_curve() {
-                    to_nudge.insert(next);
-                }
-            }
-        }
+    /// Scale the selection.
+    ///
+    /// `scale` is the new scale, as a ratio.
+    /// `anchor` is a point on the screen that should remain fixed.
+    pub(crate) fn scale_points(&mut self, points: &[EntityId], scale: Vec2, anchor: DPoint) {
+        let scale_xform = Affine::scale_non_uniform(scale.x, scale.y);
+        self.transform_points(points, scale_xform, anchor);
+    }
 
-        for idx in &to_nudge {
-            self.nudge_point(*idx, v);
+    pub(crate) fn nudge_points(&mut self, points: &[EntityId], v: DVec2) {
+        let affine = Affine::translate(v.to_raw());
+        self.transform_points(points, affine, DPoint::ZERO);
+    }
+
+    /// Apply the provided transform to all selected points, updating handles as
+    /// appropriate.
+    ///
+    /// The `anchor` argument is a point that should be treated as the origin
+    /// when applying the transform, which is used for things like scaling from
+    /// a fixed point.
+    fn transform_points(&mut self, points: &[EntityId], affine: Affine, anchor: DPoint) {
+        let to_xform = self.points_for_points(points);
+        for idx in &to_xform {
+            self.transform_point(*idx, affine, anchor);
             if !self.points[*idx].is_on_curve() {
                 if let Some((on_curve, handle)) = self.tangent_handle(*idx) {
-                    if !to_nudge.contains(&handle) {
+                    if !to_xform.contains(&handle) {
                         self.adjust_handle_angle(*idx, on_curve, handle);
                     }
                 }
@@ -443,9 +445,35 @@ impl Path {
         }
     }
 
-    fn nudge_point(&mut self, idx: usize, v: DVec2) {
-        self.points_mut()[idx].point.x += v.x;
-        self.points_mut()[idx].point.y += v.y;
+    fn transform_point(&mut self, idx: usize, affine: Affine, anchor: DPoint) {
+        let anchor = anchor.to_dvec2().to_raw();
+        let point = self.points()[idx].point.to_raw() - anchor;
+        let point = affine * point + anchor;
+        self.points_mut()[idx].point = DPoint::from_raw(point);
+    }
+
+    /// For a list of points, returns a set of indices for those points, including
+    /// any associated off-curve points.
+    fn points_for_points(&self, points: &[EntityId]) -> HashSet<usize> {
+        let mut to_xform = HashSet::new();
+        for point in points {
+            let idx = match self.points.iter().position(|p| p.id == *point) {
+                Some(idx) => idx,
+                None => continue,
+            };
+            to_xform.insert(idx);
+            if self.points[idx].is_on_curve() {
+                let prev = self.prev_idx(idx);
+                let next = self.next_idx(idx);
+                if !self.points[prev].is_on_curve() {
+                    to_xform.insert(prev);
+                }
+                if !self.points[next].is_on_curve() {
+                    to_xform.insert(next);
+                }
+            }
+        }
+        to_xform
     }
 
     /// Returns the index for the on_curve point and the 'other' handle
