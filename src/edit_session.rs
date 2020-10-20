@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use druid::kurbo::{BezPath, ParamCurveNearest, Point, Rect, Shape, Size};
+use druid::kurbo::{BezPath, ParamCurveNearest, Point, Rect, Shape, Size, Vec2};
 use druid::{Data, Lens};
 use norad::glyph::Outline;
 use norad::{Glyph, GlyphName};
@@ -70,7 +70,9 @@ pub enum Quadrant {
 /// A type that is only created by a lens, for our coordinate editing panel
 #[derive(Debug, Clone, Copy, Data, Lens)]
 pub struct CoordinateSelection {
+    /// the number of selected points
     pub count: usize,
+    /// the bounding box of the selection
     pub frame: Rect,
     pub quadrant: Quadrant,
 }
@@ -466,6 +468,17 @@ impl EditSession {
         }
     }
 
+    fn scale_selection(&mut self, scale: Vec2, anchor: DPoint) {
+        if !self.selection.is_empty() {
+            let sel = PathSelection::new(&self.selection);
+            for path_points in sel.iter() {
+                if let Some(path) = self.path_for_point_mut(path_points[0]) {
+                    path.scale_points(path_points, scale, anchor);
+                }
+            }
+        }
+    }
+
     pub(crate) fn update_handle(&mut self, point: Point, is_locked: bool) {
         let dpoint = self.viewport.from_screen(point);
         let id = *self.selection.iter().next().unwrap();
@@ -604,6 +617,10 @@ impl CoordinateSelection {
     /// a lens to return the point representation of the current selected coord(s)
     #[allow(non_upper_case_globals)]
     pub const quadrant_coord: lenses::QuadrantCoord = lenses::QuadrantCoord;
+
+    /// a lens to return the bbox of the current selection
+    #[allow(non_upper_case_globals)]
+    pub const quadrant_bbox: lenses::QuadrantBbox = lenses::QuadrantBbox;
 }
 
 static ALL_QUADRANTS: &[Quadrant] = &[
@@ -714,9 +731,20 @@ pub mod lenses {
                 frame,
             };
             let r = f(&mut sel);
-            if sel.frame != frame {
+            // if the user has modified the origin, translate the selection
+            if sel.frame.origin() != frame.origin() {
                 let delta = sel.frame.origin() - frame.origin();
                 data.nudge_selection(DVec2::from_raw(delta));
+            }
+
+            // if the user has modified the size, scale the selection
+            if sel.frame.size() != frame.size() {
+                let scale_x = sel.frame.width() / frame.width();
+                let scale_y = sel.frame.height() / frame.height();
+                let scale = Vec2::new(scale_x, scale_y);
+
+                let scale_origin = sel.quadrant.pos_in_rect_in_design_space(frame);
+                data.scale_selection(scale, DPoint::from_raw(scale_origin));
             }
             data.quadrant = sel.quadrant;
             r
@@ -743,6 +771,30 @@ pub mod lenses {
             if point != point2 {
                 let delta = point2 - point;
                 data.frame = data.frame.with_origin(data.frame.origin() + delta);
+            }
+            r
+        }
+    }
+
+    pub struct QuadrantBbox;
+
+    impl Lens<CoordinateSelection, Size> for QuadrantBbox {
+        fn with<V, F: FnOnce(&Size) -> V>(&self, data: &CoordinateSelection, f: F) -> V {
+            //let point = data.quadrant.pos_in_rect_in_design_space(data.frame);
+            f(&data.frame.size())
+        }
+
+        fn with_mut<V, F: FnOnce(&mut Size) -> V>(
+            &self,
+            data: &mut CoordinateSelection,
+            f: F,
+        ) -> V {
+            let size = data.frame.size();
+            let mut size2 = size;
+            let r = f(&mut size2);
+
+            if size != size2 {
+                data.frame = data.frame.with_size(size2);
             }
             r
         }

@@ -46,7 +46,6 @@ impl Widget<Quadrant> for CoordRepresentationPicker {
             Event::MouseDown(mouse) if mouse.button.is_left() => {
                 ctx.set_active(true);
                 *data = Quadrant::for_point_in_size(mouse.pos, ctx.size());
-                dbg!(data);
                 ctx.request_paint();
             }
             Event::MouseUp(_) => {
@@ -93,6 +92,9 @@ fn build_widget() -> impl Widget<CoordinateSelection> {
     let point_x_lens = druid::lens!(Point, x);
     let point_y_lens = druid::lens!(Point, y);
 
+    let size_width_lens = druid::lens!(Size, width);
+    let size_height_lens = druid::lens!(Size, height);
+
     let coord_picker = Either::new(
         |d, _| d.count > 1,
         CoordRepresentationPicker
@@ -126,7 +128,7 @@ fn build_widget() -> impl Widget<CoordinateSelection> {
                 .cross_axis_alignment(CrossAxisAlignment::Baseline)
                 .with_child(
                     Label::new("y")
-                        .with_font(coord_label_font)
+                        .with_font(coord_label_font.clone())
                         .with_text_color(theme::SECONDARY_TEXT_COLOR),
                 )
                 .with_child(
@@ -138,9 +140,47 @@ fn build_widget() -> impl Widget<CoordinateSelection> {
         )
         .lens(CoordinateSelection::quadrant_coord);
 
+    let bbox_info = Either::new(
+        |d, _| d.count > 1,
+        Flex::column()
+            .with_child(
+                Flex::row()
+                    .with_child(
+                        Label::new("w")
+                            .with_font(coord_label_font.clone())
+                            .with_text_color(theme::SECONDARY_TEXT_COLOR),
+                    )
+                    .with_spacer(4.0)
+                    .with_child(
+                        EditableLabel::parse()
+                            .with_font(theme::UI_DETAIL_FONT)
+                            .lens(size_width_lens)
+                            .fix_width(40.0),
+                    ),
+            )
+            .with_child(
+                Flex::row()
+                    .with_child(
+                        Label::new("h")
+                            .with_font(coord_label_font)
+                            .with_text_color(theme::SECONDARY_TEXT_COLOR),
+                    )
+                    .with_spacer(4.0)
+                    .with_child(
+                        EditableLabel::parse()
+                            .with_font(theme::UI_DETAIL_FONT)
+                            .lens(size_height_lens)
+                            .fix_width(40.0),
+                    ),
+            )
+            .lens(CoordinateSelection::quadrant_bbox),
+        SizedBox::empty(),
+    );
+
     let picker_and_editor = Flex::row()
         .with_child(coord_picker)
         .with_child(coord_editor)
+        .with_child(bbox_info)
         .padding(4.0);
 
     // if we have any points selected, show the numerical adjust widget, else an empty widget

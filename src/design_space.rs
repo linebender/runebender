@@ -48,6 +48,8 @@ pub struct DVec2 {
 }
 
 impl DPoint {
+    pub const ZERO: DPoint = DPoint { x: 0.0, y: 0.0 };
+
     /// Should only be used with inputs already in design space, such as when
     /// loaded from file.
     pub(crate) fn new(x: f64, y: f64) -> DPoint {
@@ -85,6 +87,12 @@ impl DPoint {
     //TODO: reevaluate
     pub(super) fn to_raw(self) -> Point {
         Point::new(self.x, self.y)
+    }
+
+    /// Convert this `DPoint` to a `DVec2`.
+    pub fn to_dvec2(self) -> DVec2 {
+        let DPoint { x, y } = self;
+        DVec2 { x, y }
     }
 
     pub fn lerp(self, other: DPoint, t: f64) -> DPoint {
