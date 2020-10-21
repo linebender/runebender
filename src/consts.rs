@@ -8,10 +8,11 @@ pub const GLYPHS_APP_PASTEBOARD_TYPE: FormatId = "Glyphs elements pasteboard typ
 
 /// Commands and Selectors
 pub mod cmd {
-    use druid::kurbo::Point;
+    use druid::kurbo::{Point, Vec2};
     use druid::Selector;
     use norad::GlyphName;
 
+    use crate::design_space::{DPoint, DVec2};
     use crate::path::EntityId;
     use crate::tools::ToolId;
 
@@ -94,4 +95,16 @@ pub mod cmd {
     /// This is sent by the `EditorController` when focus is changing to 'no widget',
     /// as might happen after we finish editing a coordinate via a text field.
     pub const TAKE_FOCUS: Selector = Selector::new("runebender.editor-steal-focus");
+
+    /// Sent from the coord panel when a coordinate is manually edited.
+    pub const NUDGE_SELECTION: Selector<DVec2> = Selector::new("runebender.editor-nudge-selection");
+
+    /// Sent from the coord panel when the selection bbox is manually edited.
+    pub const SCALE_SELECTION: Selector<ScaleSelectionArgs> =
+        Selector::new("runebender.editor-scale-selection");
+
+    pub struct ScaleSelectionArgs {
+        pub scale: Vec2,
+        pub origin: DPoint,
+    }
 }
