@@ -142,6 +142,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 
 [[package]]
+name = "cfg-if"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
 name = "chrono"
 version = "0.4.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -260,7 +266,7 @@ version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba125de2af0df55319f41944744ad91c71113bf74a4646efff39afe1f6842db1"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
 ]
 
 [[package]]
@@ -291,7 +297,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "058ed274caafc1f60c4997b5fc07bf7dc7cca454af7c6e81edffe5f33f70dace"
 dependencies = [
  "autocfg",
- "cfg-if",
+ "cfg-if 0.1.10",
  "crossbeam-utils",
  "lazy_static",
  "maybe-uninit",
@@ -306,7 +312,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3c7c73a2d1e9fc0886a08b93e98eb643461230d5f1925e4036204d5f2e261a8"
 dependencies = [
  "autocfg",
- "cfg-if",
+ "cfg-if 0.1.10",
  "lazy_static",
 ]
 
@@ -319,7 +325,7 @@ checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
 [[package]]
 name = "druid"
 version = "0.6.0"
-source = "git+https://github.com/linebender/druid.git?rev=7f1fa18#7f1fa183c9291bc8fea4dc02412777c423b6111b"
+source = "git+https://github.com/linebender/druid.git?rev=0584a2d#0584a2d5199b5223a043dea0fd5e4cd9f3f86638"
 dependencies = [
  "console_log",
  "druid-derive",
@@ -339,7 +345,7 @@ dependencies = [
 [[package]]
 name = "druid-derive"
 version = "0.3.1"
-source = "git+https://github.com/linebender/druid.git?rev=7f1fa18#7f1fa183c9291bc8fea4dc02412777c423b6111b"
+source = "git+https://github.com/linebender/druid.git?rev=0584a2d#0584a2d5199b5223a043dea0fd5e4cd9f3f86638"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -349,12 +355,13 @@ dependencies = [
 [[package]]
 name = "druid-shell"
 version = "0.6.0"
-source = "git+https://github.com/linebender/druid.git?rev=7f1fa18#7f1fa183c9291bc8fea4dc02412777c423b6111b"
+source = "git+https://github.com/linebender/druid.git?rev=0584a2d#0584a2d5199b5223a043dea0fd5e4cd9f3f86638"
 dependencies = [
  "anyhow",
  "bitflags",
+ "block",
  "cairo-rs",
- "cfg-if",
+ "cfg-if 0.1.10",
  "cocoa",
  "core-graphics",
  "foreign-types",
@@ -476,7 +483,7 @@ version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "766d0e77a2c1502169d4a93ff3b8c15a71fd946cd0126309752104e5f3c46d94"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
  "crc32fast",
  "libc",
  "miniz_oxide",
@@ -878,7 +885,7 @@ version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63312a18f7ea8760cdd0a7c5aac1a619752a246b833545e3e36d1f81f7cd9e66"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
  "js-sys",
  "wasm-bindgen",
  "web-sys",
@@ -945,9 +952,9 @@ dependencies = [
 
 [[package]]
 name = "kurbo"
-version = "0.6.3"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed9be561444b7e4c4ac33b4fa36af1f996ccca1f14840ea1a09ba034289502ed"
+checksum = "0ebfa590bba04e706e514c3285bb2c662610136fdbd58d7572d8afe0d22de1f0"
 dependencies = [
  "arrayvec",
 ]
@@ -985,7 +992,7 @@ version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4fabed175da42fed1fa0746b0ea71f412aa9d35e76e95e59b192c64b9dc2bf8b"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
 ]
 
 [[package]]
@@ -1147,18 +1154,18 @@ dependencies = [
 
 [[package]]
 name = "piet"
-version = "0.2.0-pre5"
+version = "0.2.0-pre6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41dc88caa7ccaa1c1d53027f9664541c2e25bc215f711bbf3a37c7b76e08107e"
+checksum = "b6516cf192cccc3037c3ba5405018f83e026e3b340110ef7f6ce58cbddd25cf2"
 dependencies = [
  "kurbo",
 ]
 
 [[package]]
 name = "piet-cairo"
-version = "0.2.0-pre5"
+version = "0.2.0-pre6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ba3568ecdc1e9fee37f81382ff4732212d37da877e6f3ffa85137098538356f"
+checksum = "c4dc74d4de04c0bafc4d2aa358c06356bc4a361d46d8f718150557902801a1d9"
 dependencies = [
  "cairo-rs",
  "piet",
@@ -1168,13 +1175,13 @@ dependencies = [
 
 [[package]]
 name = "piet-common"
-version = "0.2.0-pre5"
+version = "0.2.0-pre6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ca8a570ed73009daa4118d5296106a89f4bb7133f989208200714f735ab6fd4"
+checksum = "c3e165053bbd04cac97cf7c3de85e64326b6d7a99ee5782d2022a8fd5d502953"
 dependencies = [
  "cairo-rs",
  "cairo-sys-rs",
- "cfg-if",
+ "cfg-if 1.0.0",
  "core-graphics",
  "piet",
  "piet-cairo",
@@ -1187,9 +1194,9 @@ dependencies = [
 
 [[package]]
 name = "piet-coregraphics"
-version = "0.2.0-pre5"
+version = "0.2.0-pre6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "235ce5a811a2b80aaa3cce285fc37f33e7ceb0f5386043565be5458341a6132a"
+checksum = "f9c8d68ea9ff581e5e3f468b562982ee78a1f3568353e6860e26c5a6a1080f15"
 dependencies = [
  "core-foundation",
  "core-foundation-sys",
@@ -1202,9 +1209,9 @@ dependencies = [
 
 [[package]]
 name = "piet-direct2d"
-version = "0.2.0-pre5"
+version = "0.2.0-pre6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91cbf9d7a33cd261bdac060149f456f0fb10ed0502b800ffbfa84e4b83fbfcc8"
+checksum = "0b74ea11318f93d52bf1c8acbb6a7ad8e09728e9321fff66847b0ae7bd097f15"
 dependencies = [
  "associative-cache",
  "dwrote",
@@ -1216,9 +1223,9 @@ dependencies = [
 
 [[package]]
 name = "piet-web"
-version = "0.2.0-pre5"
+version = "0.2.0-pre6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c5154285aedf517ad733560cf9f5f73ae1f67655ab7d41d00b32888e351693f"
+checksum = "47db6c4d7c71d4e8d1f50caf838ef99d9fad4a0d831d3026ba7716425c2e62ac"
 dependencies = [
  "js-sys",
  "piet",
@@ -1841,7 +1848,7 @@ version = "0.2.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ac64ead5ea5f05873d7c12b545865ca2b8d28adfc50a49b84770a3a97265d42"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
  "wasm-bindgen-macro",
 ]
 
