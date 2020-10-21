@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use druid::kurbo::{BezPath, ParamCurveNearest, Point, Rect, Shape, Size, Vec2};
@@ -12,6 +11,7 @@ use crate::design_space::{DPoint, DVec2, ViewPort};
 use crate::guides::Guide;
 use crate::path::{EntityId, Path, PathPoint, PathSeg};
 use crate::quadrant::Quadrant;
+use crate::selection::Selection;
 
 /// Minimum distance in screen units that a click must occur to be considered
 /// on a point?
@@ -42,7 +42,7 @@ pub struct EditSession {
     pub name: GlyphName,
     pub glyph: Arc<Glyph>,
     pub paths: Arc<Vec<Path>>,
-    pub selection: Arc<BTreeSet<EntityId>>,
+    pub selection: Selection,
     pub components: Arc<Vec<Component>>,
     pub guides: Arc<Vec<Guide>>,
     pub viewport: ViewPort,
@@ -94,7 +94,7 @@ impl EditSession {
             name,
             glyph,
             paths: Arc::new(paths),
-            selection: Arc::default(),
+            selection: Selection::new(),
             components: Arc::new(components),
             guides: Arc::new(guides),
             viewport: ViewPort::default(),
@@ -134,16 +134,6 @@ impl EditSession {
     /// that are 'part of the glyph'.
     pub fn work_bounds(&self) -> Rect {
         self.work_bounds
-    }
-
-    pub fn selection_mut(&mut self) -> &mut BTreeSet<EntityId> {
-        Arc::make_mut(&mut self.selection)
-    }
-
-    pub fn set_selection_one(&mut self, id: EntityId) {
-        let selection = self.selection_mut();
-        selection.clear();
-        selection.insert(id);
     }
 
     pub fn paths_mut(&mut self) -> &mut Vec<Path> {
@@ -299,12 +289,12 @@ impl EditSession {
         let point = path.points()[0].id;
 
         self.paths_mut().push(path);
-        self.set_selection_one(point);
+        self.selection.select_one(point);
     }
 
     pub fn paste_paths(&mut self, paths: Vec<Path>) {
-        self.clear_selection();
-        self.selection_mut()
+        self.selection.clear();
+        self.selection
             .extend(paths.iter().flat_map(|p| p.points().iter().map(|pt| pt.id)));
         self.paths_mut().extend(paths);
     }
@@ -319,7 +309,7 @@ impl EditSession {
         } else {
             let point = self.viewport.from_screen(point);
             let new_point = self.active_path_mut().unwrap().append_point(point);
-            self.set_selection_one(new_point);
+            self.selection.select_one(new_point);
         }
     }
 
@@ -346,8 +336,8 @@ impl EditSession {
     }
 
     pub fn delete_selection(&mut self) {
-        let to_delete = PathSelection::new(&self.selection);
-        self.selection_mut().clear();
+        let to_delete = self.selection.per_path_selection();
+        self.selection.clear();
         for path_points in to_delete.iter() {
             if let Some(path) = self.path_for_point_mut(path_points[0]) {
                 path.delete_points(path_points);
@@ -361,11 +351,8 @@ impl EditSession {
     /// Select all points.
     //NOTE: should this select other things too? Which ones?
     pub fn select_all(&mut self) {
-        *self.selection_mut() = self.iter_points().map(|p| p.id).collect();
-    }
-
-    pub fn clear_selection(&mut self) {
-        self.selection_mut().clear()
+        self.selection.clear();
+        self.selection = self.iter_points().map(|p| p.id).collect();
     }
 
     /// returns a rect representing the containing rect of the current selection
@@ -389,14 +376,13 @@ impl EditSession {
             return;
         }
         let id = self.selection.iter().next().copied().unwrap();
-        self.selection_mut().clear();
         let id = self
             .paths
             .iter()
             .find(|p| **p == id)
             .map(|path| path.next_point(id).id)
             .unwrap_or(id);
-        self.selection_mut().insert(id);
+        self.selection.select_one(id);
     }
 
     /// If the current selection is a single point, select the previous point
@@ -406,14 +392,13 @@ impl EditSession {
             return;
         }
         let id = self.selection.iter().next().copied().unwrap();
-        self.selection_mut().clear();
         let id = self
             .paths
             .iter()
             .find(|p| **p == id)
             .map(|path| path.prev_point(id).id)
             .unwrap_or(id);
-        self.selection_mut().insert(id);
+        self.selection.select_one(id);
     }
 
     pub fn select_path(&mut self, point: Point, toggle: bool) -> bool {
@@ -428,8 +413,8 @@ impl EditSession {
 
         let points: Vec<_> = self.paths[path_idx].points().to_owned();
         for point in points {
-            if !self.selection_mut().insert(point.id) && toggle {
-                self.selection_mut().remove(&point.id);
+            if !self.selection.insert(point.id) && toggle {
+                self.selection.remove(&point.id);
             }
         }
         true
@@ -440,7 +425,7 @@ impl EditSession {
             return;
         }
 
-        let to_nudge = PathSelection::new(&self.selection);
+        let to_nudge = self.selection.per_path_selection();
         for path_points in to_nudge.iter() {
             if let Some(path) = self.path_for_point_mut(path_points[0]) {
                 path.nudge_points(path_points, nudge);
@@ -456,7 +441,7 @@ impl EditSession {
 
     pub(crate) fn scale_selection(&mut self, scale: Vec2, anchor: DPoint) {
         if !self.selection.is_empty() {
-            let sel = PathSelection::new(&self.selection);
+            let sel = self.selection.per_path_selection();
             for path_points in sel.iter() {
                 if let Some(path) = self.path_for_point_mut(path_points[0]) {
                     path.scale_points(path_points, scale, anchor);
@@ -523,8 +508,7 @@ impl EditSession {
 
         let guide =
             guide.unwrap_or_else(|| Guide::horiz(DPoint::from_screen(point, self.viewport)));
-        self.selection_mut().clear();
-        self.selection_mut().insert(guide.id);
+        self.selection.select_one(guide.id);
         self.guides_mut().push(guide);
     }
 
@@ -548,54 +532,6 @@ impl EditSession {
         }
         // codepoints
         glyph
-    }
-}
-
-/// A helper for iterating through a selection in per-path chunks.
-struct PathSelection {
-    inner: Vec<EntityId>,
-}
-
-impl PathSelection {
-    fn new(src: &BTreeSet<EntityId>) -> PathSelection {
-        let mut inner: Vec<_> = src.iter().copied().collect();
-        inner.sort();
-        PathSelection { inner }
-    }
-
-    fn iter(&self) -> PathSelectionIter {
-        PathSelectionIter {
-            inner: &self.inner,
-            idx: 0,
-        }
-    }
-}
-
-struct PathSelectionIter<'a> {
-    inner: &'a [EntityId],
-    idx: usize,
-}
-
-impl<'a> Iterator for PathSelectionIter<'a> {
-    type Item = &'a [EntityId];
-    fn next(&mut self) -> Option<&'a [EntityId]> {
-        if self.idx >= self.inner.len() {
-            return None;
-        }
-        let path_id = self.inner[self.idx].parent;
-        let end_idx = self.inner[self.idx..]
-            .iter()
-            .position(|p| p.parent != path_id)
-            .map(|idx| idx + self.idx)
-            .unwrap_or_else(|| self.inner.len());
-        let range = self.idx..end_idx;
-        self.idx = end_idx;
-        // probably unnecessary, but we don't expect empty slices
-        if range.start == range.end {
-            None
-        } else {
-            Some(&self.inner[range])
-        }
     }
 }
 

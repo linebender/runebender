@@ -1,17 +1,15 @@
-use std::collections::BTreeSet;
-use std::sync::Arc;
-
 use druid::kurbo::{Point, Rect, Vec2};
 use druid::piet::{Color, RenderContext};
 use druid::{Data, Env, EventCtx, HotKey, KbKey, KeyEvent, MouseEvent, PaintCtx, RawMods};
 
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
-use crate::path::{EntityId, PathSeg};
+use crate::path::PathSeg;
 use crate::tools::{EditType, Tool, ToolId};
 use crate::{
     design_space::{DPoint, DVec2},
     path::PointType,
+    selection::Selection,
 };
 
 const SELECTION_RECT_BG_COLOR: Color = Color::rgba8(0xDD, 0xDD, 0xDD, 0x55);
@@ -21,7 +19,7 @@ const SELECTION_RECT_STROKE_COLOR: Color = Color::rgb8(0x53, 0x8B, 0xBB);
 enum DragState {
     /// State for a drag that is a rectangular selection.
     Select {
-        previous: Arc<BTreeSet<EntityId>>,
+        previous: Selection,
         rect: Rect,
     },
     /// State for a drag that is moving a selected object.
@@ -148,10 +146,10 @@ impl MouseDelegate<EditSession> for Select {
                     // when clicking a point, if it is not selected we set it as the selection,
                     // otherwise we keep the selection intact for a drag.
                     if !data.selection.contains(&point_id) {
-                        data.set_selection_one(point_id);
+                        data.selection.select_one(point_id);
                     }
-                } else if !data.selection_mut().remove(&point_id) {
-                    data.selection_mut().insert(point_id);
+                } else if !data.selection.remove(&point_id) {
+                    data.selection.insert(point_id);
                 }
             } else if let Some((seg, _t)) = data.hit_test_segments(event.pos, None) {
                 // TODO: make these non-draggable.
@@ -162,21 +160,20 @@ impl MouseDelegate<EditSession> for Select {
                     return;
                 }
                 let ids = seg.ids();
-                let sel = data.selection_mut();
                 if !event.mods.shift() {
-                    if !ids.iter().all(|id| sel.contains(id)) {
-                        sel.clear();
-                        sel.extend(&ids);
+                    if !ids.iter().all(|id| data.selection.contains(id)) {
+                        data.selection.clear();
+                        data.selection.extend(ids);
                     }
-                } else if ids.iter().all(|id| sel.contains(id)) {
+                } else if ids.iter().all(|id| data.selection.contains(id)) {
                     for id in &ids {
-                        sel.remove(id);
+                        data.selection.remove(id);
                     }
                 } else {
-                    sel.extend(&ids);
+                    data.selection.extend(ids);
                 }
             } else if !event.mods.shift() {
-                data.selection_mut().clear();
+                data.selection.clear();
             }
         } else if event.count == 2 {
             let sel = data.hit_test_all(event.pos, None);
@@ -280,7 +277,7 @@ impl MouseDelegate<EditSession> for Select {
 
 fn update_selection_for_drag(
     data: &mut EditSession,
-    prev_sel: &BTreeSet<EntityId>,
+    prev_sel: &Selection,
     rect: Rect,
     shift: bool,
 ) {
@@ -289,15 +286,11 @@ fn update_selection_for_drag(
         .filter(|p| rect.contains(p.to_screen(data.viewport)))
         .map(|p| p.id)
         .collect();
-    let new_sel = if shift {
-        prev_sel
-            .symmetric_difference(&in_select_rect)
-            .copied()
-            .collect()
+    data.selection = if shift {
+        prev_sel.symmetric_difference(&in_select_rect)
     } else {
-        prev_sel.union(&in_select_rect).copied().collect()
+        prev_sel.union(&in_select_rect)
     };
-    *data.selection_mut() = new_sel;
 }
 
 impl Default for DragState {
