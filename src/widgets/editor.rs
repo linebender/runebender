@@ -186,6 +186,17 @@ impl Editor {
                 data.session_mut().align_selection();
                 return (true, Some(EditType::Normal));
             }
+            c if c.is(consts::cmd::NUDGE_SELECTION) => {
+                let nudge = c.get_unchecked(consts::cmd::NUDGE_SELECTION);
+                data.session_mut().nudge_selection(*nudge);
+                return (true, Some(EditType::Normal));
+            }
+            c if c.is(consts::cmd::SCALE_SELECTION) => {
+                let consts::cmd::ScaleSelectionArgs { scale, origin } =
+                    c.get_unchecked(consts::cmd::SCALE_SELECTION);
+                data.session_mut().scale_selection(*scale, *origin);
+                return (true, Some(EditType::Normal));
+            }
             // all unhandled commands:
             _ => return (false, None),
         }

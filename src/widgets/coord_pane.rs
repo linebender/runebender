@@ -5,9 +5,10 @@ use druid::kurbo::{Circle, Vec2};
 use druid::widget::{prelude::*, Controller, CrossAxisAlignment, Either, Flex, Label, SizedBox};
 use druid::{Color, FontDescriptor, FontFamily, FontStyle, Point, WidgetExt};
 
+use crate::design_space::{DPoint, DVec2};
 use crate::edit_session::{CoordinateSelection, Quadrant};
-use crate::theme;
 use crate::widgets::EditableLabel;
+use crate::{consts, theme};
 
 /// A panel for editing the selected coordinate
 pub struct CoordPane;
@@ -29,12 +30,37 @@ impl<W: Widget<CoordinateSelection>> Controller<CoordinateSelection, W> for Coor
         data: &mut CoordinateSelection,
         env: &Env,
     ) {
-        child.event(ctx, event, data, env);
+        let mut child_data = *data;
+        child.event(ctx, event, &mut child_data, env);
+        data.quadrant = child_data.quadrant;
+
+        // if another edit has occured in the coordpanel, we turn it into
+        // a command so that the Editor can update undo state:
+        if child_data.frame.origin() != data.frame.origin() {
+            let delta = child_data.frame.origin() - data.frame.origin();
+            ctx.submit_command(consts::cmd::NUDGE_SELECTION.with(DVec2::from_raw(delta)));
+        } else if child_data.frame.size() != data.frame.size() {
+            let scale = compute_scale(data.frame.size(), child_data.frame.size());
+            let scale_origin = child_data.quadrant.pos_in_rect_in_design_space(data.frame);
+            let args = consts::cmd::ScaleSelectionArgs {
+                scale,
+                origin: DPoint::from_raw(scale_origin),
+            };
+            ctx.submit_command(consts::cmd::SCALE_SELECTION.with(args));
+        }
+
         // suppress clicks so that the editor doesn't handle them.
         if matches!(event,Event::MouseUp(_) | Event::MouseDown(_)) {
             ctx.set_handled();
         }
     }
+}
+
+fn compute_scale(pre: Size, post: Size) -> Vec2 {
+    let ensure_finite = |f: f64| if f.is_finite() { f } else { 1.0 };
+    let x = ensure_finite(post.width / pre.width);
+    let y = ensure_finite(post.height / pre.height);
+    Vec2::new(x, y)
 }
 
 /// A widget for picking how to represent a multi-point selection.

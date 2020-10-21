@@ -472,7 +472,7 @@ impl EditSession {
         }
     }
 
-    fn scale_selection(&mut self, scale: Vec2, anchor: DPoint) {
+    pub(crate) fn scale_selection(&mut self, scale: Vec2, anchor: DPoint) {
         if !self.selection.is_empty() {
             let sel = PathSelection::new(&self.selection);
             for path_points in sel.iter() {
@@ -675,7 +675,7 @@ impl Quadrant {
         }
     }
 
-    pub fn pos_in_size(self, size: Size) -> Point {
+    pub(crate) fn pos_in_size(self, size: Size) -> Point {
         match self {
             Quadrant::TopLeft => Point::new(0., 0.),
             Quadrant::Top => Point::new(size.width / 2.0, 0.),
@@ -689,7 +689,7 @@ impl Quadrant {
         }
     }
 
-    fn pos_in_rect_in_design_space(self, rect: Rect) -> Point {
+    pub(crate) fn pos_in_rect_in_design_space(self, rect: Rect) -> Point {
         let flipped = match self {
             Quadrant::TopRight => Quadrant::BottomRight,
             Quadrant::TopLeft => Quadrant::BottomLeft,
@@ -735,21 +735,6 @@ pub mod lenses {
                 frame,
             };
             let r = f(&mut sel);
-            // if the user has modified the origin, translate the selection
-            if sel.frame.origin() != frame.origin() {
-                let delta = sel.frame.origin() - frame.origin();
-                data.nudge_selection(DVec2::from_raw(delta));
-            }
-
-            // if the user has modified the size, scale the selection
-            if sel.frame.size() != frame.size() {
-                let scale_x = sel.frame.width() / frame.width();
-                let scale_y = sel.frame.height() / frame.height();
-                let scale = Vec2::new(scale_x, scale_y);
-
-                let scale_origin = sel.quadrant.pos_in_rect_in_design_space(frame);
-                data.scale_selection(scale, DPoint::from_raw(scale_origin));
-            }
             data.quadrant = sel.quadrant;
             r
         }
@@ -784,7 +769,6 @@ pub mod lenses {
 
     impl Lens<CoordinateSelection, Size> for QuadrantBbox {
         fn with<V, F: FnOnce(&Size) -> V>(&self, data: &CoordinateSelection, f: F) -> V {
-            //let point = data.quadrant.pos_in_rect_in_design_space(data.frame);
             f(&data.frame.size())
         }
 

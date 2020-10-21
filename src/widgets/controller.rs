@@ -1,9 +1,7 @@
 //! Controller widgets
 
 use druid::widget::{prelude::*, Controller};
-use druid::{
-    Env, Event, EventCtx, InternalLifeCycle, LensExt, Rect, UpdateCtx, Widget, WidgetExt, WidgetPod,
-};
+use druid::{InternalLifeCycle, LensExt, Rect, WidgetExt, WidgetPod};
 
 use crate::consts;
 use crate::data::{AppState, EditorState};
