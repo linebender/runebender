@@ -22,6 +22,7 @@ mod mouse;
 mod path;
 mod plist;
 mod quadrant;
+mod selection;
 mod theme;
 mod tools;
 mod undo;
