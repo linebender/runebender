@@ -175,10 +175,8 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         //check all segments of all paths, and we could at least just keep track
         //of whether a path contained *any* selected points, and short-circuit.
         for segment in path.segments_for_points(sels) {
-            let seg = backport_pathseg_affine_mul(segment.to_kurbo(), self.space.affine());
-            //FIXME: PathSeg is a shape in kurbo > 0.7.0
-            let bez = bezpath_from_seg(seg);
-            self.stroke(&bez, &SELECTED_LINE_SEGMENT_COLOR, 3.0);
+            let seg = self.space.affine() * segment.to_kurbo();
+            self.stroke(&seg, &SELECTED_LINE_SEGMENT_COLOR, 3.0);
         }
     }
 
@@ -482,65 +480,10 @@ fn perp(p0: Point, p1: Point, len: f64) -> Line {
 
 fn make_arrow() -> BezPath {
     let mut bez = BezPath::new();
-    //bez.move_to((-5., 0.));
-    //bez.line_to((5., 0.));
-    //bez.line_to((5., 11.));
-    //bez.line_to((15., 11.));
-    //bez.line_to((0., 32.));
-    //bez.line_to((-15., 11.));
-    //bez.line_to((-5., 11.));
-    //bez.close_path();
 
     bez.move_to((0., 18.));
     bez.line_to((-12., 0.));
     bez.line_to((12., 0.));
     bez.close_path();
     bez
-}
-
-//fn intersects(line: Line, rect: Rect) -> bool {
-//let linev = line.p1 - line.p0;
-//let tl = rect.origin();
-//let bl = Point::new(rect.x0, rect.y1);
-//let tr = Point::new(rect.x1, rect.y0);
-//let br = Point::new(rect.x1, rect.y1);
-//let left = bl - tl;
-//let top = tr - tl;
-//let right = br - tr;
-//let bottom = br - bl;
-//let s: f64 = [left, top, right, bottom]
-//.iter()
-//.map(|v| linev.dot(*v).signum())
-//.sum();
-
-//s.abs() == 4.0
-//}
-
-//temp fix until `PathSeg` impls `Shape`
-fn bezpath_from_seg(seg: PathSeg) -> BezPath {
-    let mut path = BezPath::new();
-    match seg {
-        PathSeg::Line(line) => {
-            path.move_to(line.p0);
-            path.line_to(line.p1);
-        }
-        PathSeg::Quad(line) => {
-            path.move_to(line.p0);
-            path.quad_to(line.p1, line.p2);
-        }
-        PathSeg::Cubic(line) => {
-            path.move_to(line.p0);
-            path.curve_to(line.p1, line.p2, line.p3);
-        }
-    }
-    path
-}
-
-// temp fix pending a kurbo release
-fn backport_pathseg_affine_mul(seg: PathSeg, affine: Affine) -> PathSeg {
-    match seg {
-        PathSeg::Line(line) => PathSeg::Line(affine * line),
-        PathSeg::Quad(quad) => PathSeg::Quad(affine * quad),
-        PathSeg::Cubic(cubic) => PathSeg::Cubic(affine * cubic),
-    }
 }

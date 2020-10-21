@@ -1031,7 +1031,7 @@ mod tests {
     #[test]
     fn from_bezpath() {
         let rect = Rect::from_origin_size((0., 0.), (10., 10.));
-        let path = Path::from_bezpath(rect.to_bez_path(0.1)).unwrap();
+        let path = Path::from_bezpath(rect.to_path(0.1)).unwrap();
         assert!(path.is_closed());
         assert_eq!(path.points.len(), 4);
         assert_eq!(path.start_point().point.to_raw(), Point::ORIGIN);
@@ -1040,7 +1040,7 @@ mod tests {
     #[test]
     fn iter_rect_segs() {
         let rect = Rect::new(0., 0., 10., 10.);
-        let path = Path::from_bezpath(rect.to_bez_path(0.1)).unwrap(); // make_rect_path(rect);
+        let path = Path::from_bezpath(rect.to_path(0.1)).unwrap();
 
         let mut seg_iter = path.iter_segments();
         assert!(matches!(seg_iter.next().unwrap(), PathSeg::Line(..)));
