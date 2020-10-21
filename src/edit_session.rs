@@ -47,8 +47,6 @@ pub struct EditSession {
     pub viewport: ViewPort,
     work_bounds: Rect,
     quadrant: Quadrant,
-    /// A string describing the current tool
-    pub tool_desc: Arc<str>,
 }
 
 /// when selecting multiple points, which coordinate value do we display?
@@ -115,7 +113,6 @@ impl EditSession {
             components: Arc::new(components),
             guides: Arc::new(guides),
             viewport: ViewPort::default(),
-            tool_desc: Arc::from("Select"),
             quadrant: Quadrant::Center,
             work_bounds,
         }
