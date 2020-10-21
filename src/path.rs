@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::HashSet;
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -8,6 +8,8 @@ use druid::kurbo::{
     PathSeg as KurboPathSeg, Point, Vec2,
 };
 use druid::Data;
+
+use crate::selection::Selection;
 
 const RESERVED_ID_COUNT: usize = 5;
 const GUIDE_TYPE_ID: usize = 1;
@@ -402,10 +404,10 @@ impl Path {
     }
 
     /// Iterate the segments of this path where both the start and end
-    /// of the segment are in the set.
+    /// of the segment are in the selection.
     pub(crate) fn segments_for_points<'a>(
         &'a self,
-        points: &'a BTreeSet<EntityId>,
+        points: &'a Selection,
     ) -> impl Iterator<Item = PathSeg> + 'a {
         self.iter_segments()
             .filter(move |seg| points.contains(&seg.start_id()) && points.contains(&seg.end_id()))
