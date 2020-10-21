@@ -127,7 +127,7 @@ impl MouseDelegate<EditSession> for Ellipse {
             let ellipse = rect.to_ellipse();
             if let Ok(path) = Path::from_bezpath(
                 ellipse
-                    .to_bez_path(1.0)
+                    .path_elements(1.0)
                     .chain(std::iter::once(PathEl::ClosePath)),
             ) {
                 data.paste_paths(vec![path]);

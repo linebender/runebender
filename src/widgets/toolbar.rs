@@ -304,7 +304,7 @@ fn pen_path() -> BezPath {
     bez.line_to((155.0, 0.0));
     bez.close_path();
     let circle = Circle::new((155.0, 361.0), 50.0);
-    bez.extend(circle.to_bez_path(0.1));
+    bez.extend(circle.path_elements(0.1));
     bez
 }
 

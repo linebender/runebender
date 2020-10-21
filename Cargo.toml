@@ -17,5 +17,5 @@ svg = "0.8.0"
 chrono = "0.4"
 
 [patch.crates-io]
-druid = { version = "0.6.0", git = "https://github.com/linebender/druid.git", rev = "7f1fa18" }
+druid = { version = "0.6.0", git = "https://github.com/linebender/druid.git", rev = "0584a2d" }
 

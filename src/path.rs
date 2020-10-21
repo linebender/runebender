@@ -4,7 +4,8 @@ use std::sync::Arc;
 
 use super::design_space::{DPoint, DVec2, ViewPort};
 use druid::kurbo::{
-    Affine, BezPath, CubicBez, Line, ParamCurve, PathEl, PathSeg as KurboPathSeg, Point, Vec2,
+    Affine, BezPath, CubicBez, Line, ParamCurve, ParamCurveNearest, PathEl,
+    PathSeg as KurboPathSeg, Point, Vec2,
 };
 use druid::Data;
 
@@ -407,8 +408,10 @@ impl Path {
 
     pub fn screen_dist(&self, vport: ViewPort, point: Point) -> f64 {
         let screen_bez = vport.affine() * self.bezier();
-        let (_, x, y) = screen_bez.nearest(point, 0.1);
-        Vec2::new(x, y).hypot()
+        screen_bez
+            .segments()
+            .map(|seg| seg.nearest(point, 0.1).1)
+            .fold(f64::MAX, |a, b| a.min(b))
     }
 
     /// Appends a point. Called when the user clicks. This point is always a corner;
