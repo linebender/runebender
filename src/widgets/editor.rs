@@ -194,9 +194,8 @@ impl Editor {
         (true, None)
     }
 
-    fn set_tool(&mut self, data: &mut EditorState, tool: Box<dyn Tool>) {
+    fn set_tool(&mut self, tool: Box<dyn Tool>) {
         self.draw_filled_outlines = tool.name() == "Preview";
-        data.session_mut().tool_desc = tool.name().into();
         self.tool = tool;
         self.mouse.reset();
         self.tool.init_mouse(&mut self.mouse);
@@ -249,7 +248,7 @@ impl Widget<EditorState> for Editor {
                     None
                 } else if let Some(tool) = cmd.get(consts::cmd::SET_TOOL) {
                     let tool = crate::tools::tool_for_id(tool).unwrap();
-                    self.set_tool(data, tool);
+                    self.set_tool(tool);
                     None
                 } else {
                     let (handled, edit) = self.handle_cmd(cmd, data);
