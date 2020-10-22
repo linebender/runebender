@@ -39,6 +39,20 @@ pub struct PathPoint {
     pub typ: PointType,
 }
 
+/// A single bezier path.
+///
+/// This does not contain subpaths, but a glyph can contain multiple paths.
+/// UFO calls this a [contour][].
+///
+/// # Notes
+///
+/// As UFO does not support the idea of a 'start point' for closed glyphs,
+/// and defines the points in a path as a cycle, we adopt the convention that
+/// the 'first point' in a closed path is always the last point in the vec.
+///
+/// A path that is 'open' must both begin and end with on-curve points.
+///
+/// [contour]: https://unifiedfontobject.org/versions/ufo3/glyphs/glif/#contour
 #[derive(Debug, Data, Clone)]
 pub struct Path {
     id: usize,
@@ -163,12 +177,26 @@ impl Path {
 
     pub fn from_raw_parts(
         id: usize,
-        points: Vec<PathPoint>,
+        mut points: Vec<PathPoint>,
         trailing: Option<DPoint>,
         closed: bool,
     ) -> Self {
         assert!(!points.is_empty(), "path may not be empty");
         assert!(points.iter().all(|pt| pt.id.parent == id), "{:#?}", points);
+        if !closed {
+            assert!(points.first().unwrap().is_on_curve());
+        }
+        // normalize incoming representation
+        // if the path is closed, the last point should be an on-curve point,
+        // and is considered the start of the path.
+        if closed && !points.last().unwrap().is_on_curve() {
+            // we assume there is at least one on-curve point. One day,
+            // we will find out one day that this assumption was wrong.
+            let rotate_distance = points.iter().position(|p| p.is_on_curve()).unwrap() + 1;
+
+            points.rotate_left(rotate_distance);
+        }
+
         Path {
             id,
             points: Arc::new(points),
@@ -386,7 +414,6 @@ impl Path {
     pub(crate) fn append_to_bezier(&self, bez: &mut BezPath) {
         bez.move_to(self.start_point().point.to_raw());
         let mut i = if self.closed { 0 } else { 1 };
-        //self.debug_print_points();
 
         while i < self.points.len() {
             if self.points[i].is_on_curve() {

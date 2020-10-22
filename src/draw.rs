@@ -8,8 +8,8 @@ use crate::data::{FontMetrics, Workspace};
 use crate::design_space::ViewPort;
 use crate::edit_session::EditSession;
 use crate::guides::{Guide, GuideLine};
-use crate::path::{EntityId, Path, PointType};
-use druid::kurbo::{Affine, BezPath, Circle, CubicBez, Line, PathSeg, Point, Rect, Vec2};
+use crate::path::{EntityId, Path, PathSeg, PointType};
+use druid::kurbo::{self, Affine, BezPath, Circle, CubicBez, Line, Point, Rect, Vec2};
 use druid::piet::{Color, Piet, RenderContext};
 use druid::PaintCtx;
 
@@ -195,26 +195,25 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
     }
 
     fn draw_control_point_lines(&mut self, path: &Path) {
-        let mut prev_point = path.start_point().to_screen(self.space);
-        let mut idx = 0;
-        while idx < path.points().len() {
-            match path.points()[idx] {
-                p if p.is_on_curve() => prev_point = p.to_screen(self.space),
-                p => {
-                    self.draw_control_handle(prev_point, p.to_screen(self.space));
-                    let p1 = path.points()[idx + 1].to_screen(self.space);
-                    let p2 = path.points()[idx + 2].to_screen(self.space);
-                    self.draw_control_handle(p1, p2);
-                    idx += 2;
-                    prev_point = p2;
+        // if there is a trailing handle (the last operation was a click_drag
+        // we need to draw that from the end point, which we track here.)
+        let mut end_point = path.start_point().to_screen(self.space);
+
+        for seg in path.iter_segments() {
+            match seg {
+                PathSeg::Line(_, p1) => end_point = p1.to_screen(self.space),
+                PathSeg::Cubic(p0, p1, p2, p3) => {
+                    let r = self.space;
+                    self.draw_control_handle(p0.to_screen(r), p1.to_screen(r));
+                    self.draw_control_handle(p2.to_screen(r), p3.to_screen(r));
+                    end_point = p3.to_screen(r);
                 }
             }
-            idx += 1;
         }
 
         if let Some(trailing) = path.trailing() {
             if path.should_draw_trailing() {
-                self.draw_control_handle(prev_point, trailing.to_screen(self.space));
+                self.draw_control_handle(end_point, trailing.to_screen(self.space));
             }
         }
     }
@@ -240,7 +239,7 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         }
     }
 
-    fn draw_open_path_terminal(&mut self, seg: &PathSeg, selected: bool) {
+    fn draw_open_path_terminal(&mut self, seg: &kurbo::PathSeg, selected: bool) {
         let cap = cap_line(seg.to_cubic(), 12.);
         if selected {
             self.stroke(cap, &OFF_CURVE_HANDLE_COLOR, 3.0);
@@ -292,7 +291,7 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
     }
 
     fn draw_direction_indicator(&mut self, path: &BezPath) {
-        let first_seg = match path.segments().next().as_ref().map(PathSeg::to_cubic) {
+        let first_seg = match path.segments().next().as_ref().map(|seg| seg.to_cubic()) {
             None => return,
             Some(cubic) => cubic,
         };
@@ -325,8 +324,8 @@ struct PointStyle {
 
 #[derive(Debug, Clone)]
 enum Style {
-    Open(PathSeg),
-    Close(PathSeg),
+    Open(kurbo::PathSeg),
+    Close(kurbo::PathSeg),
     Corner,
     Smooth,
     Tangent,
