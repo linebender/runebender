@@ -6,7 +6,8 @@ use druid::widget::{prelude::*, Controller, CrossAxisAlignment, Either, Flex, La
 use druid::{Color, FontDescriptor, FontFamily, FontStyle, Point, WidgetExt};
 
 use crate::design_space::{DPoint, DVec2};
-use crate::edit_session::{CoordinateSelection, Quadrant};
+use crate::edit_session::CoordinateSelection;
+use crate::quadrant::Quadrant;
 use crate::widgets::EditableLabel;
 use crate::{consts, theme};
 
@@ -41,7 +42,7 @@ impl<W: Widget<CoordinateSelection>> Controller<CoordinateSelection, W> for Coor
             ctx.submit_command(consts::cmd::NUDGE_SELECTION.with(DVec2::from_raw(delta)));
         } else if child_data.frame.size() != data.frame.size() {
             let scale = compute_scale(data.frame.size(), child_data.frame.size());
-            let scale_origin = child_data.quadrant.pos_in_rect_in_design_space(data.frame);
+            let scale_origin = child_data.quadrant.point_in_dspace_rect(data.frame);
             let args = consts::cmd::ScaleSelectionArgs {
                 scale,
                 origin: DPoint::from_raw(scale_origin),
@@ -71,7 +72,7 @@ impl Widget<Quadrant> for CoordRepresentationPicker {
         match event {
             Event::MouseDown(mouse) if mouse.button.is_left() => {
                 ctx.set_active(true);
-                *data = Quadrant::for_point_in_size(mouse.pos, ctx.size());
+                *data = Quadrant::for_point_in_bounds(mouse.pos, ctx.size());
                 ctx.request_paint();
             }
             Event::MouseUp(_) => {
@@ -101,7 +102,7 @@ impl Widget<Quadrant> for CoordRepresentationPicker {
         let rect = frame_size.to_rect().inset(-padding);
         ctx.stroke(rect, &Color::BLACK, 1.0);
         for quadrant in Quadrant::all() {
-            let pt = quadrant.pos_in_size(rect.size());
+            let pt = quadrant.point_in_bounds(rect.size());
             let pt = pt + Vec2::new(5.0, 5.0);
             let color = if data == quadrant {
                 env.get(druid::theme::SELECTION_COLOR)

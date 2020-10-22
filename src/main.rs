@@ -21,6 +21,7 @@ mod menus;
 mod mouse;
 mod path;
 mod plist;
+mod quadrant;
 mod theme;
 mod tools;
 mod undo;
