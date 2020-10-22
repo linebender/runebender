@@ -11,6 +11,7 @@ use crate::data::Workspace;
 use crate::design_space::{DPoint, DVec2, ViewPort};
 use crate::guides::Guide;
 use crate::path::{EntityId, Path, PathPoint, PathSeg};
+use crate::quadrant::Quadrant;
 
 /// Minimum distance in screen units that a click must occur to be considered
 /// on a point?
@@ -47,22 +48,6 @@ pub struct EditSession {
     pub viewport: ViewPort,
     work_bounds: Rect,
     quadrant: Quadrant,
-}
-
-/// when selecting multiple points, which coordinate value do we display?
-///
-/// This is really UI state, but it is convenient to keep it in our data model.
-#[derive(Debug, Clone, Copy, PartialEq, Data)]
-pub enum Quadrant {
-    Center,
-    TopLeft,
-    Top,
-    TopRight,
-    Right,
-    BottomRight,
-    Bottom,
-    BottomLeft,
-    Left,
 }
 
 /// A type that is only created by a lens, for our coordinate editing panel
@@ -624,82 +609,6 @@ impl CoordinateSelection {
     pub const quadrant_bbox: lenses::QuadrantBbox = lenses::QuadrantBbox;
 }
 
-static ALL_QUADRANTS: &[Quadrant] = &[
-    Quadrant::TopLeft,
-    Quadrant::Top,
-    Quadrant::TopRight,
-    Quadrant::Left,
-    Quadrant::Center,
-    Quadrant::Right,
-    Quadrant::BottomLeft,
-    Quadrant::Bottom,
-    Quadrant::BottomRight,
-];
-
-impl Quadrant {
-    pub fn all() -> &'static [Quadrant] {
-        ALL_QUADRANTS
-    }
-
-    pub fn for_point_in_size(pt: Point, size: Size) -> Self {
-        let zone_x = size.width / 3.0;
-        let zone_y = size.height / 3.0;
-        let mouse_x = match pt.x {
-            x if x < zone_x => 0,
-            x if x >= zone_x && x < zone_x * 2.0 => 1,
-            x if x >= zone_x * 2.0 => 2,
-            _ => unreachable!(),
-        };
-
-        let mouse_y = match pt.y {
-            y if y < zone_y => 0,
-            y if y >= zone_y && y < zone_y * 2.0 => 1,
-            y if y >= zone_y * 2.0 => 2,
-            _ => unreachable!(),
-        };
-
-        match (mouse_x, mouse_y) {
-            (0, 0) => Quadrant::TopLeft,
-            (1, 0) => Quadrant::Top,
-            (2, 0) => Quadrant::TopRight,
-            (0, 1) => Quadrant::Left,
-            (1, 1) => Quadrant::Center,
-            (2, 1) => Quadrant::Right,
-            (0, 2) => Quadrant::BottomLeft,
-            (1, 2) => Quadrant::Bottom,
-            (2, 2) => Quadrant::BottomRight,
-            _ => unreachable!(),
-        }
-    }
-
-    pub(crate) fn pos_in_size(self, size: Size) -> Point {
-        match self {
-            Quadrant::TopLeft => Point::new(0., 0.),
-            Quadrant::Top => Point::new(size.width / 2.0, 0.),
-            Quadrant::TopRight => Point::new(size.width, 0.),
-            Quadrant::Left => Point::new(0., size.height / 2.0),
-            Quadrant::Center => Point::new(size.width / 2.0, size.height / 2.0),
-            Quadrant::Right => Point::new(size.width, size.height / 2.0),
-            Quadrant::BottomLeft => Point::new(0.0, size.height),
-            Quadrant::Bottom => Point::new(size.width / 2.0, size.height),
-            Quadrant::BottomRight => Point::new(size.width, size.height),
-        }
-    }
-
-    pub(crate) fn pos_in_rect_in_design_space(self, rect: Rect) -> Point {
-        let flipped = match self {
-            Quadrant::TopRight => Quadrant::BottomRight,
-            Quadrant::TopLeft => Quadrant::BottomLeft,
-            Quadrant::Top => Quadrant::Bottom,
-            Quadrant::BottomRight => Quadrant::TopRight,
-            Quadrant::BottomLeft => Quadrant::TopLeft,
-            Quadrant::Bottom => Quadrant::Top,
-            other => other,
-        };
-        flipped.pos_in_size(rect.size()) + rect.origin().to_vec2()
-    }
-}
-
 pub mod lenses {
     use super::*;
     use druid::Lens;
@@ -741,7 +650,7 @@ pub mod lenses {
 
     impl Lens<CoordinateSelection, Point> for QuadrantCoord {
         fn with<V, F: FnOnce(&Point) -> V>(&self, data: &CoordinateSelection, f: F) -> V {
-            let point = data.quadrant.pos_in_rect_in_design_space(data.frame);
+            let point = data.quadrant.point_in_dspace_rect(data.frame);
             f(&point)
         }
 
@@ -750,7 +659,7 @@ pub mod lenses {
             data: &mut CoordinateSelection,
             f: F,
         ) -> V {
-            let point = data.quadrant.pos_in_rect_in_design_space(data.frame);
+            let point = data.quadrant.point_in_dspace_rect(data.frame);
             let mut point2 = point;
             let r = f(&mut point2);
 
@@ -783,31 +692,5 @@ pub mod lenses {
             }
             r
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn quadrant_pos() {
-        let rect = Rect::new(10.0, 10., 100., 100.);
-        assert_eq!(
-            Quadrant::BottomLeft.pos_in_rect_in_design_space(rect),
-            rect.origin()
-        );
-        assert_eq!(
-            Quadrant::Center.pos_in_rect_in_design_space(rect),
-            Point::new(55.0, 55.0)
-        );
-        assert_eq!(
-            Quadrant::TopRight.pos_in_rect_in_design_space(rect),
-            Point::new(100.0, 100.0)
-        );
-        assert_eq!(
-            Quadrant::Top.pos_in_rect_in_design_space(rect),
-            Point::new(55.0, 100.0)
-        );
     }
 }
