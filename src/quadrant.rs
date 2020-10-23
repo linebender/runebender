@@ -1,4 +1,4 @@
-use druid::{Data, Point, Rect, Size};
+use druid::{Data, Point, Rect, Size, Vec2};
 
 /// Divisions of a 2D plane.
 ///
@@ -36,6 +36,38 @@ impl Quadrant {
         ALL_QUADRANTS
     }
 
+    /// Return the position opposite this one; TopRight to BottomLeft, e.g.
+    ///
+    /// This is used when dragging a selection handle; you anchor the point
+    /// opposite the selected handle.
+    pub fn inverse(self) -> Quadrant {
+        self.invert_y().invert_x()
+    }
+
+    fn invert_y(self) -> Quadrant {
+        match self {
+            Quadrant::TopRight => Quadrant::BottomRight,
+            Quadrant::TopLeft => Quadrant::BottomLeft,
+            Quadrant::Top => Quadrant::Bottom,
+            Quadrant::BottomRight => Quadrant::TopRight,
+            Quadrant::BottomLeft => Quadrant::TopLeft,
+            Quadrant::Bottom => Quadrant::Top,
+            other => other,
+        }
+    }
+
+    fn invert_x(self) -> Quadrant {
+        match self {
+            Quadrant::TopRight => Quadrant::TopLeft,
+            Quadrant::TopLeft => Quadrant::TopRight,
+            Quadrant::Left => Quadrant::Right,
+            Quadrant::Right => Quadrant::Left,
+            Quadrant::BottomRight => Quadrant::BottomLeft,
+            Quadrant::BottomLeft => Quadrant::BottomRight,
+            other => other,
+        }
+    }
+
     /// given a point and a size, return the quadrant containing that point.
     pub fn for_point_in_bounds(pt: Point, size: Size) -> Self {
         let zone_x = size.width / 3.0;
@@ -69,8 +101,10 @@ impl Quadrant {
     }
 
     /// Given a bounds, return the point corresponding to this quadrant.
-    pub fn point_in_bounds(self, size: Size) -> Point {
-        match self {
+    pub fn point_in_rect(self, bounds: Rect) -> Point {
+        let size = bounds.size();
+        let origin_offset = bounds.origin().to_vec2();
+        let rel_point = match self {
             Quadrant::TopLeft => Point::new(0., 0.),
             Quadrant::Top => Point::new(size.width / 2.0, 0.),
             Quadrant::TopRight => Point::new(size.width, 0.),
@@ -80,22 +114,14 @@ impl Quadrant {
             Quadrant::BottomLeft => Point::new(0.0, size.height),
             Quadrant::Bottom => Point::new(size.width / 2.0, size.height),
             Quadrant::BottomRight => Point::new(size.width, size.height),
-        }
+        };
+        rel_point + origin_offset
     }
 
     /// Given a rect in *design space* (that is, y-up), return the point
     /// corresponding to this quadrant.
     pub(crate) fn point_in_dspace_rect(self, rect: Rect) -> Point {
-        let flipped = match self {
-            Quadrant::TopRight => Quadrant::BottomRight,
-            Quadrant::TopLeft => Quadrant::BottomLeft,
-            Quadrant::Top => Quadrant::Bottom,
-            Quadrant::BottomRight => Quadrant::TopRight,
-            Quadrant::BottomLeft => Quadrant::TopLeft,
-            Quadrant::Bottom => Quadrant::Top,
-            other => other,
-        };
-        flipped.point_in_bounds(rect.size()) + rect.origin().to_vec2()
+        self.invert_y().point_in_bounds(rect)
     }
 }
 
