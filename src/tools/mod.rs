@@ -137,6 +137,7 @@ impl EditType {
             (EditType::NudgeLeft, EditType::NudgeLeft) => false,
             (EditType::NudgeRight, EditType::NudgeRight) => false,
             (EditType::Drag, EditType::Drag) => false,
+            (EditType::Drag, EditType::DragUp) => false,
             _ => true,
         }
     }
