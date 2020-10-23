@@ -6,7 +6,7 @@
 //! scroll offset and zoom level.
 
 use std::fmt;
-use std::ops::{Add, Sub};
+use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 use druid::kurbo::{Affine, Point, Rect, Vec2};
 use druid::{Data, Lens};
@@ -133,6 +133,16 @@ impl DVec2 {
             DVec2::new(0.0, self.y)
         }
     }
+
+    #[inline]
+    pub(crate) fn zero_x(self) -> DVec2 {
+        DVec2::new(0.0, self.y)
+    }
+
+    #[inline]
+    pub(crate) fn zero_y(self) -> DVec2 {
+        DVec2::new(self.x, 0.0)
+    }
 }
 
 impl ViewPort {
@@ -207,12 +217,24 @@ impl Add for DVec2 {
     }
 }
 
+impl AddAssign for DVec2 {
+    fn add_assign(&mut self, rhs: DVec2) {
+        *self = *self + rhs
+    }
+}
+
 impl Sub for DVec2 {
     type Output = DVec2;
 
     #[inline]
     fn sub(self, other: DVec2) -> DVec2 {
         DVec2::new(self.x - other.x, self.y - other.y)
+    }
+}
+
+impl SubAssign for DVec2 {
+    fn sub_assign(&mut self, rhs: DVec2) {
+        *self = *self - rhs
     }
 }
 
