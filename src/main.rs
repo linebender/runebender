@@ -26,6 +26,7 @@ mod selection;
 mod theme;
 mod tools;
 mod undo;
+mod util;
 pub mod widgets;
 
 use std::convert::TryFrom;

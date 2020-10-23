@@ -1,7 +1,7 @@
 //! The floating panel that displays the coordinate of the currently
 //! selected point.
 
-use druid::kurbo::{Circle, Vec2};
+use druid::kurbo::Circle;
 use druid::widget::{prelude::*, Controller, CrossAxisAlignment, Either, Flex, Label, SizedBox};
 use druid::{Color, FontDescriptor, FontFamily, FontStyle, Point, WidgetExt};
 
@@ -9,7 +9,7 @@ use crate::design_space::{DPoint, DVec2};
 use crate::edit_session::CoordinateSelection;
 use crate::quadrant::Quadrant;
 use crate::widgets::EditableLabel;
-use crate::{consts, theme};
+use crate::{consts, theme, util};
 
 /// A panel for editing the selected coordinate
 pub struct CoordPane;
@@ -41,7 +41,7 @@ impl<W: Widget<CoordinateSelection>> Controller<CoordinateSelection, W> for Coor
             let delta = child_data.frame.origin() - data.frame.origin();
             ctx.submit_command(consts::cmd::NUDGE_SELECTION.with(DVec2::from_raw(delta)));
         } else if child_data.frame.size() != data.frame.size() {
-            let scale = compute_scale(data.frame.size(), child_data.frame.size());
+            let scale = util::compute_scale(data.frame.size(), child_data.frame.size());
             let scale_origin = child_data.quadrant.point_in_dspace_rect(data.frame);
             let args = consts::cmd::ScaleSelectionArgs {
                 scale,
@@ -55,13 +55,6 @@ impl<W: Widget<CoordinateSelection>> Controller<CoordinateSelection, W> for Coor
             ctx.set_handled();
         }
     }
-}
-
-fn compute_scale(pre: Size, post: Size) -> Vec2 {
-    let ensure_finite = |f: f64| if f.is_finite() { f } else { 1.0 };
-    let x = ensure_finite(post.width / pre.width);
-    let y = ensure_finite(post.height / pre.height);
-    Vec2::new(x, y)
 }
 
 /// A widget for picking how to represent a multi-point selection.
