@@ -95,8 +95,7 @@ impl Widget<Quadrant> for CoordRepresentationPicker {
         let rect = frame_size.to_rect().inset(-padding);
         ctx.stroke(rect, &Color::BLACK, 1.0);
         for quadrant in Quadrant::all() {
-            let pt = quadrant.point_in_bounds(rect.size());
-            let pt = pt + Vec2::new(5.0, 5.0);
+            let pt = quadrant.point_in_rect(rect);
             let color = if data == quadrant {
                 env.get(druid::theme::SELECTION_COLOR)
             } else {
