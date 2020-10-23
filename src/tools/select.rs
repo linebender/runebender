@@ -1,5 +1,5 @@
-use druid::kurbo::{Point, Rect, Vec2};
-use druid::piet::{Color, RenderContext};
+use druid::kurbo::{BezPath, Circle, Insets, Point, Rect, Shape, Vec2};
+use druid::piet::{RenderContext, StrokeStyle};
 use druid::{Data, Env, EventCtx, HotKey, KbKey, KeyEvent, MouseEvent, PaintCtx, RawMods};
 
 use crate::edit_session::EditSession;
@@ -7,12 +7,15 @@ use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
 use crate::path::PathSeg;
 use crate::tools::{EditType, Tool, ToolId};
 use crate::{
-    design_space::{DPoint, DVec2},
+    design_space::{DPoint, DVec2, ViewPort},
+    quadrant::Quadrant,
     selection::Selection,
+    theme,
 };
 
-const SELECTION_RECT_BG_COLOR: Color = Color::rgba8(0xDD, 0xDD, 0xDD, 0x55);
-const SELECTION_RECT_STROKE_COLOR: Color = Color::rgb8(0x53, 0x8B, 0xBB);
+// distance from edges of the selection bbox to where we draw the handles
+const SELECTION_BBOX_HANDLE_PADDING: Insets = Insets::uniform(6.0);
+const SELECTION_HANDLE_RADIUS: f64 = 4.;
 
 /// A set of states that are possible while handling a mouse drag.
 #[derive(Debug, Clone)]
@@ -24,7 +27,6 @@ enum DragState {
     },
     /// State for a drag that is moving a selected object.
     Move {
-        drag_start: DPoint,
         delta: DVec2,
     },
     /// State for a drag that is moving an off-curve point.
@@ -32,6 +34,14 @@ enum DragState {
     /// State if some earlier gesture consumed the mouse-down, and we should not
     /// recognize a drag.
     Suppress,
+    TransformSelection {
+        quadrant: Quadrant,
+        previous: EditSession,
+        delta: DVec2,
+        /// The paths before this transform; we want to draw these faintly
+        /// until the gesture completes
+        pre_paths: BezPath,
+    },
     None,
 }
 
@@ -52,10 +62,47 @@ pub struct Select {
 }
 
 impl Tool for Select {
-    fn paint(&mut self, ctx: &mut PaintCtx, _data: &EditSession, _env: &Env) {
-        if let DragState::Select { rect, .. } = self.drag {
-            ctx.fill(rect, &SELECTION_RECT_BG_COLOR);
-            ctx.stroke(rect, &SELECTION_RECT_STROKE_COLOR, 1.0);
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &EditSession, env: &Env) {
+        let selection_stroke = env.get(theme::SELECTION_RECT_STROKE_COLOR);
+        match &self.drag {
+            DragState::Select { rect, .. } => {
+                ctx.fill(rect, &env.get(theme::SELECTION_RECT_FILL_COLOR));
+                ctx.stroke(rect, &selection_stroke, 1.0);
+            }
+            // draw the selection bounding box
+            DragState::None if data.selection.len() > 1 => {
+                let bbox = data.viewport.rect_to_screen(data.selection_dpoint_bbox());
+                let style = StrokeStyle::new().dash(vec![2.0, 4.0], 0.0);
+                ctx.stroke_styled(&bbox, &selection_stroke, 0.5, &style);
+
+                for (_, circle) in iter_handle_circles(data) {
+                    if circle.contains(self.last_pos) {
+                        ctx.fill(circle, &selection_stroke);
+                    }
+                    ctx.stroke(circle, &selection_stroke, 0.5);
+                }
+            }
+            DragState::TransformSelection { pre_paths, .. } => {
+                ctx.stroke(
+                    data.viewport.affine() * pre_paths,
+                    &env.get(theme::PLACEHOLDER_GLYPH_COLOR),
+                    1.0,
+                );
+                let bbox = data.viewport.rect_to_screen(data.selection_dpoint_bbox());
+                let style = StrokeStyle::new().dash(vec![2.0, 4.0], 0.0);
+                ctx.stroke_styled(&bbox, &selection_stroke, 0.5, &style);
+
+                for (_loc, circle) in iter_handle_circles(data) {
+                    //FIXME: we don't fill while dragging because we would
+                    //fill the wrong handle when scale goes negative. Lots of
+                    //ways to be fancy here, but for now we can just leave it.
+                    //if loc == *quadrant {
+                    //ctx.fill(circle, &selection_stroke);
+                    //}
+                    ctx.stroke(circle, &selection_stroke, 0.5);
+                }
+            }
+            _ => (),
         }
     }
 
@@ -134,6 +181,31 @@ impl Select {
             self.this_edit_type = Some(edit_type);
         }
     }
+
+    fn selection_handle_hit(&self, data: &EditSession, pos: Point) -> Option<Quadrant> {
+        if data.selection.len() <= 1 {
+            return None;
+        }
+
+        let (handle, handle_dist) = iter_handle_circles(data)
+            .map(|(loc, circ)| (loc, circ.center.distance(pos)))
+            .fold(
+                (Quadrant::Center, f64::MAX),
+                |(best_loc, closest), (this_loc, this_dist)| {
+                    let best_loc = if this_dist < closest {
+                        this_loc
+                    } else {
+                        best_loc
+                    };
+                    (best_loc, this_dist.min(closest))
+                },
+            );
+        if handle_dist <= SELECTION_HANDLE_RADIUS {
+            Some(handle)
+        } else {
+            None
+        }
+    }
 }
 
 impl MouseDelegate<EditSession> for Select {
@@ -142,7 +214,15 @@ impl MouseDelegate<EditSession> for Select {
     }
 
     fn left_down(&mut self, event: &MouseEvent, data: &mut EditSession) {
+        assert!(matches!(self.drag, DragState::None));
         if event.count == 1 {
+            // if we have an existing multi-point selection we first hit-test
+            // our own selection handles. If we're on one of them, we don't
+            // do anything further; we will start a transform in drag_began
+            if self.selection_handle_hit(data, event.pos).is_some() {
+                return;
+            }
+
             let sel = data.hit_test_all(event.pos, None);
             if let Some(point_id) = sel {
                 if !event.mods.shift() {
@@ -215,6 +295,19 @@ impl MouseDelegate<EditSession> for Select {
             return;
         }
 
+        // are we dragging a selection rect handle?
+        if let Some(quadrant) = self.selection_handle_hit(data, drag.start.pos) {
+            let pre_paths = data.to_bezier();
+            self.drag = DragState::TransformSelection {
+                delta: DVec2::ZERO,
+                quadrant,
+                previous: data.clone(),
+                pre_paths,
+            };
+            return;
+        }
+
+        // if we're starting a rectangular selection, we save the previous selection
         let sel = data.hit_test_all(drag.start.pos, None);
         self.drag = if let Some(pt) = sel.and_then(|id| data.path_point_for_id(id)) {
             let is_handle = !pt.is_on_curve();
@@ -222,16 +315,10 @@ impl MouseDelegate<EditSession> for Select {
             if is_dragging_handle {
                 DragState::MoveHandle
             } else {
-                DragState::Move {
-                    drag_start: data.viewport.from_screen(drag.start.pos),
-                    delta: DVec2::ZERO,
-                }
+                DragState::Move { delta: DVec2::ZERO }
             }
         } else if data.hit_test_segments(drag.start.pos, None).is_some() {
-            DragState::Move {
-                drag_start: data.viewport.from_screen(drag.start.pos),
-                delta: DVec2::ZERO,
-            }
+            DragState::Move { delta: DVec2::ZERO }
         } else {
             // if we're starting a rectangular selection, we save the previous selection
             DragState::Select {
@@ -242,22 +329,18 @@ impl MouseDelegate<EditSession> for Select {
     }
 
     fn left_drag_changed(&mut self, drag: Drag, data: &mut EditSession) {
+        self.last_pos = drag.current.pos;
         match &mut self.drag {
-            DragState::Select {
-                previous,
-                ref mut rect,
-            } => {
+            DragState::Select { previous, rect } => {
                 *rect = Rect::from_points(drag.current.pos, drag.start.pos);
                 update_selection_for_drag(data, previous, *rect, drag.current.mods.shift());
             }
-            DragState::Move { drag_start, delta } => {
-                let drag_pos = data.viewport.from_screen(drag.current.pos);
-                let mut new_delta = drag_pos - *drag_start;
+            DragState::Move { delta } => {
+                let mut new_delta = delta_for_drag_change(&drag, data.viewport);
                 if drag.current.mods.shift() {
                     new_delta = new_delta.axis_locked();
                 }
                 let drag_delta = new_delta - *delta;
-                // TODO: constrain drag when shift is pressed
                 if drag_delta.hypot() > 0. {
                     data.nudge_selection(drag_delta);
                     *delta = new_delta;
@@ -267,16 +350,34 @@ impl MouseDelegate<EditSession> for Select {
                 data.update_handle(drag.current.pos, drag.current.mods.shift());
             }
             DragState::Suppress => (),
+            DragState::TransformSelection {
+                quadrant,
+                previous,
+                delta,
+                ..
+            } => {
+                let new_delta = delta_for_drag_change(&drag, data.viewport);
+                let new_delta = quadrant.lock_delta(new_delta);
+                if new_delta.hypot() > 0.0 && new_delta != *delta {
+                    *delta = new_delta;
+                    let mut new_data = previous.clone();
+                    let sel_rect = previous.selection_dpoint_bbox();
+                    let scale = quadrant.scale_dspace_rect(sel_rect, new_delta);
+                    let anchor = quadrant.inverse().point_in_dspace_rect(sel_rect);
+                    new_data.scale_selection(scale, DPoint::from_raw(anchor));
+                    *data = new_data;
+                }
+            }
             DragState::None => unreachable!("invalid state"),
         }
 
-        if self.drag.is_move() {
+        if self.drag.is_move() || self.drag.is_transform() {
             self.this_edit_type = Some(EditType::Drag);
         }
     }
 
     fn left_drag_ended(&mut self, _drag: Drag, _data: &mut EditSession) {
-        if self.drag.is_move() {
+        if self.drag.is_move() || self.drag.is_transform() {
             self.this_edit_type = Some(EditType::DragUp);
         }
     }
@@ -287,6 +388,33 @@ impl MouseDelegate<EditSession> for Select {
             data.selection = previous;
         }
     }
+}
+
+/// When dragging, we only update positions when they change in design-space,
+/// so we keep track of the current total design-space delta.
+fn delta_for_drag_change(drag: &Drag, viewport: ViewPort) -> DVec2 {
+    let drag_start = viewport.from_screen(drag.start.pos);
+    let drag_pos = viewport.from_screen(drag.current.pos);
+    drag_pos - drag_start
+}
+
+fn iter_handle_circles(session: &EditSession) -> impl Iterator<Item = (Quadrant, Circle)> {
+    let bbox = session
+        .viewport
+        .rect_to_screen(session.selection_dpoint_bbox());
+    let handle_frame = bbox + SELECTION_BBOX_HANDLE_PADDING;
+    Quadrant::all()
+        .iter()
+        .filter(move |q| {
+            !(bbox.width() == 0. && q.modifies_x_axis())
+                && !(bbox.height() == 0. && q.modifies_y_axis())
+                && !matches!(q, Quadrant::Center)
+        })
+        .map(move |loc| {
+            let center = loc.point_in_rect(handle_frame);
+            let circle = Circle::new(center, SELECTION_HANDLE_RADIUS);
+            (*loc, circle)
+        })
 }
 
 fn update_selection_for_drag(
@@ -324,5 +452,9 @@ impl DragState {
 
     fn is_move(&self) -> bool {
         matches!(self, DragState::Move { .. })
+    }
+
+    fn is_transform(&self) -> bool {
+        matches!(self, DragState::TransformSelection{ .. })
     }
 }

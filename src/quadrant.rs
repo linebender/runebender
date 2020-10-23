@@ -1,3 +1,5 @@
+use crate::design_space::DVec2;
+use crate::util;
 use druid::{Data, Point, Rect, Size, Vec2};
 
 /// Divisions of a 2D plane.
@@ -68,6 +70,14 @@ impl Quadrant {
         }
     }
 
+    pub(crate) fn modifies_x_axis(self) -> bool {
+        !matches!(self, Quadrant::Top | Quadrant::Bottom | Quadrant::Center)
+    }
+
+    pub(crate) fn modifies_y_axis(self) -> bool {
+        !matches!(self, Quadrant::Left | Quadrant::Right | Quadrant::Center)
+    }
+
     /// given a point and a size, return the quadrant containing that point.
     pub fn for_point_in_bounds(pt: Point, size: Size) -> Self {
         let zone_x = size.width / 3.0;
@@ -121,7 +131,31 @@ impl Quadrant {
     /// Given a rect in *design space* (that is, y-up), return the point
     /// corresponding to this quadrant.
     pub(crate) fn point_in_dspace_rect(self, rect: Rect) -> Point {
-        self.invert_y().point_in_bounds(rect)
+        self.invert_y().point_in_rect(rect)
+    }
+
+    /// Return the x&y suitable for transforming `rect` given a drag
+    /// originating at this quadrant.
+    ///
+    /// This can be negative in either direction if the drag crosses the
+    /// opposite quadrant point.
+    pub(crate) fn scale_dspace_rect(self, rect: Rect, drag: DVec2) -> Vec2 {
+        // axis locking should have already happened
+        assert_eq!(drag, self.lock_delta(drag));
+        let start_point = self.point_in_dspace_rect(rect);
+        let origin_point = self.inverse().point_in_dspace_rect(rect);
+        let origin_delta = origin_point - start_point;
+        let cur_delta = origin_point - (start_point + drag.to_raw());
+        util::compute_scale(origin_delta.to_size(), cur_delta.to_size())
+    }
+
+    /// When dragging from a control handle, side handles lock an axis.
+    pub(crate) fn lock_delta(self, delta: DVec2) -> DVec2 {
+        match self {
+            Quadrant::Top | Quadrant::Bottom => delta.zero_x(),
+            Quadrant::Left | Quadrant::Right => delta.zero_y(),
+            _ => delta,
+        }
     }
 }
 
