@@ -195,6 +195,9 @@ impl Editor {
                 let consts::cmd::ScaleSelectionArgs { scale, origin } =
                     c.get_unchecked(consts::cmd::SCALE_SELECTION);
                 data.session_mut().scale_selection(*scale, *origin);
+            }
+            c if c.is(consts::cmd::REVERSE_CONTOURS) => {
+                data.session_mut().reverse_contours();
                 return (true, Some(EditType::Normal));
             }
             // all unhandled commands:

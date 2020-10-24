@@ -178,7 +178,7 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
             Event::MouseMove(mouse) => {
                 self.mouse = mouse.pos;
             }
-            Event::Wheel(wheel) if wheel.mods.meta() => {
+            Event::Wheel(wheel) if wheel.mods.alt() => {
                 self.wheel_zoom(data, wheel.wheel_delta, None);
                 self.after_zoom_changed(ctx, env);
                 return;

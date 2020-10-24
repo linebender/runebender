@@ -784,6 +784,15 @@ impl Path {
         self.points.last().unwrap().id
     }
 
+    pub fn reverse_contour(&mut self) {
+        let last = if self.closed {
+            self.points.len() - 1
+        } else {
+            self.points.len()
+        };
+        self.points_mut()[..last].reverse();
+    }
+
     #[inline]
     fn prev_idx(&self, idx: usize) -> usize {
         if idx == 0 {
