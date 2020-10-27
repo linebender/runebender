@@ -149,6 +149,19 @@ impl EditSession {
         self.paths.iter().flat_map(|p| p.points().iter())
     }
 
+    pub(crate) fn paths_for_selection(&self) -> Vec<Path> {
+        let mut result = Vec::new();
+        for paths in self
+            .paths
+            .iter()
+            .map(|p| p.paths_for_selection(&self.selection))
+        {
+            result.extend(paths);
+        }
+
+        result
+    }
+
     // Replaced by hit test methods.
     /*
     /// For hit testing; iterates 'clickable items' (right now just points
