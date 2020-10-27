@@ -47,6 +47,14 @@ impl Editor {
         env: &Env,
     ) -> Option<EditType> {
         if !event.inner().button.is_right() {
+            // set active, to ensure we receive events if the mouse leaves
+            // the window:
+            match &event {
+                TaggedEvent::Down(_) => ctx.set_active(true),
+                TaggedEvent::Up(m) if m.buttons.is_empty() => ctx.set_active(false),
+                _ => (),
+            };
+
             return self
                 .tool
                 .mouse_event(event, &mut self.mouse, ctx, data.session_mut(), env);
