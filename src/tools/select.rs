@@ -8,7 +8,6 @@ use crate::path::PathSeg;
 use crate::tools::{EditType, Tool, ToolId};
 use crate::{
     design_space::{DPoint, DVec2},
-    path::PointType,
     selection::Selection,
 };
 
@@ -172,9 +171,8 @@ impl MouseDelegate<EditSession> for Select {
                     data.selection.extend(ids);
                 } else if !append_mode && all_selected {
                     // we allow a drag gesture to begin only if the clicked
-                    // segment was previously selected. This won't work correctly
-                    // until we update drag_began.
-                    ()
+                    // segment was previously selected.
+                    self.drag = DragState::None;
                 } else if append_mode && all_selected {
                     for id in &ids {
                         data.selection.remove(id);
@@ -216,15 +214,11 @@ impl MouseDelegate<EditSession> for Select {
         if matches!(self.drag, DragState::Suppress) {
             return;
         }
-        // if we're starting a rectangular selection, we save the previous selection
+
         let sel = data.hit_test_all(drag.start.pos, None);
-        let is_dragging_item = sel.is_some();
-        self.drag = if is_dragging_item {
-            let is_dragging_handle = data.selection.len() == 1
-                && data
-                    .path_point_for_id(*data.selection.iter().next().unwrap())
-                    .map(|pt| pt.typ == PointType::OffCurve)
-                    .unwrap_or(false);
+        self.drag = if let Some(pt) = sel.and_then(|id| data.path_point_for_id(id)) {
+            let is_handle = !pt.is_on_curve();
+            let is_dragging_handle = data.selection.len() == 1 && is_handle;
             if is_dragging_handle {
                 DragState::MoveHandle
             } else {
@@ -233,7 +227,13 @@ impl MouseDelegate<EditSession> for Select {
                     delta: DVec2::ZERO,
                 }
             }
+        } else if data.hit_test_segments(drag.start.pos, None).is_some() {
+            DragState::Move {
+                drag_start: data.viewport.from_screen(drag.start.pos),
+                delta: DVec2::ZERO,
+            }
         } else {
+            // if we're starting a rectangular selection, we save the previous selection
             DragState::Select {
                 previous: data.selection.clone(),
                 rect: Rect::from_points(drag.start.pos, drag.current.pos),
