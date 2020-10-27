@@ -13,6 +13,13 @@ use crate::edit_session::EditSession;
 use crate::path::{EntityId, Path, PathPoint, PointType};
 use crate::plist::Plist;
 
+//FIXME:
+// this is all poorly done, especially for copy, where each clipboard format
+// duplicates work and allocations when generating the paths to copy.
+// I think there should be a single top-level function that returns a
+// Vec<ClipboardFormat>, and handles only generating the paths once, passing
+// them down to each encoding step.
+
 /// Generates druid-compatible drawing code for all of the `Paths` in this
 /// session, if any exist.
 pub fn make_code_string(session: &EditSession) -> Option<String> {
@@ -76,7 +83,11 @@ fn append_path(path: &BezPath, out: &mut String) -> std::fmt::Result {
 }
 
 pub fn make_glyphs_plist(session: &EditSession) -> Option<Vec<u8>> {
-    let paths: Vec<_> = session.paths.iter().map(GlyphPlistPath::from).collect();
+    let paths: Vec<_> = session
+        .paths_for_selection()
+        .iter()
+        .map(GlyphPlistPath::from)
+        .collect();
     if paths.is_empty() {
         return None;
     }
@@ -142,7 +153,7 @@ pub fn make_pdf_data(session: &EditSession) -> Option<Vec<u8>> {
     let mut ops = Vec::new();
     let mut rect = Rect::ZERO;
 
-    for path in session.paths.iter() {
+    for path in session.paths_for_selection() {
         let bezier = path.bezier();
         rect = rect.union(bezier.bounding_box());
         append_pdf_ops(&mut ops, &bezier);
@@ -378,7 +389,7 @@ pub fn make_svg_data(session: &EditSession) -> Option<Vec<u8>> {
     let mut bbox = Rect::ZERO;
     let mut data = Data::new();
 
-    for path in session.paths.iter() {
+    for path in session.paths_for_selection() {
         let bezier = path.bezier();
         bbox = bbox.union(bezier.bounding_box());
         for element in bezier.elements() {
