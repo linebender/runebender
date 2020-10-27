@@ -483,7 +483,7 @@ impl From<&GlyphPlistPath> for Path {
 }
 
 fn from_glyphs_plist_point(s: &str, parent_id: usize) -> Option<PathPoint> {
-    let mut iter = s.trim_matches('"').split(' ');
+    let mut iter = s.trim_matches('"').splitn(3, ' ');
     match (iter.next(), iter.next(), iter.next()) {
         (Some(x_), Some(y_), Some(typ_)) => {
             let x: f64 = x_
