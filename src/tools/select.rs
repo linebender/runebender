@@ -15,6 +15,7 @@ use crate::{
 const SELECTION_RECT_BG_COLOR: Color = Color::rgba8(0xDD, 0xDD, 0xDD, 0x55);
 const SELECTION_RECT_STROKE_COLOR: Color = Color::rgb8(0x53, 0x8B, 0xBB);
 
+/// A set of states that are possible while handling a mouse drag.
 #[derive(Debug, Clone)]
 enum DragState {
     /// State for a drag that is a rectangular selection.
@@ -29,6 +30,9 @@ enum DragState {
     },
     /// State for a drag that is moving an off-curve point.
     MoveHandle,
+    /// State if some earlier gesture consumed the mouse-down, and we should not
+    /// recognize a drag.
+    Suppress,
     None,
 }
 
@@ -152,24 +156,30 @@ impl MouseDelegate<EditSession> for Select {
                     data.selection.insert(point_id);
                 }
             } else if let Some((seg, _t)) = data.hit_test_segments(event.pos, None) {
-                // TODO: make these non-draggable.
+                let ids = seg.ids();
+                let all_selected = ids.iter().all(|id| data.selection.contains(id));
+                let append_mode = event.mods.shift();
+                self.drag = DragState::Suppress;
+
                 if event.mods.alt() && matches!(seg, PathSeg::Line(..)) {
                     let path = data.path_for_point_mut(seg.start_id()).unwrap();
-                    self.this_edit_type = Some(EditType::Normal);
                     path.upgrade_line_seg(seg);
+                    self.this_edit_type = Some(EditType::Normal);
                     return;
                 }
-                let ids = seg.ids();
-                if !event.mods.shift() {
-                    if !ids.iter().all(|id| data.selection.contains(id)) {
-                        data.selection.clear();
-                        data.selection.extend(ids);
-                    }
-                } else if ids.iter().all(|id| data.selection.contains(id)) {
+                if !append_mode && !all_selected {
+                    data.selection.clear();
+                    data.selection.extend(ids);
+                } else if !append_mode && all_selected {
+                    // we allow a drag gesture to begin only if the clicked
+                    // segment was previously selected. This won't work correctly
+                    // until we update drag_began.
+                    ()
+                } else if append_mode && all_selected {
                     for id in &ids {
                         data.selection.remove(id);
                     }
-                } else {
+                } else if append_mode {
                     data.selection.extend(ids);
                 }
             } else if !event.mods.shift() {
@@ -203,6 +213,9 @@ impl MouseDelegate<EditSession> for Select {
     }
 
     fn left_drag_began(&mut self, drag: Drag, data: &mut EditSession) {
+        if matches!(self.drag, DragState::Suppress) {
+            return;
+        }
         // if we're starting a rectangular selection, we save the previous selection
         let sel = data.hit_test_all(drag.start.pos, None);
         let is_dragging_item = sel.is_some();
@@ -253,6 +266,7 @@ impl MouseDelegate<EditSession> for Select {
             DragState::MoveHandle => {
                 data.update_handle(drag.current.pos, drag.current.mods.shift());
             }
+            DragState::Suppress => (),
             DragState::None => unreachable!("invalid state"),
         }
 
