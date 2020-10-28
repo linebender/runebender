@@ -136,7 +136,7 @@ impl<'a> Iterator for PathSelectionIter<'a> {
         let path_id = self.inner[self.idx];
         let end_idx = self.inner[self.idx..]
             .iter()
-            .position(|p| p.parent_eq(path_id))
+            .position(|p| !p.parent_eq(path_id))
             .map(|idx| idx + self.idx)
             .unwrap_or_else(|| self.inner.len());
         let range = self.idx..end_idx;
