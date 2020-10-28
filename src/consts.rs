@@ -102,6 +102,9 @@ pub mod cmd {
     /// Sent from the coord panel when a coordinate is manually edited.
     pub const NUDGE_SELECTION: Selector<DVec2> = Selector::new("runebender.editor-nudge-selection");
 
+    /// Sent from the sidebearing panel when an edit occurs.
+    pub const NUDGE_EVERYTHING: Selector<DVec2> = Selector::new("runebender.editor.nudge-it-all");
+
     /// Sent from the coord panel when the selection bbox is manually edited.
     pub const SCALE_SELECTION: Selector<ScaleSelectionArgs> =
         Selector::new("runebender.editor-scale-selection");

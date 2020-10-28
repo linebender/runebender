@@ -608,6 +608,17 @@ impl Path {
         self.transform_points(points, affine, DPoint::ZERO);
     }
 
+    pub(crate) fn nudge_all_points(&mut self, v: DVec2) {
+        let affine = Affine::translate(v.to_raw());
+        for idx in 0..self.points.len() {
+            self.transform_point(idx, affine, DPoint::ZERO);
+        }
+        if let Some(trailing) = self.trailing.as_mut() {
+            let new_trailing = affine * trailing.to_raw();
+            *trailing = DPoint::from_raw(new_trailing);
+        }
+    }
+
     /// Apply the provided transform to all selected points, updating handles as
     /// appropriate.
     ///

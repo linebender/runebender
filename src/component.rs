@@ -4,6 +4,7 @@ use druid::kurbo::Affine;
 use druid::Data;
 use norad::GlyphName;
 
+use crate::design_space::DVec2;
 use crate::path::EntityId;
 
 #[derive(Debug, Data, Clone)]
@@ -39,5 +40,10 @@ impl Component {
             transform,
             identifier,
         }
+    }
+
+    pub(crate) fn nudge(&mut self, delta: DVec2) {
+        let [a, b, c, d, t_x, t_y] = self.transform.as_coeffs();
+        self.transform = Affine::new([a, b, c, d, t_x + delta.x, t_y + delta.y]);
     }
 }
