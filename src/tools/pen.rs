@@ -15,7 +15,7 @@ pub struct Pen {
 
 impl MouseDelegate<EditSession> for Pen {
     fn cancel(&mut self, canvas: &mut EditSession) {
-        canvas.selection.clear();
+        canvas.selection_mut().clear();
     }
 
     fn left_down(&mut self, event: &MouseEvent, data: &mut EditSession) {
@@ -30,7 +30,7 @@ impl MouseDelegate<EditSession> for Pen {
                             let start = path.start_point().id;
                             self.this_edit_type = Some(EditType::Normal);
                             path.close();
-                            data.selection.select_one(start);
+                            data.set_selection_one(start);
                             self.is_draggable = true;
                             return;
                         }
@@ -66,7 +66,7 @@ impl MouseDelegate<EditSession> for Pen {
         } else if event.count == 2 {
             // This is not what Glyphs does; rather, it sets the currently active
             // point to non-smooth.
-            data.selection.clear();
+            data.selection_mut().clear();
         }
     }
 

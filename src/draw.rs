@@ -1,5 +1,6 @@
 //! Drawing algorithms and helpers
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use crate::component::Component;
@@ -7,9 +8,7 @@ use crate::data::{FontMetrics, Workspace};
 use crate::design_space::ViewPort;
 use crate::edit_session::EditSession;
 use crate::guides::{Guide, GuideLine};
-use crate::path::{Path, PathSeg, PointType};
-use crate::selection::Selection;
-
+use crate::path::{EntityId, Path, PathSeg, PointType};
 use druid::kurbo::{self, Affine, BezPath, Circle, CubicBez, Line, Point, Rect, Vec2};
 use druid::piet::{Color, Piet, RenderContext};
 use druid::PaintCtx;
@@ -121,7 +120,7 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         }
     }
 
-    fn draw_guides(&mut self, guides: &[Guide], sels: &Selection) {
+    fn draw_guides(&mut self, guides: &[Guide], sels: &BTreeSet<EntityId>) {
         //eprintln!("drawing {} guides", guides.len());
         //let view_origin = self.space.transform().inverse() * Point::new(0., 0.);
         //let Point { x, y } = view_origin.round();
@@ -171,7 +170,7 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         }
     }
 
-    fn draw_selected_segments(&mut self, path: &Path, sels: &Selection) {
+    fn draw_selected_segments(&mut self, path: &Path, sels: &BTreeSet<EntityId>) {
         //FIXME: this is less efficient than it could be; we create and
         //check all segments of all paths, and we could at least just keep track
         //of whether a path contained *any* selected points, and short-circuit.
@@ -338,11 +337,16 @@ struct PointIter<'a> {
     vport: ViewPort,
     path: &'a Path,
     bez: &'a BezPath,
-    sels: &'a Selection,
+    sels: &'a BTreeSet<EntityId>,
 }
 
 impl<'a> PointIter<'a> {
-    fn new(path: &'a Path, vport: ViewPort, bez: &'a BezPath, sels: &'a Selection) -> Self {
+    fn new(
+        path: &'a Path,
+        vport: ViewPort,
+        bez: &'a BezPath,
+        sels: &'a BTreeSet<EntityId>,
+    ) -> Self {
         PointIter {
             idx: 0,
             vport,

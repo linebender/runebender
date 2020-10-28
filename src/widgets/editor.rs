@@ -143,7 +143,7 @@ impl Editor {
     fn handle_cmd(&mut self, cmd: &Command, data: &mut EditorState) -> (bool, Option<EditType>) {
         match cmd {
             c if c.is(consts::cmd::SELECT_ALL) => data.session_mut().select_all(),
-            c if c.is(consts::cmd::DESELECT_ALL) => data.session_mut().selection.clear(),
+            c if c.is(consts::cmd::DESELECT_ALL) => data.session_mut().clear_selection(),
             c if c.is(consts::cmd::DELETE) => data.session_mut().delete_selection(),
             c if c.is(consts::cmd::TOGGLE_PREVIEW_TOOL) => {
                 let is_mouse_down: &bool = cmd.get_unchecked(consts::cmd::TOGGLE_PREVIEW_TOOL);
@@ -274,7 +274,7 @@ impl Widget<EditorState> for Editor {
                 }
             }
             Event::KeyDown(k) if k.key == KbKey::Escape => {
-                data.session_mut().selection.clear();
+                data.session_mut().clear_selection();
                 None
             }
             Event::KeyDown(k) => self.tool.key_down(k, ctx, data.session_mut(), env),
