@@ -199,6 +199,12 @@ impl Editor {
                 data.session_mut().nudge_selection(*nudge);
                 return (true, Some(EditType::Normal));
             }
+            c if c.is(consts::cmd::NUDGE_EVERYTHING) => {
+                let nudge = c.get_unchecked(consts::cmd::NUDGE_EVERYTHING);
+                data.session_mut().nudge_everything(*nudge);
+                return (true, Some(EditType::Normal));
+            }
+
             c if c.is(consts::cmd::SCALE_SELECTION) => {
                 let consts::cmd::ScaleSelectionArgs { scale, origin } =
                     c.get_unchecked(consts::cmd::SCALE_SELECTION);

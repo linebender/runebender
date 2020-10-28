@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use druid::kurbo::{BezPath, Point, Rect, Size};
+use druid::kurbo::{BezPath, Point, Rect, Shape, Size};
 use druid::{Data, Lens, WindowId};
 use norad::glyph::{Contour, ContourPoint, Glyph, GlyphName, PointType};
 use norad::{FontInfo, Ufo};
@@ -99,6 +99,13 @@ pub struct EditorState {
     pub metrics: FontMetrics,
     pub font: Workspace,
     pub session: Arc<EditSession>,
+}
+
+/// A type constructed by a lens to represent our sidebearings.
+#[derive(Debug, Clone, Data, Lens)]
+pub struct Sidebearings {
+    pub left: f64,
+    pub right: f64,
 }
 
 impl Workspace {
@@ -359,6 +366,10 @@ impl GlyphDetail {
 }
 
 impl EditorState {
+    /// a lens to return info on the current selection
+    #[allow(non_upper_case_globals)]
+    pub const sidebearings: lenses::Sidebearings = lenses::Sidebearings;
+
     /// The bounds of the metric square, in design space. (0, 0) is at the
     /// left edge of the baseline, and y is up.
     pub(crate) fn layout_bounds(&self) -> Rect {
@@ -375,6 +386,21 @@ impl EditorState {
 
     pub fn session_mut(&mut self) -> &mut EditSession {
         Arc::make_mut(&mut self.session)
+    }
+
+    fn compute_sidebearings(&self) -> Sidebearings {
+        let content_region = self
+            .font
+            .get_bezier(&self.session.name)
+            .map(|p| p.bounding_box())
+            .unwrap_or_default();
+        let layout_bounds = self.layout_bounds();
+        // the content region if it contains components and a scale transform
+        // can need rounding.
+        let left = content_region.min_x().round();
+        let right = layout_bounds.width() - content_region.max_x().round();
+
+        Sidebearings { left, right }
     }
 }
 
@@ -506,7 +532,8 @@ mod lenses {
     use norad::GlyphName as GlyphName_;
 
     use super::{
-        EditorState as EditorState_, GlyphDetail, GridGlyph as GridGlyph_, SessionId, Workspace,
+        EditorState as EditorState_, GlyphDetail, GridGlyph as GridGlyph_, SessionId,
+        Sidebearings as Sidebearings_, Workspace,
     };
 
     /// Workspace -> EditorState
@@ -526,6 +553,8 @@ mod lenses {
 
     pub struct Advance;
 
+    pub struct Sidebearings;
+
     impl Lens<Workspace, EditorState_> for EditorState {
         fn with<V, F: FnOnce(&EditorState_) -> V>(&self, data: &Workspace, f: F) -> V {
             let metrics = data.info.metrics.clone();
@@ -537,7 +566,6 @@ mod lenses {
             };
             f(&glyph)
         }
-
         fn with_mut<V, F: FnOnce(&mut EditorState_) -> V>(&self, data: &mut Workspace, f: F) -> V {
             //FIXME: this is creating a new copy and then throwing it away
             //this is just so that the signatures work for now, we aren't actually doing any
@@ -560,6 +588,22 @@ mod lenses {
                 data.invalidate_path(&name);
             }
             v
+        }
+    }
+
+    impl Lens<EditorState_, Sidebearings_> for Sidebearings {
+        fn with<V, F: FnOnce(&Sidebearings_) -> V>(&self, data: &EditorState_, f: F) -> V {
+            let sidebearings = data.compute_sidebearings();
+            f(&sidebearings)
+        }
+
+        fn with_mut<V, F: FnOnce(&mut Sidebearings_) -> V>(
+            &self,
+            data: &mut EditorState_,
+            f: F,
+        ) -> V {
+            let mut sidebearings = data.compute_sidebearings();
+            f(&mut sidebearings)
         }
     }
 

@@ -7,7 +7,10 @@ use crate::consts;
 use crate::data::{AppState, EditorState};
 use crate::edit_session::EditSession;
 use crate::menus;
-use crate::widgets::{CoordPane, FloatingPanel, Toolbar};
+use crate::widgets::{CoordPane, FloatingPanel, GlyphPane, Toolbar};
+
+/// the distance from the edge of a floating panel to the edge of the window.
+const FLOATING_PANEL_PADDING: f64 = 20.0;
 
 /// A widget that wraps all root widgets
 #[derive(Debug, Default)]
@@ -53,6 +56,7 @@ pub struct EditorController<W> {
     inner: W,
     toolbar: WidgetPod<(), FloatingPanel<Toolbar>>,
     coord_panel: WidgetPod<EditorState, FloatingPanel<Box<dyn Widget<EditorState>>>>,
+    glyph_panel: WidgetPod<EditorState, FloatingPanel<Box<dyn Widget<EditorState>>>>,
 }
 
 impl<W> EditorController<W> {
@@ -65,6 +69,7 @@ impl<W> EditorController<W> {
                     .lens(EditorState::session.then(EditSession::selected_coord.in_arc()))
                     .boxed(),
             )),
+            glyph_panel: WidgetPod::new(FloatingPanel::new(GlyphPane::new().boxed())),
         }
     }
 }
@@ -83,6 +88,7 @@ impl<W: Widget<EditorState>> Widget<EditorState> for EditorController<W> {
         }
         self.toolbar.event(ctx, event, &mut (), env);
         self.coord_panel.event(ctx, event, data, env);
+        self.glyph_panel.event(ctx, event, data, env);
         if !ctx.is_handled() {
             self.inner.event(ctx, event, data, env);
         }
@@ -104,6 +110,7 @@ impl<W: Widget<EditorState>> Widget<EditorState> for EditorController<W> {
         }
         self.toolbar.lifecycle(ctx, event, &(), env);
         self.coord_panel.lifecycle(ctx, event, data, env);
+        self.glyph_panel.lifecycle(ctx, event, data, env);
         self.inner.lifecycle(ctx, event, data, env);
     }
 
@@ -115,6 +122,7 @@ impl<W: Widget<EditorState>> Widget<EditorState> for EditorController<W> {
         env: &Env,
     ) {
         self.coord_panel.update(ctx, data, env);
+        self.glyph_panel.update(ctx, data, env);
         self.inner.update(ctx, old_data, data, env);
     }
 
@@ -127,27 +135,33 @@ impl<W: Widget<EditorState>> Widget<EditorState> for EditorController<W> {
     ) -> Size {
         let child_bc = bc.loosen();
         let size = self.toolbar.layout(ctx, &child_bc, &(), env);
+        let orig = (FLOATING_PANEL_PADDING, FLOATING_PANEL_PADDING);
         self.toolbar
-            .set_layout_rect(ctx, &(), env, Rect::from_origin_size((20.0, 20.0), size));
+            .set_layout_rect(ctx, &(), env, Rect::from_origin_size(orig, size));
         let our_size = self.inner.layout(ctx, bc, data, env);
         let coords_size = self.coord_panel.layout(ctx, &child_bc, data, env);
         let coords_origin = (
             (our_size.width / 2.0) - coords_size.width / 2.0,
             our_size.height - coords_size.height - 20.0,
         );
-        self.coord_panel.set_layout_rect(
-            ctx,
-            data,
-            env,
-            Rect::from_origin_size(coords_origin, coords_size),
-        );
+        let coord_frame = Rect::from_origin_size(coords_origin, coords_size);
+        self.coord_panel
+            .set_layout_rect(ctx, data, env, coord_frame);
 
+        let size = self.glyph_panel.layout(ctx, &child_bc, data, env);
+        let orig = (
+            FLOATING_PANEL_PADDING,
+            our_size.height - size.height - FLOATING_PANEL_PADDING,
+        );
+        let frame = Rect::from_origin_size(orig, size);
+        self.glyph_panel.set_layout_rect(ctx, data, env, frame);
         our_size
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &EditorState, env: &Env) {
         self.inner.paint(ctx, data, env);
         self.coord_panel.paint(ctx, data, env);
+        self.glyph_panel.paint(ctx, data, env);
         self.toolbar.paint(ctx, &(), env);
     }
 }

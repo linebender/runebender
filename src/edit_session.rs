@@ -85,6 +85,7 @@ impl EditSession {
             .map(|guides| guides.iter().map(Guide::from_norad).collect())
             .unwrap_or_default();
 
+        //FIXME: this is never updated, and shouldn't be relied on
         let work_bounds = glyphs
             .get_bezier(&name)
             .map(|b| b.bounding_box())
@@ -139,6 +140,10 @@ impl EditSession {
 
     pub fn paths_mut(&mut self) -> &mut Vec<Path> {
         Arc::make_mut(&mut self.paths)
+    }
+
+    pub fn components_mut(&mut self) -> &mut Vec<Component> {
+        Arc::make_mut(&mut self.components)
     }
 
     pub fn guides_mut(&mut self) -> &mut Vec<Guide> {
@@ -450,6 +455,15 @@ impl EditSession {
                     }
                 }
             }
+        }
+    }
+
+    pub(crate) fn nudge_everything(&mut self, nudge: DVec2) {
+        for path in self.paths_mut() {
+            path.nudge_all_points(nudge);
+        }
+        for component in self.components_mut() {
+            component.nudge(nudge);
         }
     }
 
