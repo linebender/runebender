@@ -421,7 +421,7 @@ fn split_path_at_intersections(path: &Path, start: Hit, end: Hit) -> (Path, Path
 /// set tangent handles, set correct parent ids, and construct the path
 fn finalize_path(mut points: Vec<PathPoint>, parent_id: usize, closed: bool) -> Path {
     crate::path::mark_tangent_handles(&mut points);
-    points.iter_mut().for_each(|p| p.id.parent = parent_id);
+    points.iter_mut().for_each(|p| p.id.set_parent(parent_id));
     if closed {
         points.rotate_left(1);
     }

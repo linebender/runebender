@@ -258,7 +258,7 @@ impl EditSession {
     fn active_path_idx(&self) -> Option<usize> {
         if self.selection.len() == 1 {
             let active = self.selection.iter().next().unwrap();
-            self.paths.iter().position(|p| *p == *active)
+            self.paths.iter().position(|p| p.contains(active))
         } else {
             None
         }
@@ -279,18 +279,22 @@ impl EditSession {
     }
 
     pub fn path_point_for_id(&self, id: EntityId) -> Option<PathPoint> {
-        self.paths
-            .iter()
-            .find(|p| **p == id)
+        self.path_for_point(id)
             .and_then(|path| path.path_point_for_id(id))
     }
 
     pub fn path_for_point(&self, point: EntityId) -> Option<&Path> {
-        self.paths.iter().find(|p| **p == point)
+        self.path_idx_for_point(point)
+            .and_then(|idx| self.paths.get(idx))
     }
 
     pub fn path_for_point_mut(&mut self, point: EntityId) -> Option<&mut Path> {
-        self.paths_mut().iter_mut().find(|p| **p == point)
+        let idx = self.path_idx_for_point(point)?;
+        self.paths_mut().get_mut(idx)
+    }
+
+    fn path_idx_for_point(&self, point: EntityId) -> Option<usize> {
+        self.paths.iter().position(|p| p.contains(&point))
     }
 
     fn new_path(&mut self, start: Point) {
@@ -391,9 +395,7 @@ impl EditSession {
         let id = self.selection.iter().next().copied().unwrap();
         self.selection_mut().clear();
         let id = self
-            .paths
-            .iter()
-            .find(|p| **p == id)
+            .path_for_point(id)
             .map(|path| path.next_point(id).id)
             .unwrap_or(id);
         self.selection_mut().insert(id);
@@ -408,9 +410,7 @@ impl EditSession {
         let id = self.selection.iter().next().copied().unwrap();
         self.selection_mut().clear();
         let id = self
-            .paths
-            .iter()
-            .find(|p| **p == id)
+            .path_for_point(id)
             .map(|path| path.prev_point(id).id)
             .unwrap_or(id);
         self.selection_mut().insert(id);
@@ -497,7 +497,7 @@ impl EditSession {
     pub(crate) fn reverse_contours(&mut self) {
         let mut path_ixs = BTreeSet::new();
         for entity in &*self.selection {
-            if let Some(path_ix) = self.paths.iter().position(|p| p == entity) {
+            if let Some(path_ix) = self.path_idx_for_point(*entity) {
                 path_ixs.insert(path_ix);
             }
         }
@@ -598,10 +598,10 @@ impl<'a> Iterator for PathSelectionIter<'a> {
         if self.idx >= self.inner.len() {
             return None;
         }
-        let path_id = self.inner[self.idx].parent;
+        let path_id = self.inner[self.idx];
         let end_idx = self.inner[self.idx..]
             .iter()
-            .position(|p| p.parent != path_id)
+            .position(|p| p.parent_eq(path_id))
             .map(|idx| idx + self.idx)
             .unwrap_or_else(|| self.inner.len());
         let range = self.idx..end_idx;
