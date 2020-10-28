@@ -20,9 +20,16 @@ pub fn next_id() -> usize {
 }
 
 #[derive(Debug, Clone, Copy, Data, PartialEq, PartialOrd, Hash, Eq, Ord)]
+/// A unique identifier for some entity, such as a point or a component.
+///
+/// The entity has two parts; the first ('parent') identifies the type of the
+/// entity or the identity of its containing path (for points) and the second
+/// ('child') identifies the item itself.
+///
+/// A given id will be unique across the application at any given time.
 pub struct EntityId {
-    pub(crate) parent: usize,
-    pub(crate) point: usize,
+    parent: usize,
+    point: usize,
 }
 
 #[derive(Debug, Clone, Copy, Data, PartialEq)]
@@ -98,17 +105,14 @@ impl EntityId {
     pub fn is_guide(self) -> bool {
         self.parent == GUIDE_TYPE_ID
     }
-}
 
-impl std::cmp::PartialEq<Path> for EntityId {
-    fn eq(&self, other: &Path) -> bool {
-        self.parent == other.id
+    pub(crate) fn parent_eq(self, other: EntityId) -> bool {
+        self.parent == other.parent
     }
-}
 
-impl std::cmp::PartialEq<EntityId> for Path {
-    fn eq(&self, other: &EntityId) -> bool {
-        self.id == other.parent
+    // should only be used for things like splitting paths
+    pub(crate) fn set_parent(&mut self, parent: usize) {
+        self.parent = parent;
     }
 }
 
@@ -346,6 +350,13 @@ impl Path {
 
     pub fn id(&self) -> usize {
         self.id
+    }
+
+    // this will return `true` if passed an entity that does not actually
+    // exist in this path but has the same parent id, such as for a point
+    // that has been deleted. I don't think this is an issue in practice?
+    pub(crate) fn contains(&self, id: &EntityId) -> bool {
+        id.parent == self.id()
     }
 
     pub fn is_closed(&self) -> bool {
