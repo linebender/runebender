@@ -177,7 +177,6 @@ fn build_widget() -> impl Widget<CoordinateSelection> {
                             .with_font(coord_label_font.clone())
                             .with_text_color(theme::SECONDARY_TEXT_COLOR),
                     )
-                    .with_spacer(4.0)
                     .with_child(
                         EditableLabel::parse()
                             .with_font(theme::UI_DETAIL_FONT)
@@ -192,7 +191,6 @@ fn build_widget() -> impl Widget<CoordinateSelection> {
                             .with_font(coord_label_font)
                             .with_text_color(theme::SECONDARY_TEXT_COLOR),
                     )
-                    .with_spacer(4.0)
                     .with_child(
                         EditableLabel::parse()
                             .with_font(theme::UI_DETAIL_FONT)
