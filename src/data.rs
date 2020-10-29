@@ -365,10 +365,12 @@ impl GlyphDetail {
     }
 }
 
+#[allow(non_upper_case_globals)]
 impl EditorState {
     /// a lens to return info on the current selection
-    #[allow(non_upper_case_globals)]
     pub const sidebearings: lenses::Sidebearings = lenses::Sidebearings;
+
+    pub const detail_glyph: lenses::EditorGlyph = lenses::EditorGlyph;
 
     /// The bounds of the metric square, in design space. (0, 0) is at the
     /// left edge of the baseline, and y is up.
@@ -545,6 +547,9 @@ mod lenses {
     /// Workspace -> GlyphPlus
     pub struct SelectedGlyph;
 
+    /// EditorState -> GlyphDetail
+    pub struct EditorGlyph;
+
     /// GlyphPlus => GlyphName_
     pub struct GlyphName;
 
@@ -607,65 +612,36 @@ mod lenses {
         }
     }
 
-    impl Lens<Workspace, Option<GridGlyph_>> for GridGlyph {
-        fn with<V, F: FnOnce(&Option<GridGlyph_>) -> V>(&self, data: &Workspace, f: F) -> V {
-            let outline = data.get_bezier(&self.0);
-
-            let is_selected = data.selected.as_ref() == Some(&self.0);
-            let glyph = Some(GridGlyph_ {
-                name: self.0.clone(),
-                is_placeholder: outline.is_none(),
-                outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
-                upm: data.units_per_em(),
-                is_selected,
-            });
-            f(&glyph)
-        }
-
-        fn with_mut<V, F: FnOnce(&mut Option<GridGlyph_>) -> V>(
-            &self,
-            data: &mut Workspace,
-            f: F,
-        ) -> V {
-            let outline = data.get_bezier(&self.0);
-            let is_selected = data.selected.as_ref() == Some(&self.0);
-            let mut glyph = Some(GridGlyph_ {
-                name: self.0.clone(),
-                is_placeholder: outline.is_none(),
-                outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
-                upm: data.units_per_em(),
-                is_selected,
-            });
-            let r = f(&mut glyph);
-            // we track selections by having the grid item set this flag,
-            // and then we propogate that up to the workspace here.
-            if glyph.as_ref().map(|g| g.is_selected).unwrap_or(false) {
-                data.selected = Some(self.0.clone());
+    impl EditorGlyph {
+        fn make_data(state: &EditorState_) -> GlyphDetail {
+            let glyph = state.session.glyph.clone();
+            let outline = state.font.get_bezier(&glyph.name);
+            let is_placeholder = outline.is_none();
+            let metrics = state.font.info.metrics.clone();
+            GlyphDetail {
+                glyph,
+                outline: outline.unwrap_or_else(|| state.font.font.placeholder.clone()),
+                is_placeholder,
+                metrics,
             }
-            r
         }
     }
 
-    impl Lens<GlyphDetail, Option<char>> for Codepoint {
-        fn with<V, F: FnOnce(&Option<char>) -> V>(&self, data: &GlyphDetail, f: F) -> V {
-            let c = data.get_codepoint();
-            f(&c)
+    impl Lens<EditorState_, GlyphDetail> for EditorGlyph {
+        fn with<V, F: FnOnce(&GlyphDetail) -> V>(&self, data: &EditorState_, f: F) -> V {
+            let g = EditorGlyph::make_data(data);
+            f(&g)
         }
 
-        fn with_mut<V, F: FnOnce(&mut Option<char>) -> V>(
+        fn with_mut<V, F: FnOnce(&mut GlyphDetail) -> V>(
             &self,
-            data: &mut GlyphDetail,
+            data: &mut EditorState_,
             f: F,
         ) -> V {
-            let mut c = data.get_codepoint();
-            let r = f(&mut c);
-            let old = data.get_codepoint();
-            if c != old {
-                let glyph = Arc::make_mut(&mut data.glyph);
-                match c {
-                    Some(c) => glyph.codepoints = Some(vec![c]),
-                    None => glyph.codepoints = None,
-                }
+            let mut g = EditorGlyph::make_data(data);
+            let r = f(&mut g);
+            if !g.glyph.same(&data.session.glyph) {
+                data.session_mut().update_glyph_metadata(&g.glyph);
             }
             r
         }
@@ -724,6 +700,70 @@ mod lenses {
                 if !is_same {
                     data.update_glyph_metadata(&selected.glyph);
                     data.selected = Some(selected.glyph.name.clone());
+                }
+            }
+            r
+        }
+    }
+
+    impl Lens<Workspace, Option<GridGlyph_>> for GridGlyph {
+        fn with<V, F: FnOnce(&Option<GridGlyph_>) -> V>(&self, data: &Workspace, f: F) -> V {
+            let outline = data.get_bezier(&self.0);
+
+            let is_selected = data.selected.as_ref() == Some(&self.0);
+            let glyph = Some(GridGlyph_ {
+                name: self.0.clone(),
+                is_placeholder: outline.is_none(),
+                outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
+                upm: data.units_per_em(),
+                is_selected,
+            });
+            f(&glyph)
+        }
+
+        fn with_mut<V, F: FnOnce(&mut Option<GridGlyph_>) -> V>(
+            &self,
+            data: &mut Workspace,
+            f: F,
+        ) -> V {
+            let outline = data.get_bezier(&self.0);
+            let is_selected = data.selected.as_ref() == Some(&self.0);
+            let mut glyph = Some(GridGlyph_ {
+                name: self.0.clone(),
+                is_placeholder: outline.is_none(),
+                outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
+                upm: data.units_per_em(),
+                is_selected,
+            });
+            let r = f(&mut glyph);
+            // we track selections by having the grid item set this flag,
+            // and then we propogate that up to the workspace here.
+            if glyph.as_ref().map(|g| g.is_selected).unwrap_or(false) {
+                data.selected = Some(self.0.clone());
+            }
+            r
+        }
+    }
+
+    impl Lens<GlyphDetail, Option<char>> for Codepoint {
+        fn with<V, F: FnOnce(&Option<char>) -> V>(&self, data: &GlyphDetail, f: F) -> V {
+            let c = data.get_codepoint();
+            f(&c)
+        }
+
+        fn with_mut<V, F: FnOnce(&mut Option<char>) -> V>(
+            &self,
+            data: &mut GlyphDetail,
+            f: F,
+        ) -> V {
+            let mut c = data.get_codepoint();
+            let r = f(&mut c);
+            let old = data.get_codepoint();
+            if c != old {
+                let glyph = Arc::make_mut(&mut data.glyph);
+                match c {
+                    Some(c) => glyph.codepoints = Some(vec![c]),
+                    None => glyph.codepoints = None,
                 }
             }
             r
