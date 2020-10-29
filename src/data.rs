@@ -70,7 +70,7 @@ pub(crate) struct GridGlyph {
 pub struct GlyphDetail {
     pub glyph: Arc<Glyph>,
     // the full outline, including things like components
-    outline: Arc<BezPath>,
+    pub outline: Arc<BezPath>,
     metrics: FontMetrics,
     is_placeholder: bool,
 }
@@ -80,16 +80,6 @@ pub struct SimpleFontInfo {
     metrics: FontMetrics,
     pub family_name: Arc<str>,
     pub style_name: Arc<str>,
-}
-
-impl Default for SimpleFontInfo {
-    fn default() -> Self {
-        SimpleFontInfo {
-            metrics: Default::default(),
-            family_name: "".into(),
-            style_name: "".into(),
-        }
-    }
 }
 
 /// Things in `FontInfo` that are relevant while editing or drawing.
@@ -356,6 +346,12 @@ impl GlyphDetail {
             .cloned()
     }
 
+    /// The bounds of the metric square, in design space. (0, 0) is at the
+    /// left edge of the baseline, and y is up.
+    pub(crate) fn layout_bounds(&self) -> Rect {
+        layout_bounds(&self.glyph, &self.metrics)
+    }
+
     /// The upm for the font this glyph belongs to.
     pub fn upm(&self) -> f64 {
         self.metrics.units_per_em
@@ -363,28 +359,10 @@ impl GlyphDetail {
 }
 
 impl EditorState {
-    /// Returns a rect representing the metric bounds of this glyph; that is,
-    /// taking into account the font metrics (ascender, descender) as well as the
-    /// glyph's width.
-    ///
-    /// This rect is in the same coordinate space as the glyph; the origin
-    /// is at the intersection of the baseline and the left sidebearing,
-    /// and y is up.
-    fn layout_bounds(&self) -> Rect {
-        let upm = self.metrics.units_per_em;
-        let ascender = self.metrics.ascender.unwrap_or(upm * 0.8);
-        let descender = self.metrics.descender.unwrap_or(upm * -0.2);
-        let width = self
-            .session
-            .glyph
-            .advance
-            .as_ref()
-            .map(|a| a.width as f64)
-            .unwrap_or(upm * 0.5);
-
-        let work_size = Size::new(width, ascender + descender.abs());
-        let work_origin = Point::new(0., descender);
-        Rect::from_origin_size(work_origin, work_size)
+    /// The bounds of the metric square, in design space. (0, 0) is at the
+    /// left edge of the baseline, and y is up.
+    pub(crate) fn layout_bounds(&self) -> Rect {
+        layout_bounds(&self.session.glyph, &self.metrics)
     }
 
     /// Returns a `Rect` representing, in the coordinate space of the canvas,
@@ -478,6 +456,16 @@ impl SimpleFontInfo {
                 .as_ref()
                 .map(FontMetrics::from)
                 .unwrap_or_default(),
+        }
+    }
+}
+
+impl Default for SimpleFontInfo {
+    fn default() -> Self {
+        SimpleFontInfo {
+            metrics: Default::default(),
+            family_name: "".into(),
+            style_name: "".into(),
         }
     }
 }
@@ -802,6 +790,24 @@ pub(crate) fn path_for_glyph(glyph: &Glyph) -> Option<BezPath> {
     } else {
         None
     }
+}
+
+/// Returns a rect representing the metric bounds of this glyph; that is,
+/// taking into account the font metrics (ascender, descender) as well as the
+/// glyph's width.
+///
+/// This rect is in the same coordinate space as the glyph: y is up, and
+/// (0, 0)  is at the intersection of the baseline and the left sidebearing.
+fn layout_bounds(glyph: &Glyph, metrics: &FontMetrics) -> Rect {
+    let upm = metrics.units_per_em;
+    let ascender = metrics.ascender.unwrap_or(upm * 0.8);
+    let descender = metrics.descender.unwrap_or(upm * -0.2);
+    let width = glyph.advance.as_ref().map(|a| a.width as f64);
+    let width = width.unwrap_or(upm / 2.0);
+
+    let work_size = Size::new(width, ascender + descender.abs());
+    let work_origin = Point::new(0., descender);
+    Rect::from_origin_size(work_origin, work_size)
 }
 
 /// a poorly drawn question mark glyph, used as a placeholder

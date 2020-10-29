@@ -2,7 +2,7 @@
 
 use druid::kurbo::Line;
 use druid::{
-    Affine, BoxConstraints, Color, Data, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx,
+    BoxConstraints, Color, Data, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx,
     PaintCtx, Rect, RenderContext, Size, UpdateCtx, Widget, WidgetPod,
 };
 
@@ -12,10 +12,13 @@ use norad::GlyphName;
 
 use crate::data::{GlyphDetail, Workspace};
 use crate::theme;
-use crate::widgets::{EditableLabel, Maybe};
+use crate::widgets::{EditableLabel, GlyphPainter, Maybe};
 
 const SELECTED_GLYPH_BOTTOM_PADDING: f64 = 10.0;
-const SELECTED_GLYPH_HEIGHT: f64 = 220.0;
+const SELECTED_GLYPH_HEIGHT: f64 = 100.0;
+
+// So that accents don't paint too much over other widgets
+const GLYPH_TOP_PADDING: f64 = SELECTED_GLYPH_HEIGHT * 0.2;
 
 pub struct Sidebar {
     selected_glyph: WidgetPod<Workspace, Box<dyn Widget<Workspace>>>,
@@ -50,7 +53,8 @@ fn selected_glyph_widget() -> impl Widget<GlyphDetail> {
             )
             .lens(GlyphDetail::codepoint),
         )
-        .with_flex_child(GlyphPainter::new(), 1.0)
+        .with_spacer(GLYPH_TOP_PADDING)
+        .with_child(GlyphPainter::new().fix_height(SELECTED_GLYPH_HEIGHT))
         .with_child(
             EditableLabel::parse()
                 .fix_width(45.)
@@ -82,7 +86,6 @@ impl Sidebar {
                     || SizedBox::empty().expand_width().boxed(),
                 )
                 .lens(Workspace::selected_glyph)
-                .fix_height(SELECTED_GLYPH_HEIGHT)
                 .background(Color::grey8(0xCC))
                 .boxed(),
             ),
@@ -137,70 +140,6 @@ impl Widget<Workspace> for Sidebar {
         let max_x = rect.max_x() - 0.5;
         let line = Line::new((max_x, 0.0), (max_x, rect.max_y()));
         ctx.stroke(line, &env.get(theme::SIDEBAR_EDGE_STROKE), 1.0);
-    }
-}
-
-// currently just paints the glyph shape
-struct GlyphPainter;
-
-impl GlyphPainter {
-    pub fn new() -> Self {
-        GlyphPainter
-    }
-}
-
-impl Widget<GlyphDetail> for GlyphPainter {
-    fn event(&mut self, _ctx: &mut EventCtx, _event: &Event, _data: &mut GlyphDetail, _env: &Env) {}
-    fn lifecycle(
-        &mut self,
-        _ctx: &mut LifeCycleCtx,
-        _event: &LifeCycle,
-        _data: &GlyphDetail,
-        _env: &Env,
-    ) {
-    }
-    fn update(
-        &mut self,
-        _ctx: &mut UpdateCtx,
-        _old_data: &GlyphDetail,
-        _data: &GlyphDetail,
-        _env: &Env,
-    ) {
-    }
-    fn layout(
-        &mut self,
-        _ctx: &mut LayoutCtx,
-        bc: &BoxConstraints,
-        _data: &GlyphDetail,
-        _env: &Env,
-    ) -> Size {
-        let width = bc.max().width;
-        bc.constrain(Size::new(width, SELECTED_GLYPH_HEIGHT))
-    }
-
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &GlyphDetail, env: &Env) {
-        let advance = data
-            .glyph
-            .advance
-            .as_ref()
-            .map(|a| a.width as f64)
-            .unwrap_or(data.upm() * 0.5);
-
-        let path = data.get_bezier();
-        let geom = ctx.size().to_rect();
-        let scale = geom.height() as f64 / data.upm();
-        let scaled_width = advance * scale as f64;
-        let l_pad = ((geom.width() as f64 - scaled_width) / 2.).round();
-        let baseline = geom.height() - (geom.height() * 0.16) as f64;
-        let affine = Affine::new([scale as f64, 0.0, 0.0, -scale as f64, l_pad, baseline]);
-
-        let glyph_color = if data.is_placeholder_glyph() {
-            env.get(theme::PLACEHOLDER_GLYPH_COLOR)
-        } else {
-            env.get(theme::PRIMARY_TEXT_COLOR)
-        };
-
-        ctx.fill(affine * &*path, &glyph_color);
     }
 }
 
