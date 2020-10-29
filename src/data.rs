@@ -52,7 +52,7 @@ pub struct FontObject {
 
 /// The data type for a grid square.
 ///
-/// Unlike GlyphPlus, this doesn't have a reference to the glyph itself,
+/// Unlike GlyphDetail, this doesn't have a reference to the glyph itself,
 /// which is expensive to find in large glyphsets.
 #[derive(Debug, Clone, Data, Lens)]
 pub(crate) struct GridGlyph {
@@ -63,14 +63,16 @@ pub(crate) struct GridGlyph {
     pub upm: f64,
 }
 
-/// The currently selected glyph; we need to be able to update fields on
-/// this glyph from side panel.
+/// Detailed information about a specific glyph.
+///
+/// This is used in the sidepanel, as well as in the editor window.
 #[derive(Clone, Data, Lens)]
-pub struct SelectedGlyph {
+pub struct GlyphDetail {
     pub glyph: Arc<Glyph>,
+    // the full outline, including things like components
     outline: Arc<BezPath>,
+    metrics: FontMetrics,
     is_placeholder: bool,
-    units_per_em: f64,
 }
 
 #[derive(Clone, Data, Lens)]
@@ -323,7 +325,7 @@ impl Workspace {
 }
 
 #[allow(non_upper_case_globals)]
-impl SelectedGlyph {
+impl GlyphDetail {
     /// A lens for retrieving the glyph's codepoint
     pub const codepoint: lenses::Codepoint = lenses::Codepoint;
 
@@ -356,7 +358,7 @@ impl SelectedGlyph {
 
     /// The upm for the font this glyph belongs to.
     pub fn upm(&self) -> f64 {
-        self.units_per_em
+        self.metrics.units_per_em
     }
 }
 
@@ -516,8 +518,7 @@ mod lenses {
     use norad::GlyphName as GlyphName_;
 
     use super::{
-        EditorState as EditorState_, GridGlyph as GridGlyph_, SelectedGlyph as SelectedGlyph_,
-        SessionId, Workspace,
+        EditorState as EditorState_, GlyphDetail, GridGlyph as GridGlyph_, SessionId, Workspace,
     };
 
     /// Workspace -> EditorState
@@ -613,15 +614,15 @@ mod lenses {
         }
     }
 
-    impl Lens<SelectedGlyph_, Option<char>> for Codepoint {
-        fn with<V, F: FnOnce(&Option<char>) -> V>(&self, data: &SelectedGlyph_, f: F) -> V {
+    impl Lens<GlyphDetail, Option<char>> for Codepoint {
+        fn with<V, F: FnOnce(&Option<char>) -> V>(&self, data: &GlyphDetail, f: F) -> V {
             let c = data.get_codepoint();
             f(&c)
         }
 
         fn with_mut<V, F: FnOnce(&mut Option<char>) -> V>(
             &self,
-            data: &mut SelectedGlyph_,
+            data: &mut GlyphDetail,
             f: F,
         ) -> V {
             let mut c = data.get_codepoint();
@@ -638,8 +639,8 @@ mod lenses {
         }
     }
 
-    impl Lens<Workspace, Option<SelectedGlyph_>> for SelectedGlyph {
-        fn with<V, F: FnOnce(&Option<SelectedGlyph_>) -> V>(&self, data: &Workspace, f: F) -> V {
+    impl Lens<Workspace, Option<GlyphDetail>> for SelectedGlyph {
+        fn with<V, F: FnOnce(&Option<GlyphDetail>) -> V>(&self, data: &Workspace, f: F) -> V {
             let selected = data.selected.as_ref().map(|name| {
                 let glyph = data
                     .font
@@ -648,17 +649,18 @@ mod lenses {
                     .expect("missing glyph in lens");
                 let outline = data.get_bezier(&glyph.name);
                 let is_placeholder = outline.is_none();
-                SelectedGlyph_ {
+                let metrics = data.info.metrics.clone();
+                GlyphDetail {
                     glyph: Arc::clone(glyph),
                     outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
-                    units_per_em: data.units_per_em(),
+                    metrics,
                     is_placeholder,
                 }
             });
             f(&selected)
         }
 
-        fn with_mut<V, F: FnOnce(&mut Option<SelectedGlyph_>) -> V>(
+        fn with_mut<V, F: FnOnce(&mut Option<GlyphDetail>) -> V>(
             &self,
             data: &mut Workspace,
             f: F,
@@ -671,10 +673,11 @@ mod lenses {
                     .expect("missing glyph in lens");
                 let outline = data.get_bezier(&glyph.name);
                 let is_placeholder = outline.is_none();
-                SelectedGlyph_ {
+                let metrics = data.info.metrics.clone();
+                GlyphDetail {
                     glyph: Arc::clone(glyph),
                     outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
-                    units_per_em: data.units_per_em(),
+                    metrics,
                     is_placeholder,
                 }
             });
@@ -695,14 +698,14 @@ mod lenses {
         }
     }
 
-    impl Lens<SelectedGlyph_, f32> for Advance {
-        fn with<V, F: FnOnce(&f32) -> V>(&self, data: &SelectedGlyph_, f: F) -> V {
+    impl Lens<GlyphDetail, f32> for Advance {
+        fn with<V, F: FnOnce(&f32) -> V>(&self, data: &GlyphDetail, f: F) -> V {
             let advance = data.glyph.advance.as_ref().map(|a| a.width).unwrap_or(0.);
             f(&advance)
         }
 
         #[allow(clippy::float_cmp)]
-        fn with_mut<V, F: FnOnce(&mut f32) -> V>(&self, data: &mut SelectedGlyph_, f: F) -> V {
+        fn with_mut<V, F: FnOnce(&mut f32) -> V>(&self, data: &mut GlyphDetail, f: F) -> V {
             let advance = data.glyph.advance.as_ref().map(|a| a.width).unwrap_or(0.);
             let mut advance2 = advance;
             let result = f(&mut advance2);
@@ -720,16 +723,12 @@ mod lenses {
         }
     }
 
-    impl Lens<SelectedGlyph_, GlyphName_> for GlyphName {
-        fn with<V, F: FnOnce(&GlyphName_) -> V>(&self, data: &SelectedGlyph_, f: F) -> V {
+    impl Lens<GlyphDetail, GlyphName_> for GlyphName {
+        fn with<V, F: FnOnce(&GlyphName_) -> V>(&self, data: &GlyphDetail, f: F) -> V {
             f(&data.glyph.name)
         }
 
-        fn with_mut<V, F: FnOnce(&mut GlyphName_) -> V>(
-            &self,
-            data: &mut SelectedGlyph_,
-            f: F,
-        ) -> V {
+        fn with_mut<V, F: FnOnce(&mut GlyphName_) -> V>(&self, data: &mut GlyphDetail, f: F) -> V {
             // THIS DOESN'T DO ANYTHING! all the mutation happens
             // as a result of the RENAME_GLYPH command.
             let mut s = data.glyph.name.clone();

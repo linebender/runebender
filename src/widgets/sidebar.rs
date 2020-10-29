@@ -10,7 +10,7 @@ use druid::widget::{Controller, Flex, Label, SizedBox, WidgetExt};
 
 use norad::GlyphName;
 
-use crate::data::{SelectedGlyph, Workspace};
+use crate::data::{GlyphDetail, Workspace};
 use crate::theme;
 use crate::widgets::{EditableLabel, Maybe};
 
@@ -21,7 +21,7 @@ pub struct Sidebar {
     selected_glyph: WidgetPod<Workspace, Box<dyn Widget<Workspace>>>,
 }
 
-fn selected_glyph_widget() -> impl Widget<SelectedGlyph> {
+fn selected_glyph_widget() -> impl Widget<GlyphDetail> {
     Flex::column()
         .with_child(
             EditableLabel::new(
@@ -33,7 +33,7 @@ fn selected_glyph_widget() -> impl Widget<SelectedGlyph> {
                 },
             )
             .controller(RenameController)
-            .lens(SelectedGlyph::glyph_name),
+            .lens(GlyphDetail::glyph_name),
         )
         .with_child(
             Maybe::new(
@@ -48,13 +48,13 @@ fn selected_glyph_widget() -> impl Widget<SelectedGlyph> {
                         .with_font(theme::UI_DETAIL_FONT)
                 },
             )
-            .lens(SelectedGlyph::codepoint),
+            .lens(GlyphDetail::codepoint),
         )
         .with_flex_child(GlyphPainter::new(), 1.0)
         .with_child(
             EditableLabel::parse()
                 .fix_width(45.)
-                .lens(SelectedGlyph::advance),
+                .lens(GlyphDetail::advance),
         )
         .with_child(
             Flex::row()
@@ -149,28 +149,21 @@ impl GlyphPainter {
     }
 }
 
-impl Widget<SelectedGlyph> for GlyphPainter {
-    fn event(
-        &mut self,
-        _ctx: &mut EventCtx,
-        _event: &Event,
-        _data: &mut SelectedGlyph,
-        _env: &Env,
-    ) {
-    }
+impl Widget<GlyphDetail> for GlyphPainter {
+    fn event(&mut self, _ctx: &mut EventCtx, _event: &Event, _data: &mut GlyphDetail, _env: &Env) {}
     fn lifecycle(
         &mut self,
         _ctx: &mut LifeCycleCtx,
         _event: &LifeCycle,
-        _data: &SelectedGlyph,
+        _data: &GlyphDetail,
         _env: &Env,
     ) {
     }
     fn update(
         &mut self,
         _ctx: &mut UpdateCtx,
-        _old_data: &SelectedGlyph,
-        _data: &SelectedGlyph,
+        _old_data: &GlyphDetail,
+        _data: &GlyphDetail,
         _env: &Env,
     ) {
     }
@@ -178,14 +171,14 @@ impl Widget<SelectedGlyph> for GlyphPainter {
         &mut self,
         _ctx: &mut LayoutCtx,
         bc: &BoxConstraints,
-        _data: &SelectedGlyph,
+        _data: &GlyphDetail,
         _env: &Env,
     ) -> Size {
         let width = bc.max().width;
         bc.constrain(Size::new(width, SELECTED_GLYPH_HEIGHT))
     }
 
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &SelectedGlyph, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &GlyphDetail, env: &Env) {
         let advance = data
             .glyph
             .advance
