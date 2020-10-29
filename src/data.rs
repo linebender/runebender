@@ -110,6 +110,20 @@ pub struct EditorState {
 }
 
 impl Workspace {
+    /// a lens into a particular editor view.
+    pub(crate) fn editor_state(id: SessionId) -> impl Lens<Workspace, EditorState> {
+        lenses::EditorState(id)
+    }
+
+    /// a lens for getting a `GridGlyph`.
+    pub(crate) fn glyph_grid(name: GlyphName) -> impl Lens<Workspace, Option<GridGlyph>> {
+        lenses::GridGlyph(name)
+    }
+
+    /// A lens or the currently selected glyph
+    #[allow(non_upper_case_globals)]
+    pub(crate) const selected_glyph: lenses::SelectedGlyph = lenses::SelectedGlyph;
+
     pub fn set_file(&mut self, ufo: Ufo, path: impl Into<Option<PathBuf>>) {
         let obj = FontObject {
             path: path.into().map(Into::into),
@@ -308,7 +322,17 @@ impl Workspace {
     }
 }
 
+#[allow(non_upper_case_globals)]
 impl SelectedGlyph {
+    /// A lens for retrieving the glyph's codepoint
+    pub const codepoint: lenses::Codepoint = lenses::Codepoint;
+
+    /// A lens for the glyph's advance.
+    pub const advance: lenses::Advance = lenses::Advance;
+
+    /// A lens for the glyph's name.
+    pub const glyph_name: lenses::GlyphName = lenses::GlyphName;
+
     /// Get the fully resolved (including components) bezier path for this glyph.
     ///
     /// Returns the placeholder glyph if this glyph has no outline.
@@ -322,7 +346,7 @@ impl SelectedGlyph {
     }
 
     /// Returns the first `char` in this glyph's codepoint list.
-    pub fn codepoint(&self) -> Option<char> {
+    pub fn get_codepoint(&self) -> Option<char> {
         self.glyph
             .codepoints
             .as_ref()
@@ -485,241 +509,231 @@ impl Default for FontMetrics {
     }
 }
 
-pub mod lenses {
-    pub mod app_state {
-        use std::sync::Arc;
+mod lenses {
+    use std::sync::Arc;
 
-        use druid::{Data, Lens};
-        use norad::GlyphName as GlyphName_;
+    use druid::{Data, Lens};
+    use norad::GlyphName as GlyphName_;
 
-        use super::super::{
-            EditorState as EditorState_, GridGlyph as GridGlyph_, SelectedGlyph as SelectedGlyph_,
-            SessionId, Workspace,
-        };
+    use super::{
+        EditorState as EditorState_, GridGlyph as GridGlyph_, SelectedGlyph as SelectedGlyph_,
+        SessionId, Workspace,
+    };
 
-        /// Workspace -> EditorState
-        pub struct EditorState(pub SessionId);
+    /// Workspace -> EditorState
+    pub struct EditorState(pub SessionId);
 
-        /// Workspace -> GridGlyph
-        pub struct GridGlyph(pub GlyphName_);
+    /// Workspace -> GridGlyph
+    pub struct GridGlyph(pub GlyphName_);
 
-        /// Workspace -> GlyphPlus
-        pub struct SelectedGlyph;
+    /// Workspace -> GlyphPlus
+    pub struct SelectedGlyph;
 
-        /// GlyphPlus => GlyphName_
-        pub struct GlyphName;
+    /// GlyphPlus => GlyphName_
+    pub struct GlyphName;
 
-        /// GlyphPlus -> char
-        pub struct Codepoint;
+    /// GlyphPlus -> char
+    pub struct Codepoint;
 
-        pub struct Advance;
+    pub struct Advance;
 
-        impl Lens<Workspace, EditorState_> for EditorState {
-            fn with<V, F: FnOnce(&EditorState_) -> V>(&self, data: &Workspace, f: F) -> V {
-                let metrics = data.info.metrics.clone();
-                let session = data.sessions.get(&self.0).cloned().unwrap();
-                let glyph = EditorState_ {
-                    font: data.clone(),
-                    metrics,
-                    session,
-                };
-                f(&glyph)
-            }
-
-            fn with_mut<V, F: FnOnce(&mut EditorState_) -> V>(
-                &self,
-                data: &mut Workspace,
-                f: F,
-            ) -> V {
-                //FIXME: this is creating a new copy and then throwing it away
-                //this is just so that the signatures work for now, we aren't actually doing any
-                let metrics = data.info.metrics.clone();
-                let session = data.sessions.get(&self.0).unwrap().to_owned();
-                let mut glyph = EditorState_ {
-                    font: data.clone(),
-                    metrics,
-                    session,
-                };
-                let v = f(&mut glyph);
-                if !data
-                    .sessions
-                    .get(&self.0)
-                    .map(|s| s.same(&glyph.session))
-                    .unwrap_or(true)
-                {
-                    let name = glyph.session.name.clone();
-                    Arc::make_mut(&mut data.sessions).insert(self.0, glyph.session);
-                    data.invalidate_path(&name);
-                }
-                v
-            }
+    impl Lens<Workspace, EditorState_> for EditorState {
+        fn with<V, F: FnOnce(&EditorState_) -> V>(&self, data: &Workspace, f: F) -> V {
+            let metrics = data.info.metrics.clone();
+            let session = data.sessions.get(&self.0).cloned().unwrap();
+            let glyph = EditorState_ {
+                font: data.clone(),
+                metrics,
+                session,
+            };
+            f(&glyph)
         }
 
-        impl Lens<Workspace, Option<GridGlyph_>> for GridGlyph {
-            fn with<V, F: FnOnce(&Option<GridGlyph_>) -> V>(&self, data: &Workspace, f: F) -> V {
-                let outline = data.get_bezier(&self.0);
+        fn with_mut<V, F: FnOnce(&mut EditorState_) -> V>(&self, data: &mut Workspace, f: F) -> V {
+            //FIXME: this is creating a new copy and then throwing it away
+            //this is just so that the signatures work for now, we aren't actually doing any
+            let metrics = data.info.metrics.clone();
+            let session = data.sessions.get(&self.0).unwrap().to_owned();
+            let mut glyph = EditorState_ {
+                font: data.clone(),
+                metrics,
+                session,
+            };
+            let v = f(&mut glyph);
+            if !data
+                .sessions
+                .get(&self.0)
+                .map(|s| s.same(&glyph.session))
+                .unwrap_or(true)
+            {
+                let name = glyph.session.name.clone();
+                Arc::make_mut(&mut data.sessions).insert(self.0, glyph.session);
+                data.invalidate_path(&name);
+            }
+            v
+        }
+    }
 
-                let is_selected = data.selected.as_ref() == Some(&self.0);
-                let glyph = Some(GridGlyph_ {
-                    name: self.0.clone(),
-                    is_placeholder: outline.is_none(),
+    impl Lens<Workspace, Option<GridGlyph_>> for GridGlyph {
+        fn with<V, F: FnOnce(&Option<GridGlyph_>) -> V>(&self, data: &Workspace, f: F) -> V {
+            let outline = data.get_bezier(&self.0);
+
+            let is_selected = data.selected.as_ref() == Some(&self.0);
+            let glyph = Some(GridGlyph_ {
+                name: self.0.clone(),
+                is_placeholder: outline.is_none(),
+                outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
+                upm: data.units_per_em(),
+                is_selected,
+            });
+            f(&glyph)
+        }
+
+        fn with_mut<V, F: FnOnce(&mut Option<GridGlyph_>) -> V>(
+            &self,
+            data: &mut Workspace,
+            f: F,
+        ) -> V {
+            let outline = data.get_bezier(&self.0);
+            let is_selected = data.selected.as_ref() == Some(&self.0);
+            let mut glyph = Some(GridGlyph_ {
+                name: self.0.clone(),
+                is_placeholder: outline.is_none(),
+                outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
+                upm: data.units_per_em(),
+                is_selected,
+            });
+            let r = f(&mut glyph);
+            // we track selections by having the grid item set this flag,
+            // and then we propogate that up to the workspace here.
+            if glyph.as_ref().map(|g| g.is_selected).unwrap_or(false) {
+                data.selected = Some(self.0.clone());
+            }
+            r
+        }
+    }
+
+    impl Lens<SelectedGlyph_, Option<char>> for Codepoint {
+        fn with<V, F: FnOnce(&Option<char>) -> V>(&self, data: &SelectedGlyph_, f: F) -> V {
+            let c = data.get_codepoint();
+            f(&c)
+        }
+
+        fn with_mut<V, F: FnOnce(&mut Option<char>) -> V>(
+            &self,
+            data: &mut SelectedGlyph_,
+            f: F,
+        ) -> V {
+            let mut c = data.get_codepoint();
+            let r = f(&mut c);
+            let old = data.get_codepoint();
+            if c != old {
+                let glyph = Arc::make_mut(&mut data.glyph);
+                match c {
+                    Some(c) => glyph.codepoints = Some(vec![c]),
+                    None => glyph.codepoints = None,
+                }
+            }
+            r
+        }
+    }
+
+    impl Lens<Workspace, Option<SelectedGlyph_>> for SelectedGlyph {
+        fn with<V, F: FnOnce(&Option<SelectedGlyph_>) -> V>(&self, data: &Workspace, f: F) -> V {
+            let selected = data.selected.as_ref().map(|name| {
+                let glyph = data
+                    .font
+                    .ufo
+                    .get_glyph(name)
+                    .expect("missing glyph in lens");
+                let outline = data.get_bezier(&glyph.name);
+                let is_placeholder = outline.is_none();
+                SelectedGlyph_ {
+                    glyph: Arc::clone(glyph),
                     outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
-                    upm: data.units_per_em(),
-                    is_selected,
-                });
-                f(&glyph)
-            }
+                    units_per_em: data.units_per_em(),
+                    is_placeholder,
+                }
+            });
+            f(&selected)
+        }
 
-            fn with_mut<V, F: FnOnce(&mut Option<GridGlyph_>) -> V>(
-                &self,
-                data: &mut Workspace,
-                f: F,
-            ) -> V {
-                let outline = data.get_bezier(&self.0);
-                let is_selected = data.selected.as_ref() == Some(&self.0);
-                let mut glyph = Some(GridGlyph_ {
-                    name: self.0.clone(),
-                    is_placeholder: outline.is_none(),
+        fn with_mut<V, F: FnOnce(&mut Option<SelectedGlyph_>) -> V>(
+            &self,
+            data: &mut Workspace,
+            f: F,
+        ) -> V {
+            let mut selected = data.selected.as_ref().map(|name| {
+                let glyph = data
+                    .font
+                    .ufo
+                    .get_glyph(name)
+                    .expect("missing glyph in lens");
+                let outline = data.get_bezier(&glyph.name);
+                let is_placeholder = outline.is_none();
+                SelectedGlyph_ {
+                    glyph: Arc::clone(glyph),
                     outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
-                    upm: data.units_per_em(),
-                    is_selected,
-                });
-                let r = f(&mut glyph);
-                // we track selections by having the grid item set this flag,
-                // and then we propogate that up to the workspace here.
-                if glyph.as_ref().map(|g| g.is_selected).unwrap_or(false) {
-                    data.selected = Some(self.0.clone());
+                    units_per_em: data.units_per_em(),
+                    is_placeholder,
                 }
-                r
+            });
+            let r = f(&mut selected);
+            if let Some(selected) = selected {
+                let is_same = data
+                    .font
+                    .ufo
+                    .get_glyph(&selected.glyph.name)
+                    .map(|g| g.same(&selected.glyph))
+                    .unwrap_or(true);
+                if !is_same {
+                    data.update_glyph_metadata(&selected.glyph);
+                    data.selected = Some(selected.glyph.name.clone());
+                }
             }
+            r
+        }
+    }
+
+    impl Lens<SelectedGlyph_, f32> for Advance {
+        fn with<V, F: FnOnce(&f32) -> V>(&self, data: &SelectedGlyph_, f: F) -> V {
+            let advance = data.glyph.advance.as_ref().map(|a| a.width).unwrap_or(0.);
+            f(&advance)
         }
 
-        impl Lens<SelectedGlyph_, Option<char>> for Codepoint {
-            fn with<V, F: FnOnce(&Option<char>) -> V>(&self, data: &SelectedGlyph_, f: F) -> V {
-                let c = data.codepoint();
-                f(&c)
-            }
-
-            fn with_mut<V, F: FnOnce(&mut Option<char>) -> V>(
-                &self,
-                data: &mut SelectedGlyph_,
-                f: F,
-            ) -> V {
-                let mut c = data.codepoint();
-                let r = f(&mut c);
-                let old = data.codepoint();
-                if c != old {
-                    let glyph = Arc::make_mut(&mut data.glyph);
-                    match c {
-                        Some(c) => glyph.codepoints = Some(vec![c]),
-                        None => glyph.codepoints = None,
-                    }
+        #[allow(clippy::float_cmp)]
+        fn with_mut<V, F: FnOnce(&mut f32) -> V>(&self, data: &mut SelectedGlyph_, f: F) -> V {
+            let advance = data.glyph.advance.as_ref().map(|a| a.width).unwrap_or(0.);
+            let mut advance2 = advance;
+            let result = f(&mut advance2);
+            if advance2 != advance {
+                let glyph = Arc::make_mut(&mut data.glyph);
+                if advance2 == 0. {
+                    glyph.advance = None;
+                } else {
+                    let mut advance = glyph.advance.clone().unwrap_or_default();
+                    advance.width = advance2;
+                    glyph.advance = Some(advance);
                 }
-                r
             }
+            result
+        }
+    }
+
+    impl Lens<SelectedGlyph_, GlyphName_> for GlyphName {
+        fn with<V, F: FnOnce(&GlyphName_) -> V>(&self, data: &SelectedGlyph_, f: F) -> V {
+            f(&data.glyph.name)
         }
 
-        impl Lens<Workspace, Option<SelectedGlyph_>> for SelectedGlyph {
-            fn with<V, F: FnOnce(&Option<SelectedGlyph_>) -> V>(
-                &self,
-                data: &Workspace,
-                f: F,
-            ) -> V {
-                let selected = data.selected.as_ref().map(|name| {
-                    let glyph = data
-                        .font
-                        .ufo
-                        .get_glyph(name)
-                        .expect("missing glyph in lens");
-                    let outline = data.get_bezier(&glyph.name);
-                    let is_placeholder = outline.is_none();
-                    SelectedGlyph_ {
-                        glyph: Arc::clone(glyph),
-                        outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
-                        units_per_em: data.units_per_em(),
-                        is_placeholder,
-                    }
-                });
-                f(&selected)
-            }
-
-            fn with_mut<V, F: FnOnce(&mut Option<SelectedGlyph_>) -> V>(
-                &self,
-                data: &mut Workspace,
-                f: F,
-            ) -> V {
-                let mut selected = data.selected.as_ref().map(|name| {
-                    let glyph = data
-                        .font
-                        .ufo
-                        .get_glyph(name)
-                        .expect("missing glyph in lens");
-                    let outline = data.get_bezier(&glyph.name);
-                    let is_placeholder = outline.is_none();
-                    SelectedGlyph_ {
-                        glyph: Arc::clone(glyph),
-                        outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
-                        units_per_em: data.units_per_em(),
-                        is_placeholder,
-                    }
-                });
-                let r = f(&mut selected);
-                if let Some(selected) = selected {
-                    let is_same = data
-                        .font
-                        .ufo
-                        .get_glyph(&selected.glyph.name)
-                        .map(|g| g.same(&selected.glyph))
-                        .unwrap_or(true);
-                    if !is_same {
-                        data.update_glyph_metadata(&selected.glyph);
-                        data.selected = Some(selected.glyph.name.clone());
-                    }
-                }
-                r
-            }
-        }
-
-        impl Lens<SelectedGlyph_, f32> for Advance {
-            fn with<V, F: FnOnce(&f32) -> V>(&self, data: &SelectedGlyph_, f: F) -> V {
-                let advance = data.glyph.advance.as_ref().map(|a| a.width).unwrap_or(0.);
-                f(&advance)
-            }
-
-            #[allow(clippy::float_cmp)]
-            fn with_mut<V, F: FnOnce(&mut f32) -> V>(&self, data: &mut SelectedGlyph_, f: F) -> V {
-                let advance = data.glyph.advance.as_ref().map(|a| a.width).unwrap_or(0.);
-                let mut advance2 = advance;
-                let result = f(&mut advance2);
-                if advance2 != advance {
-                    let glyph = Arc::make_mut(&mut data.glyph);
-                    if advance2 == 0. {
-                        glyph.advance = None;
-                    } else {
-                        let mut advance = glyph.advance.clone().unwrap_or_default();
-                        advance.width = advance2;
-                        glyph.advance = Some(advance);
-                    }
-                }
-                result
-            }
-        }
-
-        impl Lens<SelectedGlyph_, GlyphName_> for GlyphName {
-            fn with<V, F: FnOnce(&GlyphName_) -> V>(&self, data: &SelectedGlyph_, f: F) -> V {
-                f(&data.glyph.name)
-            }
-
-            fn with_mut<V, F: FnOnce(&mut GlyphName_) -> V>(
-                &self,
-                data: &mut SelectedGlyph_,
-                f: F,
-            ) -> V {
-                // THIS DOESN'T DO ANYTHING! all the mutation happens
-                // as a result of the RENAME_GLYPH command.
-                let mut s = data.glyph.name.clone();
-                f(&mut s)
-            }
+        fn with_mut<V, F: FnOnce(&mut GlyphName_) -> V>(
+            &self,
+            data: &mut SelectedGlyph_,
+            f: F,
+        ) -> V {
+            // THIS DOESN'T DO ANYTHING! all the mutation happens
+            // as a result of the RENAME_GLYPH command.
+            let mut s = data.glyph.name.clone();
+            f(&mut s)
         }
     }
 }
