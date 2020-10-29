@@ -10,7 +10,7 @@ use druid::widget::prelude::*;
 use druid::{Data, Insets, TextLayout, WidgetExt, WidgetPod};
 
 use crate::app_delegate::EDIT_GLYPH;
-use crate::data::{lenses, GridGlyph, Workspace};
+use crate::data::{GridGlyph, Workspace};
 use crate::theme;
 use crate::widgets::Maybe;
 
@@ -27,7 +27,7 @@ impl GlyphGrid {
         for key in data.font.ufo.iter_names() {
             let widget = Maybe::or_empty(GridInner::new);
             self.children.push(WidgetPod::new(
-                widget.lens(lenses::app_state::GridGlyph(key)).boxed(),
+                widget.lens(Workspace::glyph_grid(key)).boxed(),
             ));
         }
     }

@@ -12,7 +12,7 @@ use druid::widget::WidgetExt;
 use norad::{GlyphName, Ufo};
 
 use crate::consts;
-use crate::data::{lenses, AppState};
+use crate::data::{AppState, Workspace};
 use crate::edit_session::EditSession;
 use crate::widgets::{Editor, EditorController, RootWindowController, ScrollZoom};
 
@@ -116,6 +116,6 @@ impl AppDelegate<AppState> for Delegate {
 
 fn make_editor(session: &Arc<EditSession>) -> impl Widget<AppState> {
     EditorController::new(ScrollZoom::new(Editor::new(session.clone())))
-        .lens(AppState::workspace.then(lenses::app_state::EditorState(session.id)))
+        .lens(AppState::workspace.then(Workspace::editor_state(session.id)))
         .controller(RootWindowController::default())
 }

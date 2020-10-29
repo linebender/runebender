@@ -10,7 +10,7 @@ use druid::widget::{Controller, Flex, Label, SizedBox, WidgetExt};
 
 use norad::GlyphName;
 
-use crate::data::{lenses, SelectedGlyph, Workspace};
+use crate::data::{SelectedGlyph, Workspace};
 use crate::theme;
 use crate::widgets::{EditableLabel, Maybe};
 
@@ -33,7 +33,7 @@ fn selected_glyph_widget() -> impl Widget<SelectedGlyph> {
                 },
             )
             .controller(RenameController)
-            .lens(lenses::app_state::GlyphName),
+            .lens(SelectedGlyph::glyph_name),
         )
         .with_child(
             Maybe::new(
@@ -48,13 +48,13 @@ fn selected_glyph_widget() -> impl Widget<SelectedGlyph> {
                         .with_font(theme::UI_DETAIL_FONT)
                 },
             )
-            .lens(lenses::app_state::Codepoint),
+            .lens(SelectedGlyph::codepoint),
         )
         .with_flex_child(GlyphPainter::new(), 1.0)
         .with_child(
             EditableLabel::parse()
                 .fix_width(45.)
-                .lens(lenses::app_state::Advance),
+                .lens(SelectedGlyph::advance),
         )
         .with_child(
             Flex::row()
@@ -81,7 +81,7 @@ impl Sidebar {
                     || selected_glyph_widget().boxed(),
                     || SizedBox::empty().expand_width().boxed(),
                 )
-                .lens(lenses::app_state::SelectedGlyph)
+                .lens(Workspace::selected_glyph)
                 .fix_height(SELECTED_GLYPH_HEIGHT)
                 .background(Color::grey8(0xCC))
                 .boxed(),
