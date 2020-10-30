@@ -467,6 +467,23 @@ impl EditSession {
         }
     }
 
+    pub(crate) fn adjust_sidebearing(&mut self, delta: f64, is_left: bool) {
+        let glyph = Arc::make_mut(&mut self.glyph);
+        if let Some(advance) = glyph.advance.as_mut() {
+            // clamp the delta; we can't have an advance width < 0.
+            let delta = if (advance.width + delta as f32) < 0.0 {
+                -advance.width as f64
+            } else {
+                delta
+            };
+            advance.width += delta as f32;
+
+            if is_left {
+                self.nudge_everything(DVec2::from_raw((delta, 0.0)));
+            }
+        }
+    }
+
     pub(crate) fn scale_selection(&mut self, scale: Vec2, anchor: DPoint) {
         assert!(scale.x.is_finite(), scale.y.is_finite());
         if !self.selection.is_empty() {

@@ -103,7 +103,16 @@ pub mod cmd {
     pub const NUDGE_SELECTION: Selector<DVec2> = Selector::new("runebender.editor-nudge-selection");
 
     /// Sent from the sidebearing panel when an edit occurs.
-    pub const NUDGE_EVERYTHING: Selector<DVec2> = Selector::new("runebender.editor.nudge-it-all");
+    pub const ADJUST_SIDEBEARING: Selector<AdjustSidebearing> =
+        Selector::new("runebender.editor.nudge-it-all");
+
+    pub struct AdjustSidebearing {
+        /// The total delta change in the width
+        pub delta: f64,
+        /// `true` if this is the left side-bearing, in which case we translate
+        /// the contents of the editor.
+        pub is_left: bool,
+    }
 
     /// Sent from the coord panel when the selection bbox is manually edited.
     pub const SCALE_SELECTION: Selector<ScaleSelectionArgs> =

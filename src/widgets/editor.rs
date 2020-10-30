@@ -199,9 +199,10 @@ impl Editor {
                 data.session_mut().nudge_selection(*nudge);
                 return (true, Some(EditType::Normal));
             }
-            c if c.is(consts::cmd::NUDGE_EVERYTHING) => {
-                let nudge = c.get_unchecked(consts::cmd::NUDGE_EVERYTHING);
-                data.session_mut().nudge_everything(*nudge);
+            c if c.is(consts::cmd::ADJUST_SIDEBEARING) => {
+                let adjust = c.get_unchecked(consts::cmd::ADJUST_SIDEBEARING);
+                data.session_mut()
+                    .adjust_sidebearing(adjust.delta, adjust.is_left);
                 return (true, Some(EditType::Normal));
             }
 
