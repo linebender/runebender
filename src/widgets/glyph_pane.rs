@@ -2,10 +2,9 @@
 //! glyph metrics
 
 use druid::widget::{prelude::*, Controller, Flex};
-use druid::WidgetExt;
+use druid::{LensExt, WidgetExt};
 
-use crate::data::{EditorState, Sidebearings};
-use crate::design_space::DVec2;
+use crate::data::{EditorState, GlyphDetail, Sidebearings};
 use crate::widgets::{EditableLabel, GlyphPainter};
 use crate::{consts, theme};
 
@@ -35,17 +34,20 @@ impl<W: Widget<Sidebearings>> Controller<Sidebearings, W> for GlyphPane {
 
         // if an edit has occured in the panel, we turn it into
         // a command so that the Editor can update undo state:
-        let d_x = if child_data.left != data.left {
-            child_data.left - data.left
+        let (d_x, is_left) = if child_data.left != data.left {
+            (child_data.left - data.left, true)
         } else if child_data.right != data.right {
-            data.right - child_data.right
+            (child_data.right - data.right, false)
         } else {
-            0.0
+            (0.0, false)
         };
 
         if d_x != 0.0 {
-            let delta = DVec2::from_raw((d_x, 0.0));
-            ctx.submit_command(consts::cmd::NUDGE_EVERYTHING.with(delta));
+            let args = consts::cmd::AdjustSidebearing {
+                delta: d_x,
+                is_left,
+            };
+            ctx.submit_command(consts::cmd::ADJUST_SIDEBEARING.with(args));
         }
         // suppress clicks so that the editor doesn't handle them.
         if matches!(event,Event::MouseUp(_) | Event::MouseDown(_)) {
@@ -55,29 +57,38 @@ impl<W: Widget<Sidebearings>> Controller<Sidebearings, W> for GlyphPane {
 }
 
 fn build_widget() -> impl Widget<EditorState> {
-    Flex::row()
+    Flex::column()
+        .with_child(
+            Flex::row()
+                .with_child(
+                    EditableLabel::parse()
+                        .with_font(theme::UI_DETAIL_FONT)
+                        .lens(Sidebearings::left)
+                        .controller(GlyphPane)
+                        .lens(EditorState::sidebearings)
+                        .fix_width(40.0),
+                )
+                .with_child(
+                    GlyphPainter::new()
+                        .color(theme::SECONDARY_TEXT_COLOR)
+                        .draw_layout_frame(true)
+                        .fix_height(40.0)
+                        .padding((0., 8.0))
+                        .lens(EditorState::detail_glyph),
+                )
+                .with_child(
+                    EditableLabel::parse()
+                        .with_font(theme::UI_DETAIL_FONT)
+                        .lens(Sidebearings::right)
+                        .controller(GlyphPane)
+                        .lens(EditorState::sidebearings)
+                        .fix_width(40.0),
+                ),
+        )
         .with_child(
             EditableLabel::parse()
                 .with_font(theme::UI_DETAIL_FONT)
-                .lens(Sidebearings::left)
-                .controller(GlyphPane)
-                .lens(EditorState::sidebearings)
-                .fix_width(40.0),
-        )
-        .with_child(
-            GlyphPainter::new()
-                .color(theme::SECONDARY_TEXT_COLOR)
-                .draw_layout_frame(true)
-                .fix_width(40.0)
-                .padding((0., 8.0))
-                .lens(EditorState::detail_glyph),
-        )
-        .with_child(
-            EditableLabel::parse()
-                .with_font(theme::UI_DETAIL_FONT)
-                .lens(Sidebearings::right)
-                .controller(GlyphPane)
-                .lens(EditorState::sidebearings)
+                .lens(EditorState::detail_glyph.then(GlyphDetail::advance))
                 .fix_width(40.0),
         )
         .padding(4.0)
