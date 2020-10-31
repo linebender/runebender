@@ -424,7 +424,7 @@ pub(crate) fn draw_session(
             // for a segment to be selected at least two points must be selected
             draw_ctx.draw_selected_segments(path, &session.selection);
         }
-        let bez = space.affine() * path.bezier();
+        let bez = space.affine() * path.spline_bezier();
         draw_ctx.draw_path(&bez);
         draw_ctx.draw_control_point_lines(path);
         draw_ctx.draw_direction_indicator(&bez);

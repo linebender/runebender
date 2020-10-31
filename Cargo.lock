@@ -1417,6 +1417,7 @@ dependencies = [
  "plist",
  "serde",
  "serde_derive",
+ "spline",
  "svg",
 ]
 
@@ -1529,6 +1530,14 @@ name = "smallvec"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fbee7696b84bbf3d89a1c2eccff0850e3047ed46bfcd2e92c29a2d074d57e252"
+
+[[package]]
+name = "spline"
+version = "0.3.0"
+source = "git+https://github.com/linebender/spline?branch=main#e6c43357cde40396c9c8e1d8eca4978f13fcdb59"
+dependencies = [
+ "kurbo",
+]
 
 [[package]]
 name = "stable_deref_trait"
