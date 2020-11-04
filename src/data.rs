@@ -817,17 +817,21 @@ pub(crate) fn path_for_glyph(glyph: &Glyph) -> Option<BezPath> {
     fn add_contour(path: &mut BezPath, contour: &Contour) {
         let mut close: Option<&ContourPoint> = None;
 
-        if contour.points.is_empty() {
-            return;
-        }
+        let start_idx = match contour
+            .points
+            .iter()
+            .position(|pt| pt.typ != PointType::OffCurve)
+        {
+            Some(idx) => idx,
+            None => return,
+        };
 
-        let first = &contour.points[0];
+        let first = &contour.points[start_idx];
         path.move_to((first.x as f64, first.y as f64));
         if first.typ != PointType::Move {
             close = Some(first);
         }
 
-        let mut idx = 1;
         let mut controls = Vec::with_capacity(2);
 
         let mut add_curve = |to_point: Point, controls: &mut Vec<Point>| {
@@ -840,7 +844,8 @@ pub(crate) fn path_for_glyph(glyph: &Glyph) -> Option<BezPath> {
             controls.clear();
         };
 
-        while idx < contour.points.len() {
+        let mut idx = (start_idx + 1) % contour.points.len();
+        while idx != start_idx {
             let next = &contour.points[idx];
             let point = Point::new(next.x as f64, next.y as f64);
             match next.typ {
@@ -856,7 +861,7 @@ pub(crate) fn path_for_glyph(glyph: &Glyph) -> Option<BezPath> {
                 }
                 PointType::Move => debug_assert!(false, "illegal move point in path?"),
             }
-            idx += 1;
+            idx = (idx + 1) % contour.points.len();
         }
 
         if let Some(to_close) = close.take() {
