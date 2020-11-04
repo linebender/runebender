@@ -154,19 +154,27 @@ impl Workspace {
     pub fn save(&mut self) -> Result<(), Box<dyn Error>> {
         let font_obj = Arc::make_mut(&mut self.font);
         font_obj.update_info(&self.info);
+        // flush all open sessions
+        for session in self.sessions.values() {
+            let glyph = session.to_norad_glyph();
+            font_obj
+                .ufo
+                .get_default_layer_mut()
+                .unwrap()
+                .insert_glyph(glyph);
+        }
         if let Some(path) = font_obj.path.as_ref() {
-            backup_ufo_at_path(path)?;
-            log::info!("saving to {:?}", path);
-            // flush all open sessions
-            for session in self.sessions.values() {
-                let glyph = session.to_norad_glyph();
-                font_obj
-                    .ufo
-                    .get_default_layer_mut()
-                    .unwrap()
-                    .insert_glyph(glyph);
+            // very careful save: we write to a temporary location, then
+            // backup the existing data, then move data from the temporary
+            // location to the actual path
+            let temp_path = temp_write_path(path);
+            log::info!("saving to {:?}", temp_path);
+            font_obj.ufo.save(&temp_path)?;
+            if let Some(backup_path) = backup_ufo_at_path(path)? {
+                log::info!("backing up existing data to {:?}", backup_path);
             }
-            font_obj.ufo.save(&path)?;
+
+            fs::rename(&temp_path, path)?;
         } else {
             log::error!("save called with no path set");
         }
@@ -942,13 +950,31 @@ fn backup_ufo_at_path(path: &Path) -> Result<Option<PathBuf>, std::io::Error> {
     }
 
     let backup_date = chrono::Local::now();
-    let date_str = backup_date.format("%Y-%m-%d_%H&%M%S.ufo");
+    let date_str = backup_date.format("%Y-%m-%d_%Hh%Mm%Ss.ufo");
     backup_dir.push(date_str.to_string());
     if backup_dir.exists() {
         fs::remove_dir_all(&backup_dir)?;
     }
     fs::rename(path, &backup_dir)?;
     Ok(Some(backup_dir))
+}
+
+fn temp_write_path(path: &Path) -> PathBuf {
+    let mut n = 0;
+    let backup_date = chrono::Local::now();
+    let date_str = backup_date.format("%Y-%m-%d_%Hh%Mm%Ss");
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("Untitled");
+    loop {
+        let file_path = format!("{}-savefile-{}_{}.ufo", stem, date_str, n);
+        let full_path = path.with_file_name(file_path);
+        if !full_path.exists() {
+            break full_path;
+        }
+        n += 1;
+    }
 }
 
 #[cfg(test)]
