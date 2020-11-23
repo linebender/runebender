@@ -1,5 +1,7 @@
 //! A font editor.
 
+#![allow(clippy::rc_buffer)]
+
 #[macro_use]
 extern crate serde_derive;
 
