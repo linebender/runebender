@@ -19,16 +19,13 @@
 use druid::text::EditAction;
 use druid::widget::prelude::*;
 use druid::widget::{LabelText, TextBox};
-use druid::{Color, Data, FontDescriptor, HotKey, Insets, KbKey, KeyOrValue, Selector};
+use druid::{Color, Data, FontDescriptor, HotKey, KbKey, KeyOrValue, Selector, TextAlignment};
 
 // we send this to ourselves if another widget takes focus, in order
 // to validate and move out of editing mode
 //const LOST_FOCUS: Selector = Selector::new("druid.builtin.EditableLabel-lost-focus");
 const CANCEL_EDITING: Selector = Selector::new("druid.builtin.EditableLabel-cancel-editing");
 const COMPLETE_EDITING: Selector = Selector::new("druid.builtin.EditableLabel-complete-editing");
-
-/// These are just taken from the druid TextBox widget
-const TEXT_INSETS: Insets = Insets::new(4.0, 2.0, 0.0, 2.0);
 
 /// A label with text that can be edited.
 ///
@@ -107,6 +104,12 @@ impl<T: Data> EditableLabel<T> {
     /// Builder-style method to set  the text color.
     pub fn with_text_color(mut self, color: impl Into<KeyOrValue<Color>>) -> Self {
         self.text_box.set_text_color(color);
+        self
+    }
+
+    /// Builder-style method to set the [`TextAlignment`].
+    pub fn with_text_alignment(mut self, alignment: TextAlignment) -> Self {
+        self.text_box.set_text_alignment(alignment);
         self
     }
 
@@ -227,7 +230,7 @@ impl<T: Data> Widget<T> for EditableLabel<T> {
         if self.editing {
             self.text_box.paint(ctx, &self.buffer, env);
         } else {
-            let text_pos = (TEXT_INSETS.x0, TEXT_INSETS.y0);
+            let text_pos = self.text_box.text_position();
             self.text_box.editor().layout().draw(ctx, text_pos);
         }
     }

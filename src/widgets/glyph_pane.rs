@@ -63,6 +63,7 @@ fn build_widget() -> impl Widget<EditorState> {
                 .with_child(
                     EditableLabel::parse()
                         .with_font(theme::UI_DETAIL_FONT)
+                        .with_text_alignment(druid::TextAlignment::End)
                         .lens(Sidebearings::left)
                         .controller(GlyphPane)
                         .lens(EditorState::sidebearings)
@@ -79,6 +80,7 @@ fn build_widget() -> impl Widget<EditorState> {
                 .with_child(
                     EditableLabel::parse()
                         .with_font(theme::UI_DETAIL_FONT)
+                        .with_text_alignment(druid::TextAlignment::Start)
                         .lens(Sidebearings::right)
                         .controller(GlyphPane)
                         .lens(EditorState::sidebearings)
@@ -88,6 +90,7 @@ fn build_widget() -> impl Widget<EditorState> {
         .with_child(
             EditableLabel::parse()
                 .with_font(theme::UI_DETAIL_FONT)
+                .with_text_alignment(druid::TextAlignment::Center)
                 .lens(EditorState::detail_glyph.then(GlyphDetail::advance))
                 .fix_width(40.0),
         )
