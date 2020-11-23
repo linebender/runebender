@@ -404,11 +404,38 @@ fn ellipse_path() -> BezPath {
 fn measure_path() -> BezPath {
     let mut bez = BezPath::new();
 
-    // TODO: design icon
     bez.move_to((0.0, 0.0));
-    bez.line_to((200.0, 0.0));
-    bez.line_to((200.0, 20.0));
-    bez.line_to((0.0, 20.0));
+    bez.line_to((50.0, 0.0));
+    bez.line_to((50.0, 200.0));
+    bez.line_to((0.0, 200.0));
+    bez.close_path();
+
+    bez.move_to((50.0, 175.0));
+    bez.line_to((30.0, 175.0));
+    bez.close_path();
+
+    bez.move_to((50.0, 150.0));
+    bez.line_to((25.0, 150.0));
+    bez.close_path();
+
+    bez.move_to((50.0, 125.0));
+    bez.line_to((30.0, 125.0));
+    bez.close_path();
+
+    bez.move_to((50.0, 100.0));
+    bez.line_to((20.0, 100.0));
+    bez.close_path();
+
+    bez.move_to((50.0, 75.0));
+    bez.line_to((30.0, 75.0));
+    bez.close_path();
+
+    bez.move_to((50.0, 50.0));
+    bez.line_to((25.0, 50.0));
+    bez.close_path();
+
+    bez.move_to((50.0, 25.0));
+    bez.line_to((30.0, 25.0));
     bez.close_path();
     bez
 }
