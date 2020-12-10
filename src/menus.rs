@@ -214,4 +214,25 @@ fn tools_menu<T: Data>() -> MenuDesc<T> {
             )
             .hotkey(SysMods::None, "u"),
         )
+        .append(
+            MenuItem::new(
+                LocalizedString::new("menu-item-ellipse-tool").with_placeholder("Ellipse"),
+                consts::cmd::SET_TOOL.with("Ellipse"),
+            )
+            .hotkey(SysMods::Shift, "u"),
+        )
+        .append(
+            MenuItem::new(
+                LocalizedString::new("menu-item-knife-tool").with_placeholder("Knife"),
+                consts::cmd::SET_TOOL.with("Knife"),
+            )
+            .hotkey(SysMods::None, "e"),
+        )
+        .append(
+            MenuItem::new(
+                LocalizedString::new("menu-item-measure-tool").with_placeholder("Measure"),
+                consts::cmd::SET_TOOL.with("Measure"),
+            )
+            .hotkey(SysMods::None, "m"),
+        )
 }
