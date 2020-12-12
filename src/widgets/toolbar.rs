@@ -311,30 +311,45 @@ fn pen_path() -> BezPath {
 fn preview_path() -> BezPath {
     let mut bez = BezPath::new();
 
-    bez.move_to((304.5, 576.5));
-    bez.curve_to((304.5, 576.5), (300.5, 406.5), (302.5, 386.5));
-    bez.curve_to((316.5, 264.5), (475.5, 281.5), (487.5, 219.5));
-    bez.curve_to((491.5, 200.5), (468.5, 192.5), (444.5, 199.5));
-    bez.curve_to((420.5, 206.5), (300.5, 257.5), (301.5, 238.5));
-    bez.curve_to((302.5, 214.5), (387.5, 176.5), (412.5, 117.5));
-    bez.curve_to((437.5, 58.5), (369.5, 88.5), (359.5, 103.5));
-    bez.curve_to((349.5, 118.5), (283.5, 198.5), (262.5, 223.5));
-    bez.curve_to((241.5, 248.5), (240.5, 237.5), (248.5, 218.5));
-    bez.curve_to((256.5, 199.5), (263.5, 130.5), (298.5, 84.5));
-    bez.curve_to((333.5, 38.5), (252.5, 15.5), (227.5, 48.5));
-    bez.curve_to((202.5, 81.5), (219.5, 219.5), (214.5, 237.5));
-    bez.curve_to((214.5, 237.5), (215.5, 246.5), (199.5, 240.5));
-    bez.curve_to((183.5, 234.5), (171.5, 135.5), (183.5, 95.5));
-    bez.curve_to((195.5, 55.5), (162.5, -46.5), (128.5, 24.5));
-    bez.curve_to((94.5, 95.5), (142.5, 220.5), (145.5, 248.5));
-    bez.curve_to((148.5, 276.5), (129.5, 296.5), (108.5, 260.5));
-    bez.curve_to((87.5, 224.5), (16.5, 142.5), (3.5, 155.5));
-    bez.curve_to((-9.5, 168.5), (14.5, 263.5), (54.5, 308.5));
-    bez.curve_to((94.5, 353.5), (161.5, 323.5), (163.5, 381.5));
-    bez.line_to((164.5, 577.5));
-    bez.line_to((304.5, 576.5));
+    bez.move_to((320.0, 500.0)); // Bottom right: wrist
+    bez.line_to((140.0, 500.0)); // Bottom left: wrist
+    bez.line_to((140.0, 440.0));
+    bez.line_to((30.0, 320.0));
+    bez.line_to((0.0, 185.0));
+    bez.line_to((20.0, 175.0)); // Top: thumb
+    bez.line_to((40.0, 185.0));
+    bez.line_to((75.0, 255.0));
+    bez.line_to((110.0, 275.0));
+    bez.line_to((125.0, 220.0));
+    bez.line_to((120.0, 50.0)); // Top left: index finger
+    bez.line_to((130.0, 40.0));
+    bez.line_to((155.0, 40.0));
+    bez.line_to((165.0, 50.0));
+    bez.line_to((185.0, 215.0));
+    bez.line_to((190.0, 15.0)); // Top left: middle finger
+    bez.line_to((205.0, 0.0));
+    bez.line_to((220.0, 0.0));
+    bez.line_to((235.0, 15.0));
+    bez.line_to((250.0, 210.0));
+    bez.line_to((260.0, 210.0));
+    bez.line_to((270.0, 110.0));
+    bez.line_to((270.0, 30.0)); // Top left: ring finger
+    bez.line_to((280.0, 20.0));
+    bez.line_to((305.0, 20.0));
+    bez.line_to((315.0, 30.0));
+    bez.line_to((320.0, 130.0));
+    bez.line_to((315.0, 225.0));
+    bez.line_to((325.0, 230.0));
+    bez.line_to((340.0, 165.0));
+    bez.line_to((345.0, 90.0)); // Top left: little finger
+    bez.line_to((355.0, 80.0));
+    bez.line_to((355.0, 80.0));
+    bez.line_to((385.0, 90.0));
+    bez.line_to((385.0, 200.0));
+    bez.line_to((365.0, 320.0));
+    bez.line_to((320.0, 420.0));
+    bez.line_to((320.0, 500.0));
     bez.close_path();
-
     bez
 }
 
