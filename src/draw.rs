@@ -20,18 +20,25 @@ const PATH_COLOR: Color = Color::rgb8(0x00, 0x00, 0x00);
 const METRICS_COLOR: Color = Color::rgb8(0xA0, 0xA0, 0xA0);
 const GUIDE_COLOR: Color = Color::rgb8(0xFC, 0x54, 0x93);
 const SELECTED_GUIDE_COLOR: Color = Color::rgb8(0xFE, 0xCD, 0xCD);
-const SELECTED_LINE_SEGMENT_COLOR: Color = Color::rgb8(0x93, 0xc6, 0xf4);
-const SMOOTH_POINT_COLOR: Color = Color::rgb8(0x_41, 0x8E, 0x22);
-const CORNER_POINT_COLOR: Color = Color::rgb8(0x0b, 0x2b, 0xdb);
-const OFF_CURVE_POINT_COLOR: Color = Color::rgb8(0xbb, 0xbb, 0xbb);
-const OFF_CURVE_HANDLE_COLOR: Color = Color::rgb8(0xbb, 0xbb, 0xbb);
-const DIRECTION_ARROW_COLOR: Color = Color::rgba8(0x00, 0x00, 0x00, 0x44);
+const SELECTED_LINE_SEGMENT_COLOR: Color = Color::rgb8(0x93, 0xC6, 0xF4);
+const SELECTED_POINT_INNER_COLOR: Color = Color::rgba8(0xFF, 0xEE, 0x55, 0x99);
+const SELECTED_POINT_OUTER_COLOR: Color = Color::rgb8(0xFF, 0xAA, 0x11);
+const SMOOTH_POINT_OUTER_COLOR: Color = Color::rgb8(0x44, 0x28, 0xEC);
+const SMOOTH_POINT_INNER_COLOR: Color = Color::rgb8(0x57, 0x9A, 0xFF);
+const CORNER_POINT_OUTER_COLOR: Color = Color::rgb8(0x20, 0x8E, 0x56);
+const CORNER_POINT_INNER_COLOR: Color = Color::rgb8(0x6A, 0xE7, 0x56);
+const OFF_CURVE_POINT_OUTER_COLOR: Color = Color::grey8(0x99);
+const OFF_CURVE_POINT_INNER_COLOR: Color = Color::grey8(0xCC);
+const OFF_CURVE_HANDLE_COLOR: Color = Color::grey8(0xBB);
+const DIRECTION_ARROW_COLOR: Color = Color::rgba8(0x20, 0x8E, 0x56, 0x99);
 const COMPONENT_FILL_COLOR: Color = Color::rgba8(0, 0, 0, 0x44);
 
-const SMOOTH_RADIUS: f64 = 3.5;
-const SMOOTH_SELECTED_RADIUS: f64 = 4.;
-const OFF_CURVE_RADIUS: f64 = 2.;
-const OFF_CURVE_SELECTED_RADIUS: f64 = 2.5;
+const SMOOTH_RADIUS: f64 = 5.;
+const SMOOTH_SELECTED_RADIUS: f64 = 6.5;
+const CORNER_RADIUS: f64 = 4.5;
+const CORNER_SELECTED_RADIUS: f64 = 6.;
+const OFF_CURVE_RADIUS: f64 = 3.5;
+const OFF_CURVE_SELECTED_RADIUS: f64 = 5.;
 
 /// A context for drawing that maps between screen space and design space.
 struct DrawCtx<'a, 'b: 'a> {
@@ -257,23 +264,27 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         };
         let circ = Circle::new(p, radius);
         if selected {
-            self.fill(circ, &SMOOTH_POINT_COLOR);
+            self.fill(circ, &SELECTED_POINT_INNER_COLOR);
+            self.stroke(circ, &SELECTED_POINT_OUTER_COLOR, 2.0);
         } else {
-            self.stroke(circ, &SMOOTH_POINT_COLOR, 1.0);
+            self.fill(circ, &SMOOTH_POINT_INNER_COLOR);
+            self.stroke(circ, &SMOOTH_POINT_OUTER_COLOR, 2.0);
         }
     }
 
     fn draw_corner_point(&mut self, p: Point, selected: bool) {
         let radius = if selected {
-            SMOOTH_SELECTED_RADIUS
+            CORNER_SELECTED_RADIUS
         } else {
-            SMOOTH_RADIUS
+            CORNER_RADIUS
         };
         let rect = Rect::new(p.x - radius, p.y - radius, p.x + radius, p.y + radius);
         if selected {
-            self.fill(rect, &CORNER_POINT_COLOR);
+            self.fill(rect, &SELECTED_POINT_INNER_COLOR);
+            self.stroke(rect, &SELECTED_POINT_OUTER_COLOR, 2.0);
         } else {
-            self.stroke(rect, &CORNER_POINT_COLOR, 1.0);
+            self.fill(rect, &CORNER_POINT_INNER_COLOR);
+            self.stroke(rect, &CORNER_POINT_OUTER_COLOR, 2.0);
         }
     }
 
@@ -285,9 +296,11 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         };
         let circ = Circle::new(p, radius);
         if selected {
-            self.fill(circ, &OFF_CURVE_POINT_COLOR);
+            self.fill(circ, &SELECTED_POINT_INNER_COLOR);
+            self.stroke(circ, &SELECTED_POINT_OUTER_COLOR, 2.0);
         } else {
-            self.stroke(circ, &OFF_CURVE_POINT_COLOR, 1.0);
+            self.fill(circ, &OFF_CURVE_POINT_INNER_COLOR);
+            self.stroke(circ, &OFF_CURVE_POINT_OUTER_COLOR, 2.0);
         }
     }
 
@@ -300,7 +313,7 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         let tangent = tangent_vector(0.05, first_seg).normalize();
         let angle = Vec2::new(tangent.y, -tangent.x);
         let rotate = Affine::rotate(angle.atan2());
-        let translate = Affine::translate(first_seg.p0.to_vec2() + tangent * 4.0);
+        let translate = Affine::translate(first_seg.p0.to_vec2() + tangent * 8.0);
         let mut arrow = make_arrow();
         arrow.apply_affine(rotate);
         arrow.apply_affine(translate);
