@@ -3,13 +3,14 @@
 use std::sync::Arc;
 
 use druid::widget::prelude::*;
-use druid::{Application, Clipboard, ClipboardFormat, Color, Command, ContextMenu, Data, KbKey};
+use druid::{Application, Clipboard, ClipboardFormat, Command, ContextMenu, Data, KbKey};
 
 use crate::consts::{self, CANVAS_SIZE};
 use crate::data::EditorState;
 use crate::draw;
 use crate::edit_session::EditSession;
 use crate::mouse::{Mouse, TaggedEvent};
+use crate::theme;
 use crate::tools::{EditType, Select, Tool};
 use crate::undo::UndoState;
 
@@ -234,7 +235,7 @@ impl Editor {
 impl Widget<EditorState> for Editor {
     fn paint(&mut self, ctx: &mut PaintCtx, data: &EditorState, env: &Env) {
         let rect = (CANVAS_SIZE * data.session.viewport.zoom).to_rect();
-        ctx.fill(rect, &Color::WHITE);
+        ctx.fill(rect, &env.get(theme::GLYPH_LIST_BACKGROUND));
 
         draw::draw_session(
             ctx,

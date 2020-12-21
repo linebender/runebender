@@ -2,7 +2,8 @@
 
 use std::sync::Arc;
 
-use druid::kurbo::{Affine, Line, Rect, Shape, Size};
+use druid::kurbo::{Affine, Rect, Shape, Size};
+use druid::piet::Color;
 //use druid::piet::{
 //FontBuilder, PietText, PietTextLayout, RenderContext, Text, TextLayout, TextLayoutBuilder,
 //};
@@ -14,7 +15,7 @@ use crate::data::{GridGlyph, Workspace};
 use crate::theme;
 use crate::widgets::Maybe;
 
-const GLYPH_SIZE: f64 = 100.;
+const GLYPH_SIZE: f64 = 128.;
 
 #[derive(Default)]
 pub struct GlyphGrid {
@@ -37,19 +38,11 @@ impl Widget<Workspace> for GlyphGrid {
     fn paint(&mut self, ctx: &mut PaintCtx, data: &Workspace, env: &Env) {
         ctx.render_ctx.clear(env.get(theme::GLYPH_LIST_BACKGROUND));
         let row_len = 1.0_f64.max(ctx.size().width / GLYPH_SIZE).floor() as usize;
-        let row_count = if self.children.is_empty() {
+        let _row_count = if self.children.is_empty() {
             0
         } else {
             self.children.len() / row_len + 1
         };
-
-        for row in 0..row_count {
-            let baseline = row as f64 * GLYPH_SIZE + GLYPH_SIZE * (1.0 - 0.16) + 0.5;
-
-            let line = Line::new((0., baseline), (ctx.size().width + GLYPH_SIZE, baseline));
-            ctx.render_ctx
-                .stroke(&line, &env.get(theme::GLYPH_LIST_STROKE), 1.0);
-        }
 
         for child in &mut self.children {
             child.paint(ctx, data, env);
@@ -147,10 +140,10 @@ impl Widget<GridGlyph> for GridInner {
         let bb = path.bounding_box();
         let geom = ctx.size().to_rect();
         let scale = geom.height() as f64 / data.upm;
-        let scale = scale * 0.85; // some margins around glyphs
+        let scale = scale * 0.75; // some margins around glyphs
         let scaled_width = bb.width() * scale as f64;
         let l_pad = ((geom.width() as f64 - scaled_width) / 2.).round();
-        let baseline = (geom.height() * 0.16) as f64;
+        let baseline = (geom.height() * 0.29) as f64;
         let affine = Affine::new([
             scale as f64,
             0.0,
@@ -160,11 +153,15 @@ impl Widget<GridGlyph> for GridInner {
             geom.height() - baseline,
         ]);
 
-        let hl_color = env.get(druid::theme::SELECTION_COLOR);
+        let glyph_rect: Rect = geom - Insets::uniform(5.0);
+        let rounded = glyph_rect.to_rounded_rect(5.0);
+        ctx.fill(rounded, &Color::grey8(0xD0));
+        ctx.stroke(rounded, &Color::grey8(0xA0), 2.0);
+
+        let hl_color = Color::rgb8(0xFF, 0xEE, 0x55);
         if ctx.is_active() || data.is_selected {
-            let selection_rect: Rect = geom - Insets::uniform(5.0);
-            let rounded = selection_rect.to_rounded_rect(5.0);
             ctx.fill(rounded, &hl_color);
+            ctx.stroke(rounded, &Color::rgb8(0xFF, 0xAA, 0x11), 4.0);
         }
         let glyph_color = if data.is_placeholder {
             env.get(theme::PLACEHOLDER_GLYPH_COLOR)
@@ -179,7 +176,7 @@ impl Widget<GridGlyph> for GridInner {
         let xpos = geom.x0 + (geom.width() - text_size.width) / 2.0;
         let ypos = geom.max_y() - text_size.height;
 
-        self.text.draw(ctx, (xpos, ypos));
+        self.text.draw(ctx, (xpos, ypos - 8.0));
     }
 
     fn layout(

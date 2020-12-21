@@ -40,9 +40,9 @@ pub mod colors {
 pub fn configure_env(env: &mut Env) {
     env.set(SIDEBAR_BACKGROUND, colors::LIGHT_GREY);
     env.set(SIDEBAR_EDGE_STROKE, colors::SIDEBAR_EDGE);
-    env.set(PLACEHOLDER_GLYPH_COLOR, colors::LIGHT_GREY);
+    env.set(PLACEHOLDER_GLYPH_COLOR, Color::grey8(0xBB));
     env.set(GLYPH_LIST_STROKE, colors::LIGHT_GREY);
-    env.set(GLYPH_LIST_BACKGROUND, Color::WHITE);
+    env.set(GLYPH_LIST_BACKGROUND, Color::grey8(0xF0));
     env.set(PRIMARY_TEXT_COLOR, Color::BLACK);
     env.set(SECONDARY_TEXT_COLOR, colors::MEDIUM_GREY);
     env.set(SELECTION_RECT_STROKE_COLOR, colors::LIGHT_BLUE);
