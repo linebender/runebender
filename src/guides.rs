@@ -117,11 +117,6 @@ impl Guide {
             }
         };
 
-        norad::Guideline {
-            line,
-            name: None,
-            color: None,
-            identifier: None,
-        }
+        norad::Guideline::new(line, None, None, None, None)
     }
 }
