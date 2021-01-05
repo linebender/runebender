@@ -37,11 +37,14 @@ impl AppDelegate<AppState> for Delegate {
             };
             ctx.submit_command(consts::cmd::REBUILD_MENUS);
             Handled::Yes
-        } else if let Some(info) = cmd.get(druid::commands::SAVE_FILE) {
-            if let Some(path) = info.as_ref().map(|info| info.path()) {
-                Arc::make_mut(&mut data.workspace.font).path = Some(path.into());
-                ctx.submit_command(consts::cmd::REBUILD_MENUS);
+        } else if cmd.is(druid::commands::SAVE_FILE) {
+            if let Err(e) = data.workspace.save() {
+                log::error!("saving failed: '{}'", e);
             }
+            Handled::Yes
+        } else if let Some(info) = cmd.get(druid::commands::SAVE_FILE_AS) {
+            Arc::make_mut(&mut data.workspace.font).path = Some(info.path().into());
+            ctx.submit_command(consts::cmd::REBUILD_MENUS);
             if let Err(e) = data.workspace.save() {
                 log::error!("saving failed: '{}'", e);
             }

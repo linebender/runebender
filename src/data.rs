@@ -312,7 +312,7 @@ impl Workspace {
         }
         // update the UFO;
         if let Some(glyph) = self.font_mut().ufo.get_glyph_mut(&changed.name) {
-            Arc::make_mut(glyph).advance = changed.advance.clone();
+            glyph.advance = changed.advance.clone();
         }
     }
 

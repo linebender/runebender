@@ -340,24 +340,15 @@ impl Path {
             let smooth = p.typ == PointType::OnCurveSmooth;
             let x = p.point.x as f32;
             let y = p.point.y as f32;
-            points.push(ContourPoint {
-                x,
-                y,
-                typ,
-                smooth,
-                identifier: None,
-                name: None,
-            });
+            let npoint = ContourPoint::new(x, y, typ, smooth, None, None, None);
+            points.push(npoint);
             prev_off_curve = p.typ == PointType::OffCurve;
         }
 
         if self.closed {
             points.rotate_right(1);
         }
-        Contour {
-            points,
-            identifier: None,
-        }
+        Contour::new(points, None, None)
     }
 
     pub fn id(&self) -> usize {

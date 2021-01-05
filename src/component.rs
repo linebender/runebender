@@ -34,12 +34,7 @@ impl Component {
     pub fn to_norad(&self) -> norad::glyph::Component {
         let base = self.base.clone();
         let transform = self.transform.into();
-        let identifier = None;
-        norad::glyph::Component {
-            base,
-            transform,
-            identifier,
-        }
+        norad::glyph::Component::new(base, transform, None, None)
     }
 
     pub(crate) fn nudge(&mut self, delta: DVec2) {
