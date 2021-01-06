@@ -385,7 +385,7 @@ impl Path {
     }
 
     /// Iterates points in order.
-    pub(crate) fn iter_points<'a>(&'a self) -> impl Iterator<Item = PathPoint> + 'a {
+    pub(crate) fn iter_points(&self) -> impl Iterator<Item = PathPoint> + '_ {
         let (first, remaining_n) = if self.closed {
             (self.points.last().copied(), self.points.len() - 1)
         } else {

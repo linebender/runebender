@@ -32,19 +32,19 @@ enum Token<'a> {
 }
 
 fn is_numeric(b: u8) -> bool {
-    (b >= b'0' && b <= b'9') || b == b'.' || b == b'-'
+    (b'0'..=b'9').contains(&b) || b == b'.' || b == b'-'
 }
 
 fn is_alnum(b: u8) -> bool {
-    is_numeric(b) || (b >= b'A' && b <= b'Z') || (b >= b'a' && b <= b'z') || b == b'_'
+    is_numeric(b) || (b'A'..=b'Z').contains(&b) || (b'a'..=b'z').contains(&b) || b == b'_'
 }
 
 fn is_ascii_digit(b: u8) -> bool {
-    b >= b'0' && b <= b'9'
+    (b'0'..=b'9').contains(&b)
 }
 
 fn is_hex_upper(b: u8) -> bool {
-    (b >= b'0' && b <= b'9') || (b >= b'A' && b <= b'F')
+    (b'0'..=b'9').contains(&b) || (b'A'..=b'F').contains(&b)
 }
 
 fn is_ascii_whitespace(b: u8) -> bool {
@@ -258,11 +258,13 @@ impl<'a> Token<'a> {
                                     cow_start = ix + 1;
                                 }
                                 _ => {
-                                    if b >= b'0' && b <= b'3' && ix + 2 < s.len() {
+                                    if (b'0'..=b'3').contains(&b) && ix + 2 < s.len() {
                                         // octal escape
                                         let b1 = s.as_bytes()[ix + 1];
                                         let b2 = s.as_bytes()[ix + 2];
-                                        if b1 >= b'0' && b1 <= b'7' && b2 >= b'0' && b2 <= b'7' {
+                                        if (b'0'..=b'7').contains(&b1)
+                                            && (b'0'..=b'7').contains(&b2)
+                                        {
                                             let oct =
                                                 (b - b'0') * 64 + (b1 - b'0') * 8 + (b2 - b'0');
                                             buf.push(oct as char);

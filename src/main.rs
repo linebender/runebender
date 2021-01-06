@@ -124,25 +124,22 @@ fn get_initial_state() -> AppState {
 /// temporary; creates a new blank  font with some placeholder glyphs.
 fn create_blank_font() -> norad::Ufo {
     let mut ufo = norad::Ufo::new();
-    let mut font_info = norad::FontInfo::default();
-    // just some reasonable default values
-    font_info.family_name = Some("Untitled".into());
-    font_info.style_name = Some("Regular".into());
-    font_info.units_per_em = Some(TryFrom::try_from(1000.0f64).unwrap());
-    font_info.descender = Some(From::from(-200.0));
-    font_info.ascender = Some(800.0.into());
-    font_info.cap_height = Some(700.0.into());
-    font_info.x_height = Some(500.0.into());
-    ufo.font_info = Some(font_info);
-
-    let a_ = 'a' as u32;
-    #[allow(non_snake_case)]
-    let A_ = 'A' as u32;
+    ufo.font_info = norad::FontInfo {
+        family_name: Some("Untitled".into()),
+        style_name: Some("Regular".into()),
+        units_per_em: Some(TryFrom::try_from(1000.0f64).unwrap()),
+        descender: Some(From::from(-200.0)),
+        ascender: Some(800.0.into()),
+        cap_height: Some(700.0.into()),
+        x_height: Some(500.0.into()),
+        ..Default::default()
+    }
+    .into();
 
     let layer = ufo.get_default_layer_mut().unwrap();
-    (0..26)
-        .map(|i| std::char::from_u32(a_ + i).unwrap())
-        .chain((0..26).map(|i| std::char::from_u32(A_ + i).unwrap()))
+    ('a'..='z')
+        .into_iter()
+        .chain('A'..='Z')
         .map(|chr| {
             let mut glyph = norad::Glyph::new_named(chr.to_string());
             glyph.codepoints = Some(vec![chr]);
