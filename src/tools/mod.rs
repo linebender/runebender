@@ -130,6 +130,7 @@ pub fn tool_for_id(id: ToolId) -> Option<Box<dyn Tool>> {
 }
 
 impl EditType {
+    #[allow(clippy::match_like_matches_macro)]
     pub fn needs_new_undo_group(self, other: EditType) -> bool {
         match (self, other) {
             (EditType::NudgeDown, EditType::NudgeDown) => false,

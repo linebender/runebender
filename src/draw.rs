@@ -471,7 +471,7 @@ pub(crate) fn draw_session(
 /// Return the tangent of the cubic bezier `cb`, at time `t`, as a vector
 /// relative to the path's start point.
 fn tangent_vector(t: f64, cb: CubicBez) -> Vec2 {
-    debug_assert!(t >= 0.0 && t <= 1.0);
+    debug_assert!((0.0..=1.0).contains(&t));
     let CubicBez { p0, p1, p2, p3 } = cb;
     let one_minus_t = 1.0 - t;
     3.0 * one_minus_t.powi(2) * (p1 - p0)
