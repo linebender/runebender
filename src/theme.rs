@@ -1,7 +1,12 @@
 //! Colors and other things that we like.
 
-pub use druid::theme::{SELECTION_COLOR, UI_FONT};
-use druid::{Color, Env, FontDescriptor, Key};
+pub use druid::theme::{
+    BACKGROUND_LIGHT, BUTTON_DARK, BUTTON_LIGHT, CURSOR_COLOR, LABEL_COLOR, SELECTION_COLOR,
+    UI_FONT, WINDOW_BACKGROUND_COLOR,
+};
+use druid::{Color, Data, Env, FontDescriptor, Key, Widget};
+
+const THEME_FILE_PATH: &str = "resources/default.theme";
 
 pub const SIDEBAR_BACKGROUND: Key<Color> = Key::new("runebender.sidebar-background");
 pub const SIDEBAR_EDGE_STROKE: Key<Color> = Key::new("runebender.sidebar-edge-stroke");
@@ -26,33 +31,29 @@ pub const SELECTION_RECT_STROKE_COLOR: Key<Color> =
 /// The font used for things like hovering over points
 pub const UI_DETAIL_FONT: Key<FontDescriptor> = Key::new("runebender.detail-font");
 
-pub mod colors {
-    use druid::Color;
-
-    pub const LIGHT_GREY: Color = Color::grey8(0xe7);
-    pub const MEDIUM_GREY: Color = Color::grey8(0x88);
-    pub const SIDEBAR_EDGE: Color = Color::grey8(0xc7);
-    pub const HIGHLIGHT_COLOR: Color = Color::rgb8(0xA6, 0xCC, 0xFF);
-    pub const LIGHT_BLUE: Color = Color::rgb8(0x53, 0x8B, 0xBB);
-    pub const TRANSPARENT_LIGHT_GREY: Color = Color::rgba8(0xDD, 0xDD, 0xDD, 0x55);
+pub fn configure_env(env: &mut Env) {
+    env.set(UI_DETAIL_FONT, FontDescriptor::default().with_size(12.0));
 }
 
-pub fn configure_env(env: &mut Env) {
-    env.set(SIDEBAR_BACKGROUND, colors::LIGHT_GREY);
-    env.set(SIDEBAR_EDGE_STROKE, colors::SIDEBAR_EDGE);
-    env.set(PLACEHOLDER_GLYPH_COLOR, Color::grey8(0xBB));
-    env.set(GLYPH_LIST_STROKE, colors::LIGHT_GREY);
-    env.set(GLYPH_LIST_BACKGROUND, Color::grey8(0xF0));
-    env.set(PRIMARY_TEXT_COLOR, Color::BLACK);
-    env.set(SECONDARY_TEXT_COLOR, colors::MEDIUM_GREY);
-    env.set(SELECTION_RECT_STROKE_COLOR, colors::LIGHT_BLUE);
-    env.set(SELECTION_RECT_FILL_COLOR, colors::TRANSPARENT_LIGHT_GREY);
-    env.set(druid::theme::SELECTION_COLOR, colors::HIGHLIGHT_COLOR);
-    env.set(druid::theme::LABEL_COLOR, Color::BLACK);
-    env.set(druid::theme::WINDOW_BACKGROUND_COLOR, Color::WHITE);
-    env.set(druid::theme::BACKGROUND_LIGHT, colors::LIGHT_GREY);
-    env.set(druid::theme::CURSOR_COLOR, Color::BLACK);
-    env.set(druid::theme::BUTTON_DARK, Color::grey8(200));
-    env.set(druid::theme::BUTTON_LIGHT, Color::WHITE);
-    env.set(UI_DETAIL_FONT, FontDescriptor::default().with_size(12.0));
+druid_theme_loader::loadable_theme!(pub MyTheme {
+    SIDEBAR_BACKGROUND,
+    SIDEBAR_EDGE_STROKE,
+    PLACEHOLDER_GLYPH_COLOR,
+    GLYPH_LIST_STROKE,
+    GLYPH_LIST_BACKGROUND,
+    PRIMARY_TEXT_COLOR,
+    SECONDARY_TEXT_COLOR,
+    SELECTION_RECT_STROKE_COLOR,
+    SELECTION_RECT_FILL_COLOR,
+    SELECTION_COLOR,
+    LABEL_COLOR,
+    WINDOW_BACKGROUND_COLOR,
+    BACKGROUND_LIGHT,
+    CURSOR_COLOR,
+    BUTTON_DARK,
+    BUTTON_LIGHT,
+});
+
+pub fn wrap_in_theme_loader<T: Data>(widget: impl Widget<T>) -> impl Widget<T> {
+    druid_theme_loader::ThemeLoader::new(THEME_FILE_PATH, MyTheme, widget)
 }
