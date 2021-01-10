@@ -1,0 +1,21 @@
+// A sample theme file
+// these are comments; blank lines are ignored
+
+SIDEBAR_BACKGROUND:             #e7e7e7
+SIDEBAR_EDGE_STROKE:            #c7c7c7
+PLACEHOLDER_GLYPH_COLOR:        #bbb
+GLYPH_LIST_STROKE:              #e7e7e7
+GLYPH_LIST_BACKGROUND:          #f0f0f0
+PRIMARY_TEXT_COLOR:             #000
+SECONDARY_TEXT_COLOR:           #888
+SELECTION_RECT_STROKE_COLOR:    #538bbb
+SELECTION_RECT_FILL_COLOR:      #ddd5
+
+
+SELECTION_COLOR:                #a6ccff
+LABEL_COLOR:                    #000
+WINDOW_BACKGROUND_COLOR:        #fff
+BACKGROUND_LIGHT:               #e7e7e7
+CURSOR_COLOR:                   #000
+BUTTON_DARK:                    #c8c8c8
+BUTTON_LIGHT:                   #fff

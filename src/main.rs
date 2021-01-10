@@ -60,8 +60,11 @@ fn main() {
 fn make_ui() -> impl Widget<AppState> {
     // paint a line under the top title bar
     let hline_painter = Painter::new(|ctx, _: &Workspace, env| {
-        let max_y = ctx.size().height - 0.5;
-        let line = Line::new((0.0, max_y), (ctx.size().width, max_y));
+        let rect = ctx.size().to_rect();
+        let max_y = rect.height() - 0.5;
+        let line = Line::new((0.0, max_y), (rect.width(), max_y));
+
+        ctx.fill(rect, &env.get(theme::GLYPH_LIST_BACKGROUND));
         ctx.stroke(line, &env.get(theme::SIDEBAR_EDGE_STROKE), 1.0);
     });
 
@@ -93,9 +96,11 @@ fn make_ui() -> impl Widget<AppState> {
             1.,
         );
 
-    ModalHost::new(main_view)
-        .lens(AppState::workspace)
-        .controller(RootWindowController::default())
+    crate::theme::wrap_in_theme_loader(
+        ModalHost::new(main_view)
+            .lens(AppState::workspace)
+            .controller(RootWindowController::default()),
+    )
 }
 
 /// If there was an argument passed at the command line, try to open it as a .ufo

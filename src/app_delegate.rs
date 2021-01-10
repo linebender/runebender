@@ -118,7 +118,9 @@ impl AppDelegate<AppState> for Delegate {
 }
 
 fn make_editor(session: &Arc<EditSession>) -> impl Widget<AppState> {
-    EditorController::new(ScrollZoom::new(Editor::new(session.clone())))
-        .lens(AppState::workspace.then(Workspace::editor_state(session.id)))
-        .controller(RootWindowController::default())
+    crate::theme::wrap_in_theme_loader(
+        EditorController::new(ScrollZoom::new(Editor::new(session.clone())))
+            .lens(AppState::workspace.then(Workspace::editor_state(session.id)))
+            .controller(RootWindowController::default()),
+    )
 }
