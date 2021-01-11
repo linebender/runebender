@@ -106,6 +106,9 @@ macro_rules! loadable_theme {
                 }
 
                 let mut new_env = current.clone();
+                let mut expected_keys = std::collections::HashSet::with_capacity(raw.len());
+                // TODO: it would be nice to also verify that all keys have unique identifiers?
+                // this requires https://github.com/linebender/druid/pull/1527
 
                 $(
                 let kind = get_kind(&$key)?;
@@ -120,8 +123,17 @@ macro_rules! loadable_theme {
                     }
                 }?;
                 new_env.try_set_raw($key, val).map_err(ThemeLoadError::ValueTypeError)?;
+                expected_keys.insert(key_ident);
                 )+
+
+                let unexpected_keys = raw.keys().filter(|k| !expected_keys.contains(*k))
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>();
+                if unexpected_keys.is_empty() {
                     Ok(new_env)
+                } else {
+                    Err(ThemeLoadError::UnexpectedKeys(unexpected_keys))
+                }
             }
         }
     };
@@ -150,6 +162,7 @@ pub enum ThemeLoadError {
     ParseColorError(druid::piet::ColorParseError),
     ParseFloatError(std::num::ParseFloatError),
     ValueTypeError(druid::ValueTypeError),
+    UnexpectedKeys(Vec<String>),
     ParseThemeLineError(String),
 }
 
@@ -162,6 +175,9 @@ impl std::fmt::Display for ThemeLoadError {
             Self::ParseColorError(e) => write!(f, "Theme failed to parse color: '{}'", e),
             Self::ParseFloatError(e) => write!(f, "Theme failed to parse float: '{}'", e),
             Self::ValueTypeError(e) => write!(f, "Theme value type mismatch: '{}'", e),
+            Self::UnexpectedKeys(keys) => {
+                write!(f, "Theme file contained undeclared keys: {:?}", keys)
+            }
             Self::ParseThemeLineError(s) => {
                 write!(f, "Theme contained malformed line: '{}'", s.escape_debug())
             }
