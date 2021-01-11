@@ -239,6 +239,7 @@ impl Widget<EditorState> for Editor {
 
         draw::draw_session(
             ctx,
+            env,
             data.session.viewport,
             ctx.region().bounding_box(),
             &data.metrics,

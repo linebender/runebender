@@ -31,6 +31,37 @@ pub const SELECTION_RECT_STROKE_COLOR: Key<Color> =
 /// The font used for things like hovering over points
 pub const UI_DETAIL_FONT: Key<FontDescriptor> = Key::new("runebender.detail-font");
 
+pub const PATH_STROKE_COLOR: Key<Color> = Key::new("runebender.path-stroke-color");
+pub const PATH_FILL_COLOR: Key<Color> = Key::new("runebender.path-fill-color");
+pub const METRICS_COLOR: Key<Color> = Key::new("runebender.metrics-color");
+pub const GUIDE_COLOR: Key<Color> = Key::new("runebender.guide-color");
+pub const SELECTED_GUIDE_COLOR: Key<Color> = Key::new("runebender.selected-guide-color");
+pub const SELECTED_LINE_SEGMENT_COLOR: Key<Color> =
+    Key::new("runebender.selected-line-segment-color");
+pub const SELECTED_POINT_INNER_COLOR: Key<Color> =
+    Key::new("runebender.selected-point-inner-color");
+pub const SELECTED_POINT_OUTER_COLOR: Key<Color> =
+    Key::new("runebender.selected-point-outer-color");
+pub const SMOOTH_POINT_OUTER_COLOR: Key<Color> = Key::new("runebender.smooth-point-outer-color");
+pub const SMOOTH_POINT_INNER_COLOR: Key<Color> = Key::new("runebender.smooth-point-inner-color");
+pub const CORNER_POINT_OUTER_COLOR: Key<Color> = Key::new("runebender.corner-point-outer-color");
+pub const CORNER_POINT_INNER_COLOR: Key<Color> = Key::new("runebender.corner-point-inner-color");
+pub const OFF_CURVE_POINT_OUTER_COLOR: Key<Color> =
+    Key::new("runebender.off-curve-point-outer-color");
+pub const OFF_CURVE_POINT_INNER_COLOR: Key<Color> =
+    Key::new("runebender.off-curve-point-inner-color");
+pub const OFF_CURVE_HANDLE_COLOR: Key<Color> = Key::new("runebender.off-curve-handle-color");
+pub const DIRECTION_ARROW_COLOR: Key<Color> = Key::new("runebender.direction-arrow-color");
+pub const COMPONENT_FILL_COLOR: Key<Color> = Key::new("runebender.component-fill-color");
+
+pub const SMOOTH_RADIUS: Key<f64> = Key::new("runebender.smooth-point-radius");
+pub const SMOOTH_SELECTED_RADIUS: Key<f64> = Key::new("runebender.smooth-point-selected-radius");
+pub const CORNER_RADIUS: Key<f64> = Key::new("runebender.corner-point-radius");
+pub const CORNER_SELECTED_RADIUS: Key<f64> = Key::new("runebender.corner-point-selected-radius");
+pub const OFF_CURVE_RADIUS: Key<f64> = Key::new("runebender.off-curve-point-radius");
+pub const OFF_CURVE_SELECTED_RADIUS: Key<f64> =
+    Key::new("runebender.off-curve-point-selected-radius");
+
 pub fn configure_env(env: &mut Env) {
     env.set(UI_DETAIL_FONT, FontDescriptor::default().with_size(12.0));
 }
@@ -52,6 +83,30 @@ druid_theme_loader::loadable_theme!(pub MyTheme {
     CURSOR_COLOR,
     BUTTON_DARK,
     BUTTON_LIGHT,
+    PATH_STROKE_COLOR,
+    PATH_FILL_COLOR,
+    METRICS_COLOR,
+    GUIDE_COLOR,
+    SELECTED_GUIDE_COLOR,
+    SELECTED_LINE_SEGMENT_COLOR,
+    SELECTED_POINT_INNER_COLOR,
+    SELECTED_POINT_OUTER_COLOR,
+    SMOOTH_POINT_OUTER_COLOR,
+    SMOOTH_POINT_INNER_COLOR,
+    CORNER_POINT_OUTER_COLOR,
+    CORNER_POINT_INNER_COLOR,
+    OFF_CURVE_POINT_OUTER_COLOR,
+    OFF_CURVE_POINT_INNER_COLOR,
+    OFF_CURVE_HANDLE_COLOR,
+    DIRECTION_ARROW_COLOR,
+    COMPONENT_FILL_COLOR,
+    SMOOTH_RADIUS,
+    SMOOTH_SELECTED_RADIUS,
+    CORNER_RADIUS,
+    CORNER_SELECTED_RADIUS,
+    OFF_CURVE_RADIUS,
+    OFF_CURVE_SELECTED_RADIUS,
+
 });
 
 pub fn wrap_in_theme_loader<T: Data>(widget: impl Widget<T>) -> impl Widget<T> {
