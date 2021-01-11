@@ -19,3 +19,31 @@ BACKGROUND_LIGHT:               #e7e7e7
 CURSOR_COLOR:                   #000
 BUTTON_DARK:                    #c8c8c8
 BUTTON_LIGHT:                   #fff
+
+// drawing of paths and points in the editor
+
+PATH_STROKE_COLOR:              #000
+PATH_FILL_COLOR:                #f1c        // during preview
+METRICS_COLOR:                  #a0a0a0     // the color of the ascender/descender/em box
+
+GUIDE_COLOR:                    #fc5493
+SELECTED_GUIDE_COLOR:           #fecdcd
+SELECTED_LINE_SEGMENT_COLOR:    #93c6f4
+SELECTED_POINT_INNER_COLOR:     #fe59
+SELECTED_POINT_OUTER_COLOR:     #fa1
+SMOOTH_POINT_OUTER_COLOR:       #4428ec
+SMOOTH_POINT_INNER_COLOR:       #579aff
+CORNER_POINT_OUTER_COLOR:       #208e56
+CORNER_POINT_INNER_COLOR:       #6ae756
+OFF_CURVE_POINT_OUTER_COLOR:    #999
+OFF_CURVE_POINT_INNER_COLOR:    #ccc
+OFF_CURVE_HANDLE_COLOR:         #bbb
+DIRECTION_ARROW_COLOR:          #208e5699
+COMPONENT_FILL_COLOR:           #f004
+
+SMOOTH_RADIUS:                  5.
+SMOOTH_SELECTED_RADIUS:         6.5
+CORNER_RADIUS:                  4.5
+CORNER_SELECTED_RADIUS:         6.
+OFF_CURVE_RADIUS:               3.5
+OFF_CURVE_SELECTED_RADIUS:      5.

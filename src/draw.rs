@@ -9,40 +9,18 @@ use crate::edit_session::EditSession;
 use crate::guides::{Guide, GuideLine};
 use crate::path::{Path, PathSeg, PointType};
 use crate::selection::Selection;
+use crate::theme;
 
 use druid::kurbo::{self, Affine, BezPath, Circle, CubicBez, Line, Point, Rect, Vec2};
 use druid::piet::{Color, Piet, RenderContext};
-use druid::PaintCtx;
+use druid::{Env, PaintCtx};
 
 use norad::Glyph;
-
-const PATH_COLOR: Color = Color::rgb8(0x00, 0x00, 0x00);
-const METRICS_COLOR: Color = Color::rgb8(0xA0, 0xA0, 0xA0);
-const GUIDE_COLOR: Color = Color::rgb8(0xFC, 0x54, 0x93);
-const SELECTED_GUIDE_COLOR: Color = Color::rgb8(0xFE, 0xCD, 0xCD);
-const SELECTED_LINE_SEGMENT_COLOR: Color = Color::rgb8(0x93, 0xC6, 0xF4);
-const SELECTED_POINT_INNER_COLOR: Color = Color::rgba8(0xFF, 0xEE, 0x55, 0x99);
-const SELECTED_POINT_OUTER_COLOR: Color = Color::rgb8(0xFF, 0xAA, 0x11);
-const SMOOTH_POINT_OUTER_COLOR: Color = Color::rgb8(0x44, 0x28, 0xEC);
-const SMOOTH_POINT_INNER_COLOR: Color = Color::rgb8(0x57, 0x9A, 0xFF);
-const CORNER_POINT_OUTER_COLOR: Color = Color::rgb8(0x20, 0x8E, 0x56);
-const CORNER_POINT_INNER_COLOR: Color = Color::rgb8(0x6A, 0xE7, 0x56);
-const OFF_CURVE_POINT_OUTER_COLOR: Color = Color::grey8(0x99);
-const OFF_CURVE_POINT_INNER_COLOR: Color = Color::grey8(0xCC);
-const OFF_CURVE_HANDLE_COLOR: Color = Color::grey8(0xBB);
-const DIRECTION_ARROW_COLOR: Color = Color::rgba8(0x20, 0x8E, 0x56, 0x99);
-const COMPONENT_FILL_COLOR: Color = Color::rgba8(0, 0, 0, 0x44);
-
-const SMOOTH_RADIUS: f64 = 5.;
-const SMOOTH_SELECTED_RADIUS: f64 = 6.5;
-const CORNER_RADIUS: f64 = 4.5;
-const CORNER_SELECTED_RADIUS: f64 = 6.;
-const OFF_CURVE_RADIUS: f64 = 3.5;
-const OFF_CURVE_SELECTED_RADIUS: f64 = 5.;
 
 /// A context for drawing that maps between screen space and design space.
 struct DrawCtx<'a, 'b: 'a> {
     ctx: &'a mut Piet<'b>,
+    env: &'a Env,
     space: ViewPort,
     /// the size of the drawing area
     visible_rect: Rect,
@@ -63,15 +41,16 @@ impl<'a, 'b> std::ops::DerefMut for DrawCtx<'a, 'b> {
 }
 
 impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
-    fn new(ctx: &'a mut Piet<'b>, space: ViewPort, visible_rect: Rect) -> Self {
+    fn new(ctx: &'a mut Piet<'b>, env: &'a Env, space: ViewPort, visible_rect: Rect) -> Self {
         DrawCtx {
             ctx,
+            env,
             space,
             visible_rect,
         }
     }
 
-    fn draw_metrics(&mut self, glyph: &Glyph, metrics: &FontMetrics) {
+    fn draw_metrics(&mut self, glyph: &Glyph, metrics: &FontMetrics, env: &Env) {
         let upm = metrics.units_per_em;
         let x_height = metrics.x_height.unwrap_or_else(|| (upm * 0.5).round());
         let cap_height = metrics.cap_height.unwrap_or_else(|| (upm * 0.7).round());
@@ -83,21 +62,22 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
             .map(|a| a.width as f64)
             .unwrap_or_else(|| (upm * 0.5).round());
 
+        let metrics_color = env.get(theme::METRICS_COLOR);
         let bounds = Rect::from_points((0., descender), (hadvance, ascender));
         let bounds = self.space.rect_to_screen(bounds);
-        self.stroke(bounds, &METRICS_COLOR, 1.0);
+        self.stroke(bounds, &metrics_color, 1.0);
 
         let baseline = Line::new((0.0, 0.0), (hadvance, 0.0));
         let baseline = self.space.affine() * baseline;
-        self.stroke(baseline, &METRICS_COLOR, 1.0);
+        self.stroke(baseline, &metrics_color, 1.0);
 
         let x_height_guide = Line::new((0.0, x_height), (hadvance, x_height));
         let x_height_guide = self.space.affine() * x_height_guide;
-        self.stroke(x_height_guide, &METRICS_COLOR, 1.0);
+        self.stroke(x_height_guide, &metrics_color, 1.0);
 
         let cap_height_guide = Line::new((0.0, cap_height), (hadvance, cap_height));
         let cap_height_guide = self.space.affine() * cap_height_guide;
-        self.stroke(cap_height_guide, &METRICS_COLOR, 1.0);
+        self.stroke(cap_height_guide, &metrics_color, 1.0);
     }
 
     fn draw_grid(&mut self) {
@@ -138,26 +118,13 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         }
     }
 
-    fn draw_guides(&mut self, guides: &[Guide], sels: &Selection) {
-        //eprintln!("drawing {} guides", guides.len());
-        //let view_origin = self.space.transform().inverse() * Point::new(0., 0.);
-        //let Point { x, y } = view_origin.round();
-        //let visible_pixels = 2000. / self.space.zoom;
-        //let bounds = Rect::from_points((x, y), (x + visible_pixels, y + visible_pixels));
-
-        let brush = self.solid_brush(GUIDE_COLOR);
-        let sel_brush = self.solid_brush(SELECTED_GUIDE_COLOR);
+    fn draw_guides(&mut self, guides: &[Guide], sels: &Selection, env: &Env) {
         for guide in guides {
             let line = self.line_for_guide(guide);
-            //if intersects(line, bounds) {
-            //eprintln!("drawing {:?}", line);
             if sels.contains(&guide.id) {
-                self.stroke(line, &sel_brush, 8.0);
+                self.stroke(line, &env.get(theme::SELECTED_GUIDE_COLOR), 8.0);
             }
-            self.stroke(line, &brush, 0.5);
-            //} else {
-            //eprintln!("skipping {:?}", guide);
-            //}
+            self.stroke(line, &env.get(theme::GUIDE_COLOR), 0.5);
         }
     }
 
@@ -192,23 +159,26 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         //FIXME: this is less efficient than it could be; we create and
         //check all segments of all paths, and we could at least just keep track
         //of whether a path contained *any* selected points, and short-circuit.
+        let selected_seg_color = self.env.get(theme::SELECTED_LINE_SEGMENT_COLOR);
         for segment in path.segments_for_points(sels) {
             let seg = self.space.affine() * segment.to_kurbo();
-            self.stroke(&seg, &SELECTED_LINE_SEGMENT_COLOR, 3.0);
+            //TODO: add width to theme
+            self.stroke(&seg, &selected_seg_color, 3.0);
         }
     }
 
     fn draw_path(&mut self, bez: &BezPath) {
-        let path_brush = self.solid_brush(PATH_COLOR);
-        self.stroke(bez, &path_brush, 1.0);
+        let path_color = self.env.get(theme::PATH_STROKE_COLOR);
+        self.stroke(bez, &path_color, 1.0);
     }
 
     fn draw_filled(&mut self, session: &EditSession, font: &Workspace) {
         let bez = self.space.affine() * session.to_bezier();
-        self.fill(bez, &Color::BLACK);
+        let fill_color = self.env.get(theme::PATH_FILL_COLOR);
+        self.fill(bez, &fill_color);
 
         for comp in session.components.iter() {
-            self.draw_component(comp, font, Color::BLACK);
+            self.draw_component(comp, font, &fill_color);
         }
     }
 
@@ -237,84 +207,86 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
     }
 
     fn draw_control_handle(&mut self, p1: Point, p2: Point) {
+        let handle_color = self.env.get(theme::OFF_CURVE_HANDLE_COLOR);
         let l = Line::new(p1, p2);
-        self.stroke(l, &OFF_CURVE_HANDLE_COLOR, 1.0);
+        self.stroke(l, &handle_color, 1.0);
     }
 
-    fn draw_point(&mut self, point: PointStyle) {
+    fn draw_point(&mut self, point: PointStyle, env: &Env) {
         let PointStyle {
             style,
             point,
             selected,
         } = point;
         match style {
-            Style::Open(seg) => self.draw_open_path_terminal(&seg, selected),
-            Style::Close(seg) => self.draw_open_path_terminal(&seg, selected),
-            Style::OffCurve => self.draw_off_curve_point(point, selected),
-            Style::Smooth => self.draw_smooth_point(point, selected),
-            Style::Tangent => self.draw_smooth_point(point, selected),
-            Style::Corner => self.draw_corner_point(point, selected),
+            Style::Open(seg) => self.draw_open_path_terminal(&seg, selected, env),
+            Style::Close(seg) => self.draw_open_path_terminal(&seg, selected, env),
+            Style::OffCurve => self.draw_off_curve_point(point, selected, env),
+            Style::Smooth => self.draw_smooth_point(point, selected, env),
+            Style::Tangent => self.draw_smooth_point(point, selected, env),
+            Style::Corner => self.draw_corner_point(point, selected, env),
         }
     }
 
-    fn draw_open_path_terminal(&mut self, seg: &kurbo::PathSeg, selected: bool) {
+    fn draw_open_path_terminal(&mut self, seg: &kurbo::PathSeg, selected: bool, env: &Env) {
         let cap = cap_line(seg.to_cubic(), 12.);
+        let handle_color = env.get(theme::OFF_CURVE_HANDLE_COLOR);
         if selected {
-            self.stroke(cap, &OFF_CURVE_HANDLE_COLOR, 3.0);
+            self.stroke(cap, &handle_color, 3.0);
         } else {
-            self.stroke(cap, &OFF_CURVE_HANDLE_COLOR, 2.0);
+            self.stroke(cap, &handle_color, 2.0);
         }
     }
 
-    fn draw_smooth_point(&mut self, p: Point, selected: bool) {
+    fn draw_smooth_point(&mut self, p: Point, selected: bool, env: &Env) {
         let radius = if selected {
-            SMOOTH_SELECTED_RADIUS
+            env.get(theme::SMOOTH_SELECTED_RADIUS)
         } else {
-            SMOOTH_RADIUS
+            env.get(theme::SMOOTH_RADIUS)
         };
         let circ = Circle::new(p, radius);
         if selected {
-            self.fill(circ, &SELECTED_POINT_INNER_COLOR);
-            self.stroke(circ, &SELECTED_POINT_OUTER_COLOR, 2.0);
+            self.fill(circ, &env.get(theme::SELECTED_POINT_INNER_COLOR));
+            self.stroke(circ, &env.get(theme::SELECTED_POINT_OUTER_COLOR), 2.0);
         } else {
-            self.fill(circ, &SMOOTH_POINT_INNER_COLOR);
-            self.stroke(circ, &SMOOTH_POINT_OUTER_COLOR, 2.0);
+            self.fill(circ, &env.get(theme::SMOOTH_POINT_INNER_COLOR));
+            self.stroke(circ, &env.get(theme::SMOOTH_POINT_OUTER_COLOR), 2.0);
         }
     }
 
-    fn draw_corner_point(&mut self, p: Point, selected: bool) {
+    fn draw_corner_point(&mut self, p: Point, selected: bool, env: &Env) {
         let radius = if selected {
-            CORNER_SELECTED_RADIUS
+            env.get(theme::CORNER_SELECTED_RADIUS)
         } else {
-            CORNER_RADIUS
+            env.get(theme::CORNER_RADIUS)
         };
         let rect = Rect::new(p.x - radius, p.y - radius, p.x + radius, p.y + radius);
         if selected {
-            self.fill(rect, &SELECTED_POINT_INNER_COLOR);
-            self.stroke(rect, &SELECTED_POINT_OUTER_COLOR, 2.0);
+            self.fill(rect, &env.get(theme::SELECTED_POINT_INNER_COLOR));
+            self.stroke(rect, &env.get(theme::SELECTED_POINT_OUTER_COLOR), 2.0);
         } else {
-            self.fill(rect, &CORNER_POINT_INNER_COLOR);
-            self.stroke(rect, &CORNER_POINT_OUTER_COLOR, 2.0);
+            self.fill(rect, &env.get(theme::CORNER_POINT_INNER_COLOR));
+            self.stroke(rect, &env.get(theme::CORNER_POINT_OUTER_COLOR), 2.0);
         }
     }
 
-    fn draw_off_curve_point(&mut self, p: Point, selected: bool) {
+    fn draw_off_curve_point(&mut self, p: Point, selected: bool, env: &Env) {
         let radius = if selected {
-            OFF_CURVE_SELECTED_RADIUS
+            env.get(theme::OFF_CURVE_SELECTED_RADIUS)
         } else {
-            OFF_CURVE_RADIUS
+            env.get(theme::OFF_CURVE_RADIUS)
         };
         let circ = Circle::new(p, radius);
         if selected {
-            self.fill(circ, &SELECTED_POINT_INNER_COLOR);
-            self.stroke(circ, &SELECTED_POINT_OUTER_COLOR, 2.0);
+            self.fill(circ, &env.get(theme::SELECTED_POINT_INNER_COLOR));
+            self.stroke(circ, &env.get(theme::SELECTED_POINT_OUTER_COLOR), 2.0);
         } else {
-            self.fill(circ, &OFF_CURVE_POINT_INNER_COLOR);
-            self.stroke(circ, &OFF_CURVE_POINT_OUTER_COLOR, 2.0);
+            self.fill(circ, &env.get(theme::OFF_CURVE_POINT_INNER_COLOR));
+            self.stroke(circ, &env.get(theme::OFF_CURVE_POINT_OUTER_COLOR), 2.0);
         }
     }
 
-    fn draw_direction_indicator(&mut self, path: &BezPath) {
+    fn draw_direction_indicator(&mut self, path: &BezPath, env: &Env) {
         let first_seg = match path.segments().next().as_ref().map(|seg| seg.to_cubic()) {
             None => return,
             Some(cubic) => cubic,
@@ -327,15 +299,15 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         let mut arrow = make_arrow();
         arrow.apply_affine(rotate);
         arrow.apply_affine(translate);
-        self.fill(arrow, &DIRECTION_ARROW_COLOR);
+        self.fill(arrow, &env.get(theme::DIRECTION_ARROW_COLOR));
     }
 
-    fn draw_component(&mut self, component: &Component, font: &Workspace, color: Color) {
+    fn draw_component(&mut self, component: &Component, font: &Workspace, color: &Color) {
         if let Some(mut bez) = font.get_bezier(&component.base) {
             let bez = Arc::make_mut(&mut bez);
             bez.apply_affine(component.transform);
             bez.apply_affine(self.space.affine());
-            self.fill(&*bez, &color);
+            self.fill(&*bez, color);
         }
     }
 }
@@ -422,8 +394,10 @@ impl<'a> std::iter::Iterator for PointIter<'a> {
     }
 }
 
+#[allow(clippy::clippy::too_many_arguments)]
 pub(crate) fn draw_session(
     ctx: &mut PaintCtx,
+    env: &Env,
     space: ViewPort,
     visible_rect: Rect,
     metrics: &FontMetrics,
@@ -431,7 +405,7 @@ pub(crate) fn draw_session(
     font: &Workspace,
     is_preview: bool,
 ) {
-    let mut draw_ctx = DrawCtx::new(&mut ctx.render_ctx, space, visible_rect);
+    let mut draw_ctx = DrawCtx::new(&mut ctx.render_ctx, env, space, visible_rect);
 
     if is_preview {
         draw_ctx.draw_filled(session, font);
@@ -439,8 +413,8 @@ pub(crate) fn draw_session(
     }
 
     draw_ctx.draw_grid();
-    draw_ctx.draw_metrics(&session.glyph, metrics);
-    draw_ctx.draw_guides(&session.guides, &session.selection);
+    draw_ctx.draw_metrics(&session.glyph, metrics, env);
+    draw_ctx.draw_guides(&session.guides, &session.selection, env);
 
     for path in session.paths.iter() {
         if session.selection.len() > 1 {
@@ -450,21 +424,21 @@ pub(crate) fn draw_session(
         let bez = space.affine() * path.bezier();
         draw_ctx.draw_path(&bez);
         draw_ctx.draw_control_point_lines(path);
-        draw_ctx.draw_direction_indicator(&bez);
+        draw_ctx.draw_direction_indicator(&bez, env);
 
         for point in PointIter::new(path, space, &bez, &session.selection) {
-            draw_ctx.draw_point(point)
+            draw_ctx.draw_point(point, env)
         }
 
         if let Some(pt) = path.trailing() {
             if path.should_draw_trailing() {
-                draw_ctx.draw_off_curve_point(pt.to_screen(space), true);
+                draw_ctx.draw_off_curve_point(pt.to_screen(space), true, env);
             }
         }
     }
 
     for component in session.components.iter() {
-        draw_ctx.draw_component(component, font, COMPONENT_FILL_COLOR);
+        draw_ctx.draw_component(component, font, &env.get(theme::COMPONENT_FILL_COLOR));
     }
 }
 
