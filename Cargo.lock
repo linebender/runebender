@@ -1643,6 +1643,23 @@ dependencies = [
  "lopdf",
  "norad",
  "plist",
+ "runebender-lib",
+ "serde",
+ "serde_derive",
+ "svg",
+]
+
+[[package]]
+name = "runebender-lib"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "druid",
+ "druid-theme-loader",
+ "log",
+ "lopdf",
+ "norad",
+ "plist",
  "serde",
  "serde_derive",
  "svg",

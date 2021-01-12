@@ -12,7 +12,7 @@ const OUT_FILE: &str = "glyph_names_codegen.rs";
 fn main() {
     let path = Path::new(&env::var("OUT_DIR").unwrap()).join(OUT_FILE);
     let mut file = BufWriter::new(File::create(&path).unwrap());
-    let names = include_str!("resources/aglfn.txt");
+    let names = include_str!("../resources/aglfn.txt");
 
     let mut entries = names
         .lines()

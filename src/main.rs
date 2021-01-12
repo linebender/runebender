@@ -1,45 +1,12 @@
 //! A font editor.
 
-#![allow(clippy::rc_buffer)]
-
-#[macro_use]
-extern crate serde_derive;
-
-#[macro_use]
-extern crate lopdf;
-
-mod app_delegate;
-mod bez_cache;
-mod clipboard;
-mod component;
-mod consts;
-mod data;
-mod design_space;
-mod draw;
-mod edit_session;
-mod glyph_names;
-mod guides;
-mod menus;
-mod mouse;
-mod path;
-mod plist;
-mod quadrant;
-mod selection;
-mod theme;
-mod tools;
-mod undo;
-mod util;
-pub mod widgets;
-
-use std::convert::TryFrom;
-
 use druid::kurbo::Line;
 use druid::widget::{Button, Flex, Label, Painter, Scroll, WidgetExt};
 use druid::{AppLauncher, Env, LocalizedString, RenderContext, Size, Widget, WindowDesc};
 
-use data::{AppState, Workspace};
-
-use widgets::{GlyphGrid, ModalHost, RootWindowController, Sidebar};
+use runebender_lib::data::{AppState, Workspace};
+use runebender_lib::widgets::{self, GlyphGrid, ModalHost, RootWindowController, Sidebar};
+use runebender_lib::{menus, theme, Delegate};
 
 fn main() {
     let state = get_initial_state();
@@ -50,7 +17,7 @@ fn main() {
         .window_size(Size::new(900.0, 800.0));
 
     AppLauncher::with_window(main_window)
-        .delegate(app_delegate::Delegate::default())
+        .delegate(Delegate::default())
         .configure_env(|env, _| theme::configure_env(env))
         .use_simple_logger()
         .launch(state)
@@ -118,38 +85,10 @@ fn get_initial_state() -> AppState {
             }
         }
     } else {
-        (create_blank_font(), None)
+        (runebender_lib::create_blank_font(), None)
     };
 
     let mut workspace = Workspace::default();
     workspace.set_file(font_file, path);
     AppState { workspace }
-}
-
-/// temporary; creates a new blank  font with some placeholder glyphs.
-fn create_blank_font() -> norad::Ufo {
-    let mut ufo = norad::Ufo::new();
-    ufo.font_info = norad::FontInfo {
-        family_name: Some("Untitled".into()),
-        style_name: Some("Regular".into()),
-        units_per_em: Some(TryFrom::try_from(1000.0f64).unwrap()),
-        descender: Some(From::from(-200.0)),
-        ascender: Some(800.0.into()),
-        cap_height: Some(700.0.into()),
-        x_height: Some(500.0.into()),
-        ..Default::default()
-    }
-    .into();
-
-    let layer = ufo.get_default_layer_mut().unwrap();
-    ('a'..='z')
-        .into_iter()
-        .chain('A'..='Z')
-        .map(|chr| {
-            let mut glyph = norad::Glyph::new_named(chr.to_string());
-            glyph.codepoints = Some(vec![chr]);
-            glyph
-        })
-        .for_each(|glyph| layer.insert_glyph(glyph));
-    ufo
 }
