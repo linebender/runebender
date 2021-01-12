@@ -10,7 +10,8 @@ use crate::component::Component;
 use crate::data::Workspace;
 use crate::design_space::{DPoint, DVec2, ViewPort};
 use crate::guides::Guide;
-use crate::path::{EntityId, Path, PathPoint, PathSeg};
+use crate::path::{Path, PathSeg};
+use crate::point::{EntityId, PathPoint};
 use crate::quadrant::Quadrant;
 use crate::selection::Selection;
 

@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use druid::Data;
 
-use crate::path::EntityId;
+use crate::point::EntityId;
 
 /// A sorted set of selected items.
 #[derive(Debug, Clone, Data)]

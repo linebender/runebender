@@ -3,6 +3,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use super::design_space::{DPoint, DVec2, ViewPort};
+use super::point::{EntityId, PathPoint, PointType};
 use druid::kurbo::{
     Affine, BezPath, CubicBez, Line, ParamCurve, ParamCurveNearest, PathEl,
     PathSeg as KurboPathSeg, Point, Vec2,
@@ -10,43 +11,6 @@ use druid::kurbo::{
 use druid::Data;
 
 use crate::selection::Selection;
-
-const RESERVED_ID_COUNT: usize = 5;
-const GUIDE_TYPE_ID: usize = 1;
-
-/// We give paths & points unique integer identifiers.
-pub fn next_id() -> usize {
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    static NEXT_ID: AtomicUsize = AtomicUsize::new(RESERVED_ID_COUNT);
-    NEXT_ID.fetch_add(1, Ordering::Relaxed)
-}
-
-#[derive(Debug, Clone, Copy, Data, PartialEq, PartialOrd, Hash, Eq, Ord)]
-/// A unique identifier for some entity, such as a point or a component.
-///
-/// The entity has two parts; the first ('parent') identifies the type of the
-/// entity or the identity of its containing path (for points) and the second
-/// ('child') identifies the item itself.
-///
-/// A given id will be unique across the application at any given time.
-pub struct EntityId {
-    parent: usize,
-    point: usize,
-}
-
-#[derive(Debug, Clone, Copy, Data, PartialEq)]
-pub enum PointType {
-    OnCurve,
-    OnCurveSmooth,
-    OffCurve,
-}
-
-#[derive(Debug, Clone, Copy, Data, PartialEq)]
-pub struct PathPoint {
-    pub id: EntityId,
-    pub point: DPoint,
-    pub typ: PointType,
-}
 
 /// A single bezier path.
 ///
@@ -64,7 +28,7 @@ pub struct PathPoint {
 /// [contour]: https://unifiedfontobject.org/versions/ufo3/glyphs/glif/#contour
 #[derive(Debug, Data, Clone)]
 pub struct Path {
-    id: usize,
+    id: EntityId,
     points: Arc<Vec<PathPoint>>,
     trailing: Option<DPoint>,
     closed: bool,
@@ -91,86 +55,9 @@ pub struct SegPointIter {
     idx: usize,
 }
 
-impl EntityId {
-    pub fn new_with_parent(parent: usize) -> Self {
-        EntityId {
-            parent,
-            point: next_id(),
-        }
-    }
-
-    #[inline]
-    pub fn new_for_guide() -> Self {
-        EntityId::new_with_parent(GUIDE_TYPE_ID)
-    }
-
-    pub fn is_guide(self) -> bool {
-        self.parent == GUIDE_TYPE_ID
-    }
-
-    pub(crate) fn parent_eq(self, other: EntityId) -> bool {
-        self.parent == other.parent
-    }
-
-    // should only be used for things like splitting paths
-    pub(crate) fn set_parent(&mut self, parent: usize) {
-        self.parent = parent;
-    }
-}
-
-impl PointType {
-    pub fn is_on_curve(self) -> bool {
-        match self {
-            PointType::OnCurve | PointType::OnCurveSmooth => true,
-            PointType::OffCurve => false,
-        }
-    }
-}
-
-impl PathPoint {
-    pub fn off_curve(path: usize, point: DPoint) -> PathPoint {
-        let id = EntityId {
-            parent: path,
-            point: next_id(),
-        };
-        PathPoint {
-            id,
-            point,
-            typ: PointType::OffCurve,
-        }
-    }
-
-    pub fn on_curve(path: usize, point: DPoint) -> PathPoint {
-        let id = EntityId {
-            parent: path,
-            point: next_id(),
-        };
-        PathPoint {
-            id,
-            point,
-            typ: PointType::OnCurve,
-        }
-    }
-
-    pub fn is_on_curve(&self) -> bool {
-        self.typ.is_on_curve()
-    }
-
-    /// The distance, in screen space, from this `PathPoint` to `point`, a point
-    /// in screen space.
-    pub fn screen_dist(&self, vport: ViewPort, point: Point) -> f64 {
-        self.point.to_screen(vport).distance(point)
-    }
-
-    /// Convert this point to point in screen space.
-    pub fn to_screen(&self, vport: ViewPort) -> Point {
-        self.point.to_screen(vport)
-    }
-}
-
 impl Path {
     pub fn new(point: DPoint) -> Path {
-        let id = next_id();
+        let id = EntityId::next();
         let start = PathPoint::on_curve(id, point);
 
         Path {
@@ -182,13 +69,17 @@ impl Path {
     }
 
     pub fn from_raw_parts(
-        id: usize,
+        id: EntityId,
         mut points: Vec<PathPoint>,
         trailing: Option<DPoint>,
         closed: bool,
     ) -> Self {
         assert!(!points.is_empty(), "path may not be empty");
-        assert!(points.iter().all(|pt| pt.id.parent == id), "{:#?}", points);
+        assert!(
+            points.iter().all(|pt| pt.id.is_child_of(id)),
+            "{:#?}",
+            points
+        );
         if !closed {
             assert!(points.first().unwrap().is_on_curve());
         }
@@ -214,11 +105,11 @@ impl Path {
     /// For constructing a new path with points that are members of another
     /// path; we need to reset the parent ids.
     fn from_points_ignoring_parent(mut points: Vec<PathPoint>, closed: bool) -> Self {
-        let path_id = next_id();
+        let new_parent = EntityId::next();
         for pt in &mut points {
-            pt.id = EntityId::new_with_parent(path_id);
+            pt.id = EntityId::new_with_parent(new_parent);
         }
-        Path::from_raw_parts(path_id, points, None, closed)
+        Path::from_raw_parts(new_parent, points, None, closed)
     }
 
     /// Attempt to create a `Path` from a BezPath.
@@ -228,7 +119,7 @@ impl Path {
     pub(crate) fn from_bezpath(
         path: impl IntoIterator<Item = PathEl>,
     ) -> Result<Self, &'static str> {
-        let path_id = next_id();
+        let path_id = EntityId::next();
         let mut els = path.into_iter();
         let mut points = Vec::new();
         let mut explicit_close = false;
@@ -286,7 +177,7 @@ impl Path {
         );
         let closed = !matches!(src.points[0].typ, NoradPType::Move);
 
-        let path_id = next_id();
+        let path_id = EntityId::next();
 
         let mut points: Vec<PathPoint> = src
             .points
@@ -294,21 +185,8 @@ impl Path {
             .map(|src_point| {
                 //eprintln!("({}, {}): {:?}{}", src_point.x, src_point.y, src_point.typ, if src_point.smooth { " smooth" } else { "" });
                 let point = DPoint::new(src_point.x.round() as f64, src_point.y.round() as f64);
-                let typ = match &src_point.typ {
-                    NoradPType::OffCurve => PointType::OffCurve,
-                    NoradPType::QCurve => panic!(
-                        "quadratics unsupported, we should have \
-                         validated input before now"
-                    ),
-                    NoradPType::Move | NoradPType::Line | NoradPType::Curve if src_point.smooth => {
-                        PointType::OnCurveSmooth
-                    }
-                    _other => PointType::OnCurve,
-                };
-                let id = EntityId {
-                    parent: path_id,
-                    point: next_id(),
-                };
+                let typ = PointType::from_norad(&src_point.typ, src_point.smooth);
+                let id = EntityId::new_with_parent(path_id);
                 PathPoint { id, point, typ }
             })
             .collect();
@@ -323,26 +201,25 @@ impl Path {
     pub fn to_norad(&self) -> norad::glyph::Contour {
         use norad::glyph::{Contour, ContourPoint, PointType as NoradPType};
         let mut points = Vec::new();
-        let mut prev_off_curve = self.points.last().map(|p| p.typ) == Some(PointType::OffCurve);
+        let mut prev_off_curve = self
+            .points
+            .last()
+            .map(|p| !p.is_on_curve())
+            .unwrap_or(false);
         for p in self.points.iter() {
-            let typ = match p.typ {
-                PointType::OnCurve | PointType::OnCurveSmooth
-                    if points.is_empty() && !self.closed =>
-                {
-                    NoradPType::Move
-                }
-                PointType::OffCurve => NoradPType::OffCurve,
-                PointType::OnCurve | PointType::OnCurveSmooth if prev_off_curve => {
-                    NoradPType::Curve
-                }
-                _ => NoradPType::Line,
+            let needs_move = points.is_empty() && !self.closed;
+            let (typ, smooth) = match p.typ {
+                PointType::OnCurve { smooth } if needs_move => (NoradPType::Move, smooth),
+                PointType::OffCurve { .. } => (NoradPType::OffCurve, false),
+                PointType::OnCurve { smooth } if prev_off_curve => (NoradPType::Curve, smooth),
+                PointType::OnCurve { smooth } => (NoradPType::Line, smooth),
             };
-            let smooth = p.typ == PointType::OnCurveSmooth;
+            //let smooth = p.typ == PointType::OnCurveSmooth;
             let x = p.point.x as f32;
             let y = p.point.y as f32;
             let npoint = ContourPoint::new(x, y, typ, smooth, None, None, None);
             points.push(npoint);
-            prev_off_curve = p.typ == PointType::OffCurve;
+            prev_off_curve = p.is_off_curve();
         }
 
         if self.closed {
@@ -351,7 +228,7 @@ impl Path {
         Contour::new(points, None, None)
     }
 
-    pub fn id(&self) -> usize {
+    pub fn id(&self) -> EntityId {
         self.id
     }
 
@@ -359,7 +236,7 @@ impl Path {
     // exist in this path but has the same parent id, such as for a point
     // that has been deleted. I don't think this is an issue in practice?
     pub(crate) fn contains(&self, id: &EntityId) -> bool {
-        id.parent == self.id()
+        id.is_child_of(self.id())
     }
 
     pub fn is_closed(&self) -> bool {
@@ -678,18 +555,14 @@ impl Path {
         let next = self.next_idx(idx);
         if self.points[prev].typ.is_on_curve() {
             let prev2 = self.prev_idx(prev);
-            if self.points[prev].typ == PointType::OnCurveSmooth
-                && !self.points[prev2].is_on_curve()
-            {
+            if self.points[prev].is_smooth() && !self.points[prev2].is_on_curve() {
                 return Some((prev, Some(prev2)));
             } else {
                 return Some((prev, None));
             }
-        } else if self.points[next].typ.is_on_curve() {
+        } else if self.points[next].is_on_curve() {
             let next2 = self.next_idx(next);
-            if self.points[next].typ == PointType::OnCurveSmooth
-                && !self.points[next2].is_on_curve()
-            {
+            if self.points[next].is_smooth() && !self.points[next2].is_on_curve() {
                 return Some((next, Some(next2)));
             } else {
                 return Some((next, None));
@@ -738,10 +611,7 @@ impl Path {
             self.closed
         );
         for point in self.points.iter() {
-            eprintln!(
-                "[{}, {}]: {:?} {:?}",
-                point.id.parent, point.id.point, point.point, point.typ
-            );
+            eprintln!("{:?}", point);
         }
     }
 
@@ -766,12 +636,12 @@ impl Path {
         self.debug_print_points();
 
         match self.points[idx].typ {
-            PointType::OffCurve => {
+            p if p.is_off_curve() => {
                 // delete both of the off curve points for this segment
-                let other_id = if self.points[prev_idx].typ == PointType::OffCurve {
+                let other_id = if self.points[prev_idx].is_off_curve() {
                     self.points[prev_idx].id
                 } else {
-                    assert!(self.points[next_idx].typ == PointType::OffCurve);
+                    assert!(self.points[next_idx].is_off_curve());
                     self.points[next_idx].id
                 };
                 self.points_mut()
@@ -815,11 +685,11 @@ impl Path {
             };
             let next_idx = (idx + 1) % self.points.len();
 
-            if self.points[idx].typ == PointType::OnCurveSmooth
+            if self.points[idx].is_smooth()
                 && self.points[prev_idx].is_on_curve()
                 && self.points[next_idx].is_on_curve()
             {
-                self.points_mut()[idx].typ = PointType::OnCurve;
+                self.points_mut()[idx].toggle_type();
             }
         }
 
@@ -855,10 +725,8 @@ impl Path {
         let has_ctrl = !self.points[self.prev_idx(idx)].is_on_curve()
             || !self.points[self.next_idx(idx)].is_on_curve();
         let point = &mut self.points_mut()[idx];
-        point.typ = match point.typ {
-            PointType::OnCurve if has_ctrl => PointType::OnCurveSmooth,
-            PointType::OnCurveSmooth => PointType::OnCurve,
-            other => other,
+        if point.is_smooth() || point.is_on_curve() && has_ctrl {
+            point.toggle_type()
         }
     }
 
@@ -877,7 +745,8 @@ impl Path {
         assert!(!self.points.is_empty());
         if self.points.len() > 1 {
             let mut prev = self.points_mut().pop().unwrap();
-            prev.typ = PointType::OnCurveSmooth;
+            assert!(prev.is_on_curve() && !prev.is_smooth());
+            prev.toggle_type();
             let p1 = self.trailing.take().unwrap_or_else(|| {
                 self.points
                     .last()
@@ -900,8 +769,8 @@ impl Path {
     fn update_trailing(&mut self, handle: DPoint) {
         if self.points.len() > 1 {
             let len = self.points.len();
-            assert!(self.points[len - 1].typ != PointType::OffCurve);
-            assert!(self.points[len - 2].typ == PointType::OffCurve);
+            assert!(self.points[len - 1].is_on_curve());
+            assert!(self.points[len - 2].is_off_curve());
             let on_curve_pt = self.points[len - 1].point;
             let new_p = on_curve_pt - (handle - on_curve_pt);
             self.points_mut()[len - 2].point = new_p;
@@ -957,19 +826,19 @@ impl Path {
     }
 
     pub(crate) fn path_point_for_id(&self, point: EntityId) -> Option<PathPoint> {
-        assert!(point.parent == self.id);
+        assert!(point.is_child_of(self.id));
         self.idx_for_point(point).map(|idx| self.points[idx])
     }
 
     pub(crate) fn prev_point(&self, point: EntityId) -> PathPoint {
-        assert!(point.parent == self.id);
+        assert!(point.is_child_of(self.id));
         let idx = self.idx_for_point(point).expect("bad input to prev_point");
         let idx = self.prev_idx(idx);
         self.points[idx]
     }
 
     pub(crate) fn next_point(&self, point: EntityId) -> PathPoint {
-        assert!(point.parent == self.id);
+        assert!(point.is_child_of(self.id));
         let idx = self.idx_for_point(point).expect("bad input to next_point");
         let idx = self.next_idx(idx);
         self.points[idx]
@@ -983,7 +852,7 @@ impl Path {
 
         let mut pre_seg = seg.subsegment(0.0..t);
         if let PathSeg::Cubic(_, _, _, p3) = &mut pre_seg {
-            p3.typ = PointType::OnCurveSmooth;
+            p3.typ = PointType::OnCurve { smooth: true };
         }
         let post_seg = seg.subsegment(t..1.0);
         let mut insert_idx = self.idx_for_point(seg.start_id()).unwrap();
@@ -998,7 +867,7 @@ impl Path {
         points.splice(
             insert_idx..insert_idx + existing_control_pts,
             iter.take(points_to_insert).map(|mut next_pt| {
-                next_pt.id.parent = self_id;
+                next_pt.reparent(self_id);
                 next_pt
             }),
         );
@@ -1013,7 +882,7 @@ impl Path {
         let p3 = points[insert_idx].point;
         let p1 = p0.lerp(p3, 1.0 / 3.0);
         let p2 = p0.lerp(p3, 2.0 / 3.0);
-        let path = seg.start_id().parent;
+        let path = seg.start_id().parent();
         points.splice(
             insert_idx..insert_idx,
             [p1, p2].iter().map(|p| PathPoint::off_curve(path, *p)),
@@ -1047,7 +916,7 @@ pub(crate) fn mark_tangent_handles(points: &mut [PathPoint]) {
                 // if the angle between the control points and the on-curve
                 // point are within ~a degree of each other, consider it a tangent point.
                 if delta_angle <= 0.018 {
-                    pt.typ = PointType::OnCurveSmooth;
+                    pt.toggle_type()
                 }
             }
         }
@@ -1130,7 +999,7 @@ impl PathSeg {
 
     pub(crate) fn subsegment(self, range: Range<f64>) -> Self {
         let subseg = self.to_kurbo().subsegment(range);
-        let path_id = self.start_id().parent;
+        let path_id = self.start_id().parent();
         match subseg {
             KurboPathSeg::Line(Line { p0, p1 }) => PathSeg::Line(
                 PathPoint::on_curve(path_id, DPoint::from_raw(p0)),
@@ -1199,12 +1068,6 @@ impl Iterator for SegPointIter {
             (4, PathSeg::Cubic(_, _, _, p4)) => Some(p4),
             _ => None,
         }
-    }
-}
-
-impl std::fmt::Display for EntityId {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "id{}.{}", self.parent, self.point)
     }
 }
 

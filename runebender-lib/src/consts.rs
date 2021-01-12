@@ -13,7 +13,7 @@ pub mod cmd {
     use norad::GlyphName;
 
     use crate::design_space::{DPoint, DVec2};
-    use crate::path::EntityId;
+    use crate::point::EntityId;
     use crate::tools::ToolId;
 
     /// Sent when windows should rebuild their menus.

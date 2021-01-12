@@ -20,6 +20,7 @@ mod glyph_names;
 mod guides;
 mod path;
 mod plist;
+mod point;
 mod quadrant;
 mod selection;
 mod tools;

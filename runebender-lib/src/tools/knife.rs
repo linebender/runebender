@@ -7,7 +7,8 @@ use druid::{Color, Env, EventCtx, KbKey, KeyEvent, MouseEvent, PaintCtx, Point, 
 use crate::design_space::DPoint;
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
-use crate::path::{Path, PathPoint, PathSeg};
+use crate::path::{Path, PathSeg};
+use crate::point::{EntityId, PathPoint};
 use crate::tools::{EditType, Tool};
 
 const MAX_RECURSE: usize = 16;
@@ -360,7 +361,7 @@ fn slice_path_impl(
 /// The 'second' path is the part that is 'sliced off', and it always closed.
 fn split_path_at_intersections(path: &Path, start: Hit, end: Hit) -> (Path, Path) {
     let one_id = path.id();
-    let two_id = crate::path::next_id();
+    let two_id = EntityId::next();
     let mut one_points = Vec::new();
     let mut two_points = Vec::new();
     let mut iter = path.iter_segments();
@@ -419,9 +420,9 @@ fn split_path_at_intersections(path: &Path, start: Hit, end: Hit) -> (Path, Path
 }
 
 /// set tangent handles, set correct parent ids, and construct the path
-fn finalize_path(mut points: Vec<PathPoint>, parent_id: usize, closed: bool) -> Path {
+fn finalize_path(mut points: Vec<PathPoint>, parent_id: EntityId, closed: bool) -> Path {
     crate::path::mark_tangent_handles(&mut points);
-    points.iter_mut().for_each(|p| p.id.set_parent(parent_id));
+    points.iter_mut().for_each(|p| p.reparent(parent_id));
     if closed {
         points.rotate_left(1);
     }

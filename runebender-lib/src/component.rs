@@ -5,7 +5,7 @@ use druid::Data;
 use norad::GlyphName;
 
 use crate::design_space::DVec2;
-use crate::path::EntityId;
+use crate::point::EntityId;
 
 #[derive(Debug, Data, Clone)]
 pub struct Component {
@@ -23,7 +23,7 @@ impl Component {
     pub fn from_norad(src: &norad::glyph::Component) -> Self {
         let base = src.base.clone();
         let transform = src.transform.into();
-        let id = EntityId::new_with_parent(0);
+        let id = EntityId::next();
         Component {
             base,
             transform,

@@ -7,7 +7,8 @@ use crate::data::{FontMetrics, Workspace};
 use crate::design_space::ViewPort;
 use crate::edit_session::EditSession;
 use crate::guides::{Guide, GuideLine};
-use crate::path::{Path, PathSeg, PointType};
+use crate::path::{Path, PathSeg};
+use crate::point::PointType;
 use crate::selection::Selection;
 use crate::theme;
 
@@ -363,9 +364,9 @@ impl<'a> PointIter<'a> {
         }
 
         match this.typ {
-            PointType::OnCurve => Style::Corner,
-            PointType::OffCurve => Style::OffCurve,
-            PointType::OnCurveSmooth => {
+            PointType::OffCurve { .. } => Style::OffCurve,
+            PointType::OnCurve { smooth: false } => Style::Corner,
+            PointType::OnCurve { smooth: true } => {
                 let prev = self.path.prev_point(this.id);
                 let next = self.path.next_point(this.id);
                 match (prev.is_on_curve(), next.is_on_curve()) {
