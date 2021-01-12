@@ -21,23 +21,28 @@
 //!
 //! # Example
 //! ```
-//! use runebender::mouse::{Mouse, MouseDelegate};
-//! use druid::shell::window::{MouseEvent, MouseButton, KeyModifiers};
-//! use druid::kurbo::Point;
+//! use runebender_lib::mouse::{Mouse, MouseDelegate};
+//! use druid::{Modifiers, MouseEvent, MouseButton, MouseButtons, Point, Vec2};
 //!
 //! struct SimpleDelegate(usize);
 //!
 //! impl MouseDelegate<()> for SimpleDelegate {
-//!     fn left_click(&mut self, _event: &MouseEvent, _data: &mut T) -> bool {
+//!     fn left_click(&mut self, _event: &MouseEvent, _data: &mut ()) {
 //!         self.0 += 1;
 //!     }
+//!
+//!     fn cancel(&mut self, _: &mut ()) {}
 //! }
 //!
 //! let event = MouseEvent {
 //!     pos: Point::new(20., 20.,),
-//!     mods: KeyModifiers::None,
+//!     window_pos: Point::new(20., 20.,),
+//!     mods: Modifiers::empty(),
 //!     count: 1,
 //!     button: MouseButton::Left,
+//!     buttons: MouseButtons::new().with(MouseButton::Left),
+//!     focus: false,
+//!     wheel_delta: Vec2::ZERO,
 //! };
 //!
 //! let mut mouse = Mouse::default();

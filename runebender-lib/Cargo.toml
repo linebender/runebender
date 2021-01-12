@@ -1,0 +1,19 @@
+[package]
+name = "runebender-lib"
+version = "0.1.0"
+authors = ["Colin Rofls <colin@cmyr.net>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+norad = { version = "0.3.1", features = ["druid", "rayon"] }
+druid = "0.7"
+log = "0.4.8"
+plist = "1.0"
+serde = "1.0"
+serde_derive = "1.0"
+lopdf = "0.26.0"
+svg = "0.8.0"
+chrono = "0.4"
+druid-theme-loader = { version = "0.1.0", path = "../druid-theme-loader", features = ["notify"] }
