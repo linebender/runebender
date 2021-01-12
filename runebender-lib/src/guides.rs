@@ -2,7 +2,7 @@ use druid::kurbo::{Line, ParamCurveNearest, Point, Vec2};
 use druid::Data;
 
 use crate::design_space::{DPoint, DVec2, ViewPort};
-use crate::path::EntityId;
+use crate::point::EntityId;
 
 #[derive(Debug, Clone, Data)]
 pub struct Guide {
@@ -100,7 +100,7 @@ impl Guide {
             }
         };
 
-        let id = EntityId::new_with_parent(0);
+        let id = EntityId::new_for_guide();
         Guide { guide, id }
     }
 

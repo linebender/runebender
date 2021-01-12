@@ -8,7 +8,8 @@ use druid::{
 use crate::design_space::DPoint;
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
-use crate::path::{Path, PathPoint};
+use crate::path::Path;
+use crate::point::{EntityId, PathPoint};
 use crate::tools::{EditType, Tool};
 
 /// The state of the rectangle tool.
@@ -188,7 +189,7 @@ impl Default for GestureState {
 }
 
 fn make_rect_path(p1: DPoint, p3: DPoint) -> Path {
-    let path_id = crate::path::next_id();
+    let path_id = EntityId::next();
     let p2 = DPoint::new(p3.x, p1.y);
     let p4 = DPoint::new(p1.x, p3.y);
     // first point goes last in closed paths

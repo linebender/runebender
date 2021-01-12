@@ -10,8 +10,9 @@ use lopdf::{Document, Object, Stream};
 
 use crate::design_space::DPoint;
 use crate::edit_session::EditSession;
-use crate::path::{EntityId, Path, PathPoint, PointType};
+use crate::path::Path;
 use crate::plist::Plist;
+use crate::point::{EntityId, PathPoint, PointType};
 
 //FIXME:
 // this is all poorly done, especially for copy, where each clipboard format
@@ -266,7 +267,7 @@ fn approx_eq(path1: &Path, path2: &Path) -> bool {
 
 // going to unjustifiable lengths to avoid an unecessary allocation :|
 fn iter_paths_for_bez_path(src: &BezPath) -> impl Iterator<Item = Path> + '_ {
-    let mut cur_path_id = crate::path::next_id();
+    let mut cur_path_id = EntityId::next();
     let mut cur_points = Vec::new();
     let mut closed = false;
     let mut iter = src.elements().iter();
@@ -291,7 +292,7 @@ fn iter_paths_for_bez_path(src: &BezPath) -> impl Iterator<Item = Path> + '_ {
                 } else {
                     Some(Path::from_raw_parts(cur_path_id, points, None, closed))
                 };
-                cur_path_id = crate::path::next_id();
+                cur_path_id = EntityId::next();
                 closed = false;
                 cur_points.push(PathPoint::on_curve(cur_path_id, DPoint::from_raw(*pt)));
                 if let Some(path) = path {
@@ -458,20 +459,20 @@ impl From<&Path> for GlyphPlistPath {
         let mut next_is_curve = src
             .points()
             .last()
-            .map(|p| p.typ == PointType::OffCurve)
+            .map(|p| p.is_off_curve())
             .unwrap_or(false);
         let nodes = src
             .points()
             .iter()
             .map(|p| {
                 let ptyp = match p.typ {
-                    PointType::OnCurve if next_is_curve => "CURVE",
-                    PointType::OnCurve => "LINE",
-                    PointType::OnCurveSmooth => "CURVE SMOOTH",
-                    PointType::OffCurve => "OFFCURVE",
+                    PointType::OnCurve { smooth: false } if next_is_curve => "CURVE",
+                    PointType::OnCurve { smooth: false } => "LINE",
+                    PointType::OnCurve { smooth: true } => "CURVE SMOOTH",
+                    PointType::OffCurve { .. } => "OFFCURVE",
                 };
 
-                next_is_curve = p.typ == PointType::OffCurve;
+                next_is_curve = p.is_off_curve();
 
                 format!("\"{} {} {}\"", p.point.x, p.point.y, ptyp)
             })
@@ -483,7 +484,7 @@ impl From<&Path> for GlyphPlistPath {
 
 impl From<&GlyphPlistPath> for Path {
     fn from(src: &GlyphPlistPath) -> Path {
-        let path_id = crate::path::next_id();
+        let path_id = EntityId::next();
         let paths: Vec<PathPoint> = src
             .nodes
             .iter()
@@ -493,7 +494,7 @@ impl From<&GlyphPlistPath> for Path {
     }
 }
 
-fn from_glyphs_plist_point(s: &str, parent_id: usize) -> Option<PathPoint> {
+fn from_glyphs_plist_point(s: &str, parent_id: EntityId) -> Option<PathPoint> {
     let mut iter = s.trim_matches('"').splitn(3, ' ');
     match (iter.next(), iter.next(), iter.next()) {
         (Some(x_), Some(y_), Some(typ_)) => {
@@ -508,10 +509,9 @@ fn from_glyphs_plist_point(s: &str, parent_id: usize) -> Option<PathPoint> {
                 .map_err(|e| log::warn!("bad glyphs plist point y val in '{}': '{}'", y_, e))
                 .ok()?;
             let typ = match typ_ {
-                "CURVE" => PointType::OnCurve,
-                "LINE" => PointType::OnCurve,
-                "CURVE SMOOTH" => PointType::OnCurveSmooth,
-                "OFFCURVE" => PointType::OffCurve,
+                "CURVE" | "LINE" => PointType::OnCurve { smooth: false },
+                "CURVE SMOOTH" => PointType::OnCurve { smooth: true },
+                "OFFCURVE" => PointType::OffCurve { auto: false },
                 other => {
                     log::warn!("unhandled glyphs point type '{}'", other);
                     return None;
