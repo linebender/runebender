@@ -7,8 +7,9 @@ use crate::data::{FontMetrics, Workspace};
 use crate::design_space::ViewPort;
 use crate::edit_session::EditSession;
 use crate::guides::{Guide, GuideLine};
-use crate::path::{Path, PathSeg};
+use crate::path::Path;
 use crate::point::PointType;
+use crate::point_list::Segment;
 use crate::selection::Selection;
 use crate::theme;
 
@@ -190,8 +191,8 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
 
         for seg in path.iter_segments() {
             match seg {
-                PathSeg::Line(_, p1) => end_point = p1.to_screen(self.space),
-                PathSeg::Cubic(p0, p1, p2, p3) => {
+                Segment::Line(_, p1) => end_point = p1.to_screen(self.space),
+                Segment::Cubic(p0, p1, p2, p3) => {
                     let r = self.space;
                     self.draw_control_handle(p0.to_screen(r), p1.to_screen(r));
                     self.draw_control_handle(p2.to_screen(r), p3.to_screen(r));
