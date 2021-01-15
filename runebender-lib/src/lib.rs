@@ -8,6 +8,9 @@ extern crate serde_derive;
 #[macro_use]
 extern crate lopdf;
 
+#[macro_use]
+mod util;
+
 mod app_delegate;
 mod bez_cache;
 mod clipboard;
@@ -21,11 +24,11 @@ mod guides;
 mod path;
 mod plist;
 mod point;
+mod point_list;
 mod quadrant;
 mod selection;
 mod tools;
 mod undo;
-mod util;
 
 pub mod data;
 pub mod menus;

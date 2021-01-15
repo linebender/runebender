@@ -169,6 +169,10 @@ impl PathPoint {
         self.id.parent = new_parent.point;
     }
 
+    pub fn to_kurbo(&self) -> Point {
+        self.point.to_raw()
+    }
+
     /// The distance, in screen space, from this `PathPoint` to `point`, a point
     /// in screen space.
     pub fn screen_dist(&self, vport: ViewPort, point: Point) -> f64 {

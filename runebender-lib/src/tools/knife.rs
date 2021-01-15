@@ -7,8 +7,9 @@ use druid::{Color, Env, EventCtx, KbKey, KeyEvent, MouseEvent, PaintCtx, Point, 
 use crate::design_space::DPoint;
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
-use crate::path::{Path, PathSeg};
+use crate::path::Path;
 use crate::point::{EntityId, PathPoint};
+use crate::point_list::Segment;
 use crate::tools::{EditType, Tool};
 
 const MAX_RECURSE: usize = 16;
@@ -39,7 +40,7 @@ enum GestureState {
 struct Hit {
     intersection: LineIntersection,
     point: Point,
-    seg: PathSeg,
+    seg: Segment,
 }
 
 impl Default for Knife {
@@ -241,7 +242,7 @@ impl MouseDelegate<EditSession> for Knife {
 }
 
 impl Hit {
-    fn new(line: Line, intersection: LineIntersection, seg: PathSeg) -> Self {
+    fn new(line: Line, intersection: LineIntersection, seg: Segment) -> Self {
         let point = line.eval(intersection.line_t);
         Hit {
             intersection,
@@ -430,7 +431,7 @@ fn finalize_path(mut points: Vec<PathPoint>, parent_id: EntityId, closed: bool) 
     Path::from_raw_parts(parent_id, points, None, closed)
 }
 
-fn append_all_points(dest: &mut Vec<PathPoint>, seg: PathSeg) {
+fn append_all_points(dest: &mut Vec<PathPoint>, seg: Segment) {
     let mut iter = seg.into_iter();
     let first = iter.next().unwrap();
     // we skip the first point if it's the same as the current previous point
@@ -532,7 +533,7 @@ mod tests {
 
         let one_segs = one
             .iter_segments()
-            .map(PathSeg::to_kurbo)
+            .map(Segment::to_kurbo)
             .collect::<Vec<_>>();
         let exp = vec![
             Line::new((10., 10.), (4., 4.)).into(),
@@ -544,7 +545,7 @@ mod tests {
 
         let two_segs = two
             .iter_segments()
-            .map(PathSeg::to_kurbo)
+            .map(Segment::to_kurbo)
             .collect::<Vec<_>>();
         let exp = vec![
             Line::new((4., 4.), (0., 0.)).into(),

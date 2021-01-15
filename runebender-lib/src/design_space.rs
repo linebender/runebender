@@ -95,6 +95,17 @@ impl DPoint {
         DVec2 { x, y }
     }
 
+    /// Given another point, lock whichever axis has the smallest differnce
+    /// between the two points to the value of that point.
+    pub(crate) fn axis_locked_to(self, other: DPoint) -> DPoint {
+        let dxy = other - self;
+        if dxy.x.abs() > dxy.y.abs() {
+            DPoint::new(self.x, other.y)
+        } else {
+            DPoint::new(other.x, self.y)
+        }
+    }
+
     pub fn lerp(self, other: DPoint, t: f64) -> DPoint {
         DPoint::from_raw(self.to_raw().lerp(other.to_raw(), t))
     }
