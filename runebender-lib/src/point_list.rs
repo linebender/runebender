@@ -175,10 +175,6 @@ impl PathPoints {
         Arc::make_mut(&mut self.points)
     }
 
-    //pub fn iter(&self) -> impl Iterator<Item = &PathPoint> {
-    //self.points.iter()
-    //}
-
     /// Iterates points in order.
     //TODO: can we combine this with the one above?
     pub(crate) fn iter_points(&self) -> impl Iterator<Item = PathPoint> + '_ {
@@ -208,13 +204,9 @@ impl PathPoints {
     /// If you pass a point id, the cursor will start at that point; if not
     /// it will start at the first point.
     pub fn cursor(&mut self, id: Option<EntityId>) -> Option<Cursor> {
-        let idx = id.and_then(|id| self.idx_for_point(id)).unwrap_or_else(|| {
-            if self.closed {
-                self.len() - 1
-            } else {
-                0
-            }
-        });
+        let idx = id
+            .and_then(|id| self.idx_for_point(id))
+            .unwrap_or_else(|| self.first_idx());
         Some(Cursor { idx, inner: self })
     }
 
@@ -226,12 +218,24 @@ impl PathPoints {
     }
 
     pub(crate) fn reverse_contour(&mut self) {
-        let last = if self.closed {
+        let last = self.last_idx();
+        self.points_mut()[..last].reverse();
+    }
+
+    fn first_idx(&self) -> usize {
+        if self.closed {
+            self.len() - 1
+        } else {
+            0
+        }
+    }
+
+    fn last_idx(&self) -> usize {
+        if self.closed {
             self.points.len() - 1
         } else {
             self.points.len()
-        };
-        self.points_mut()[..last].reverse();
+        }
     }
 
     /// Push a new on-curve point onto the end of the point list.
@@ -283,11 +287,7 @@ impl PathPoints {
 
     pub fn start_point(&self) -> &PathPoint {
         assert!(!self.points.is_empty(), "empty path is not constructable");
-        if self.closed {
-            self.points.last().unwrap()
-        } else {
-            self.points.first().unwrap()
-        }
+        self.points.get(self.first_idx()).unwrap()
     }
 
     //FIXME: this logic feels weird. What *is* an end point? in a closed path,
