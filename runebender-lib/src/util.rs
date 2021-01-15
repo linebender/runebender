@@ -4,6 +4,32 @@ use std::convert::TryFrom;
 
 use druid::kurbo::{Size, Vec2};
 
+/// Unwrap an optional, printing a message and returning if it is missing.
+///
+/// This should generate less code than unwrap? Honestly it's a total
+/// experiment.
+macro_rules! bail {
+    ($cond:expr $(,)?) => {
+        match $opt {
+            Some(val) => val,
+            None => {
+                eprintln!("[{}:{}] bailed", file!(), line!());
+                return
+            }
+        }
+    };
+     ($opt:expr, $($arg:tt)+) => {
+        match $opt {
+            Some(val) => val,
+            None => {
+                eprintln!("[{}:{}] bailed: ", file!(), line!());
+                eprintln!($($arg)+);
+                return
+            }
+        }
+    };
+}
+
 /// could be a size or a vec2 :shrug:
 pub(crate) fn compute_scale(pre: Size, post: Size) -> Vec2 {
     let ensure_finite = |f: f64| if f.is_finite() { f } else { 1.0 };

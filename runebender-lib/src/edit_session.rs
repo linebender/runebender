@@ -10,8 +10,9 @@ use crate::component::Component;
 use crate::data::Workspace;
 use crate::design_space::{DPoint, DVec2, ViewPort};
 use crate::guides::Guide;
-use crate::path::{Path, PathSeg};
+use crate::path::Path;
 use crate::point::{EntityId, PathPoint};
+use crate::point_list::Segment;
 use crate::quadrant::Quadrant;
 use crate::selection::Selection;
 
@@ -242,7 +243,7 @@ impl EditSession {
     }
 
     /// Hit test a point against the path segments.
-    pub fn hit_test_segments(&self, point: Point, max_dist: Option<f64>) -> Option<(PathSeg, f64)> {
+    pub fn hit_test_segments(&self, point: Point, max_dist: Option<f64>) -> Option<(Segment, f64)> {
         let max_dist = max_dist.unwrap_or(MIN_CLICK_DISTANCE);
         let dpt = self.viewport.from_screen(point);
         let mut best = None;
@@ -497,6 +498,9 @@ impl EditSession {
         }
     }
 
+    /// Update an off-curve point in response to a drag.
+    ///
+    /// `is_locked` corresponds to the shift key being held.
     pub(crate) fn update_handle(&mut self, point: Point, is_locked: bool) {
         let dpoint = self.viewport.from_screen(point);
         let id = *self.selection.iter().next().unwrap();
