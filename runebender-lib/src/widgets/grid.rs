@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use druid::kurbo::{Affine, Rect, Shape, Size};
-use druid::piet::Color;
 //use druid::piet::{
 //FontBuilder, PietText, PietTextLayout, RenderContext, Text, TextLayout, TextLayoutBuilder,
 //};
@@ -155,13 +154,11 @@ impl Widget<GridGlyph> for GridInner {
 
         let glyph_rect: Rect = geom - Insets::uniform(5.0);
         let rounded = glyph_rect.to_rounded_rect(5.0);
-        ctx.fill(rounded, &Color::grey8(0xD0));
-        ctx.stroke(rounded, &Color::grey8(0xA0), 2.0);
-
-        let hl_color = Color::rgb8(0xFF, 0xEE, 0x55);
+        ctx.fill(rounded, &env.get(theme::GLYPH_GRID_CELL_BACKGROUND_COLOR));
+        ctx.stroke(rounded, &env.get(theme::GLYPH_GRID_CELL_OUTLINE_COLOR), 2.0);
         if ctx.is_active() || data.is_selected {
-            ctx.fill(rounded, &hl_color);
-            ctx.stroke(rounded, &Color::rgb8(0xFF, 0xAA, 0x11), 4.0);
+            ctx.fill(rounded, &env.get(theme::FOCUS_BACKGROUND_COLOR));
+            ctx.stroke(rounded, &env.get(theme::FOCUS_OUTLINE_COLOR), 4.0);
         }
         let glyph_color = if data.is_placeholder {
             env.get(theme::PLACEHOLDER_GLYPH_COLOR)

@@ -1,0 +1,52 @@
+// A dark theme file
+// these are comments; blank lines are ignored
+
+SIDEBAR_BACKGROUND:                 #222
+SIDEBAR_EDGE_STROKE:                #333
+PLACEHOLDER_GLYPH_COLOR:            #aaa
+GLYPH_LIST_STROKE:                  #fff
+GLYPH_LIST_BACKGROUND:              #111
+GLYPH_GRID_CELL_BACKGROUND_COLOR:   #222
+GLYPH_GRID_CELL_OUTLINE_COLOR:      #555
+FOCUS_BACKGROUND_COLOR:             #114400
+FOCUS_OUTLINE_COLOR:                #aaff55
+PRIMARY_TEXT_COLOR:                 #fff
+SECONDARY_TEXT_COLOR:               #222
+SELECTION_RECT_STROKE_COLOR:        #0f2
+SELECTION_RECT_FILL_COLOR:          #0f25
+
+SELECTION_COLOR:                #a6ccff
+LABEL_COLOR:                    #05f
+WINDOW_BACKGROUND_COLOR:        #fff
+BACKGROUND_LIGHT:               #eee
+CURSOR_COLOR:                   #000
+BUTTON_DARK:                    #c8c8c8
+BUTTON_LIGHT:                   #fff
+
+// drawing of paths and points in the editor
+
+PATH_STROKE_COLOR:              #fff
+PATH_FILL_COLOR:                #fff    // during preview
+METRICS_COLOR:                  #555    // the color of the ascender/descender/em box
+
+GUIDE_COLOR:                    #fc5493
+SELECTED_GUIDE_COLOR:           #ffee55
+SELECTED_LINE_SEGMENT_COLOR:    #ffee55
+SELECTED_POINT_INNER_COLOR:     #ffaa11
+SELECTED_POINT_OUTER_COLOR:     #ffee55
+SMOOTH_POINT_OUTER_COLOR:       #579aff
+SMOOTH_POINT_INNER_COLOR:       #4428ec
+CORNER_POINT_OUTER_COLOR:       #6ae756
+CORNER_POINT_INNER_COLOR:       #208e56
+OFF_CURVE_POINT_OUTER_COLOR:    #ff99ff
+OFF_CURVE_POINT_INNER_COLOR:    #ff00ff
+OFF_CURVE_HANDLE_COLOR:         #bbb
+DIRECTION_ARROW_COLOR:          #6ae75699
+COMPONENT_FILL_COLOR:           #f004
+
+SMOOTH_RADIUS:                  6.
+SMOOTH_SELECTED_RADIUS:         7.5
+CORNER_RADIUS:                  5.5
+CORNER_SELECTED_RADIUS:         7.
+OFF_CURVE_RADIUS:               4.5
+OFF_CURVE_SELECTED_RADIUS:      6.

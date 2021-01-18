@@ -14,6 +14,14 @@ pub const SIDEBAR_EDGE_STROKE: Key<Color> = Key::new("runebender.sidebar-edge-st
 pub const GLYPH_LIST_BACKGROUND: Key<Color> = Key::new("runebender.background");
 pub const GLYPH_LIST_STROKE: Key<Color> = Key::new("runebender.glyph-list-stroke");
 
+/// Colors for the root window glyph grids cells.
+pub const GLYPH_GRID_CELL_BACKGROUND_COLOR: Key<Color> =
+    Key::new("runebender.glyph-grid-cell-background-color");
+pub const GLYPH_GRID_CELL_OUTLINE_COLOR: Key<Color> =
+    Key::new("runebender.glyph-grid-cell-outline-color");
+pub const FOCUS_BACKGROUND_COLOR: Key<Color> = Key::new("runebender.focus-background-color");
+pub const FOCUS_OUTLINE_COLOR: Key<Color> = Key::new("runebender.focus-outline-color");
+
 /// The color for placeholder glyphs
 pub const PLACEHOLDER_GLYPH_COLOR: Key<Color> = Key::new("runebender.placeholder-glyph-color");
 /// The color for primary text, filled glyph outlines, etc
@@ -72,6 +80,10 @@ druid_theme_loader::loadable_theme!(pub MyTheme {
     PLACEHOLDER_GLYPH_COLOR,
     GLYPH_LIST_STROKE,
     GLYPH_LIST_BACKGROUND,
+    GLYPH_GRID_CELL_BACKGROUND_COLOR,
+    GLYPH_GRID_CELL_OUTLINE_COLOR,
+    FOCUS_BACKGROUND_COLOR,
+    FOCUS_OUTLINE_COLOR,
     PRIMARY_TEXT_COLOR,
     SECONDARY_TEXT_COLOR,
     SELECTION_RECT_STROKE_COLOR,
