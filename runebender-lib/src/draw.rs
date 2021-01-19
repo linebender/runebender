@@ -368,9 +368,17 @@ impl<'a> PointIter<'a> {
             PointType::OffCurve { .. } => Style::OffCurve,
             PointType::OnCurve { smooth: false } => Style::Corner,
             PointType::OnCurve { smooth: true } => {
-                let prev = self.path.prev_point(this.id);
-                let next = self.path.next_point(this.id);
-                match (prev.is_on_curve(), next.is_on_curve()) {
+                let prev = self
+                    .path
+                    .prev_point(this.id)
+                    .map(|pp| pp.is_on_curve())
+                    .unwrap_or(false);
+                let next = self
+                    .path
+                    .next_point(this.id)
+                    .map(|pp| pp.is_on_curve())
+                    .unwrap_or(false);
+                match (prev, next) {
                     (false, false) => Style::Smooth,
                     (true, false) | (false, true) => Style::Tangent,
                     _ => unreachable!(),

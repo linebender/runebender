@@ -275,18 +275,55 @@ impl PathPoints {
         point.id
     }
 
-    #[inline]
-    fn prev_idx(&self, idx: usize) -> usize {
-        if idx == 0 {
-            self.points.len() - 1
+    pub fn split_segment(&mut self, old: Segment, pre: Segment, post: Segment) {
+        let insert_idx = bail!(self
+            .points
+            .index_for_point(old.start_id())
+            .and_then(|idx| self.next_idx(idx)));
+
+        let (existing_control_pts, points_to_insert) = match old {
+            Segment::Line(..) => (0, 1),
+            Segment::Cubic(..) => (2, 5),
+        };
+
+        let iter = pre.into_iter().skip(1).chain(post.into_iter().skip(1));
+        let self_id = self.id();
+        self.points.as_mut().splice(
+            insert_idx..insert_idx + existing_control_pts,
+            iter.take(points_to_insert).map(|mut next_pt| {
+                next_pt.reparent(self_id);
+                next_pt
+            }),
+        );
+    }
+
+    pub fn replace_segment(&mut self, old: Segment, new: Segment) {
+        let insert_idx = bail!(self.points.index_for_point(old.start_id()));
+        let seg_len = match old {
+            Segment::Line(..) => 1,
+            Segment::Cubic(..) => 3,
+        };
+        self.points
+            .as_mut()
+            .splice(insert_idx..insert_idx + seg_len, new.into_iter());
+    }
+
+    fn prev_idx(&self, idx: usize) -> Option<usize> {
+        if self.closed() {
+            Some(((self.len() + idx) - 1) % self.len())
         } else {
-            idx - 1
+            idx.checked_sub(1)
         }
     }
 
-    #[inline]
-    fn next_idx(&self, idx: usize) -> usize {
-        (idx + 1) % self.points.len()
+    fn next_idx(&self, idx: usize) -> Option<usize> {
+        if self.closed() {
+            Some((idx + 1) % self.len())
+        } else if idx < self.len() - 1 {
+            Some(idx + 1)
+        } else {
+            None
+        }
     }
 
     pub(crate) fn path_point_for_id(&self, point: EntityId) -> Option<PathPoint> {
@@ -294,24 +331,22 @@ impl PathPoints {
         self.points.get(point).copied()
     }
 
-    pub(crate) fn prev_point(&self, point: EntityId) -> PathPoint {
+    pub(crate) fn prev_point(&self, point: EntityId) -> Option<PathPoint> {
         assert!(point.is_child_of(self.path_id));
-        let idx = self
-            .points
+        self.points
             .index_for_point(point)
-            .expect("bad input to prev_point");
-        let idx = self.prev_idx(idx);
-        self.points.as_ref()[idx]
+            .and_then(|idx| self.prev_idx(idx))
+            .and_then(|idx| self.points.as_ref().get(idx))
+            .copied()
     }
 
-    pub(crate) fn next_point(&self, point: EntityId) -> PathPoint {
+    pub(crate) fn next_point(&self, point: EntityId) -> Option<PathPoint> {
         assert!(point.is_child_of(self.path_id));
-        let idx = self
-            .points
+        self.points
             .index_for_point(point)
-            .expect("bad input to next_point");
-        let idx = self.next_idx(idx);
-        self.points.as_ref()[idx]
+            .and_then(|idx| self.next_idx(idx))
+            .and_then(|idx| self.points.as_ref().get(idx))
+            .copied()
     }
 
     pub fn start_point(&self) -> &PathPoint {
@@ -328,17 +363,19 @@ impl PathPoints {
         }
     }
 
-    //FIXME: this logic feels weird. What *is* an end point? in a closed path,
-    //it should be the start point. Do we mean something else here,
-    // like "last on-curve point, not including the start?"
-    pub fn end_point(&self) -> &PathPoint {
+    /// Returns the 'last' on-curve point.
+    ///
+    /// In a closed path, this is the on-curve point preceding the start point.
+    /// In an open path, this is the point at the end of the array.
+    /// In a length-one path, this is the only point.
+    pub(crate) fn last_on_curve_point(&self) -> PathPoint {
         assert!(!self.points.is_empty(), "empty path is not constructable");
         let idx = if self.closed {
             self.points.len().saturating_sub(2)
         } else {
             self.points.len() - 1
         };
-        &self.points.as_ref()[idx]
+        self.points.as_ref()[idx]
     }
 
     pub fn transform_all(&mut self, affine: Affine, anchor: DPoint) {
@@ -473,76 +510,28 @@ impl PathPoints {
 
     pub fn delete_points(&mut self, points: &[EntityId]) {
         eprintln!("deleting {:?}", points);
+        let mut to_delete = HashSet::with_capacity(points.len());
         for point in points {
-            self.delete_point(*point)
-        }
-    }
-
-    //FIXME: this is currently buggy :(
-    fn delete_point(&mut self, point_id: EntityId) {
-        let idx = bail!(self.points.index_for_point(point_id));
-
-        let prev_idx = self.prev_idx(idx);
-        let next_idx = self.next_idx(idx);
-
-        eprintln!("deleting {:?}", idx);
-        //self.debug_print_points();
-
-        match self.points.as_ref()[idx].typ {
-            p if p.is_off_curve() => {
-                // delete both of the off curve points for this segment
-                let other_id = if self.points.as_ref()[prev_idx].is_off_curve() {
-                    self.points.as_ref()[prev_idx].id
-                } else {
-                    assert!(self.points.as_ref()[next_idx].is_off_curve());
-                    self.points.as_ref()[next_idx].id
-                };
-                self.points_mut()
-                    .retain(|p| p.id != point_id && p.id != other_id);
-            }
-            _on_curve if self.points.len() == 1 => {
-                self.points_mut().clear();
-            }
-            // with less than 4 points they must all be on curve
-            _on_curve if self.points.len() == 4 => {
-                self.points_mut()
-                    .retain(|p| p.is_on_curve() && p.id != point_id);
-            }
-
-            _on_curve if self.points.as_ref()[prev_idx].is_on_curve() => {
-                // this is a line segment
-                self.points_mut().remove(idx);
-            }
-            _on_curve if self.points.as_ref()[next_idx].is_on_curve() => {
-                // if we neighbour a corner point, leave handles (neighbour becomes curve)
-                self.points_mut().remove(idx);
-            }
-            _ => {
-                assert!(self.points.len() > 4);
-                let prev = self.points.as_ref()[prev_idx];
-                let next = self.points.as_ref()[next_idx];
-                assert!(!prev.is_on_curve() && !next.is_on_curve());
-                let to_del = [prev.id, next.id, point_id];
-                self.points_mut().retain(|p| !to_del.contains(&p.id));
-                if self.points.len() == 3 {
-                    self.points_mut().retain(|p| p.is_on_curve());
-                }
-            }
+            self.points_to_delete(*point, &mut to_delete)
         }
 
-        // check if any points are smooth that should now just be corners
-        for idx in 0..self.points.len() {
-            let prev_idx = match idx {
-                0 => self.points.len() - 1,
-                other => other - 1,
-            };
-            let next_idx = (idx + 1) % self.points.len();
+        self.points_mut().retain(|p| !to_delete.contains(&p.id));
+        let mut cursor = self.cursor(None);
+        let start_id = cursor.point().map(|pp| pp.id);
+        loop {
+            let next_is_on = cursor.peek_next().map(PathPoint::is_on_curve);
+            let prev_is_on = cursor.peek_prev().map(PathPoint::is_on_curve);
 
-            if self.points.as_ref()[idx].is_smooth()
-                && self.points.as_ref()[prev_idx].is_on_curve()
-                && self.points.as_ref()[next_idx].is_on_curve()
+            if cursor.point().map(|pp| pp.is_smooth()).unwrap_or(false)
+                && prev_is_on.unwrap_or(false)
+                && next_is_on.unwrap_or(false)
             {
-                self.points_mut()[idx].toggle_type();
+                cursor.point_mut().unwrap().toggle_type();
+            }
+
+            cursor.move_next();
+            if cursor.point().map(|pp| pp.id) == start_id {
+                break;
             }
         }
 
@@ -558,6 +547,36 @@ impl PathPoints {
         // if we have fewer than three on_curve points we are open.
         if self.points.len() < 3 {
             self.closed = false;
+        }
+    }
+
+    //FIXME: this is currently buggy :(
+    fn points_to_delete(&mut self, point_id: EntityId, to_delete: &mut HashSet<EntityId>) {
+        let (point, prev, next) = {
+            let cursor = self.cursor(Some(point_id));
+            // if *this* point doesn't exist we should bail
+            let point = bail!(cursor.point().copied());
+            (
+                point,
+                cursor.peek_prev().copied(),
+                cursor.peek_next().copied(),
+            )
+        };
+
+        let prev_and_next_both_off_curve = prev.map(|pp| pp.is_off_curve()).unwrap_or(false)
+            && next.map(|pp| pp.is_off_curve()).unwrap_or(false);
+
+        to_delete.insert(point.id);
+        if point.is_off_curve() {
+            if let Some(other_off_curve) = prev
+                .filter(|pp| pp.is_off_curve())
+                .or_else(|| next.filter(|pp| pp.is_off_curve()))
+            {
+                to_delete.insert(other_off_curve.id);
+            }
+        } else if prev_and_next_both_off_curve {
+            to_delete.extend(prev.map(|pp| pp.id));
+            to_delete.extend(next.map(|pp| pp.id));
         }
     }
 
@@ -577,44 +596,26 @@ impl Cursor<'_> {
         self.inner.points.as_mut().get_mut(idx)
     }
 
-    #[allow(dead_code)]
     pub fn move_next(&mut self) {
-        self.idx = self.next_idx();
+        self.idx = self.idx.and_then(|idx| self.inner.next_idx(idx))
     }
 
     pub fn move_prev(&mut self) {
-        self.idx = self.prev_idx();
+        if let Some(idx) = self.idx {
+            self.idx = self.inner.prev_idx(idx);
+        }
     }
 
     pub fn peek_next(&self) -> Option<&PathPoint> {
-        self.next_idx().map(|idx| &self.inner.points.as_ref()[idx])
-    }
-
-    pub fn peek_prev(&self) -> Option<&PathPoint> {
-        self.prev_idx()
+        self.idx
+            .and_then(|idx| self.inner.next_idx(idx))
             .and_then(|idx| self.inner.points.as_ref().get(idx))
     }
 
-    #[inline]
-    fn prev_idx(&self) -> Option<usize> {
-        let idx = self.idx?;
-        if self.inner.closed() {
-            Some(((self.inner.len() + idx) - 1) % self.inner.len())
-        } else {
-            idx.checked_sub(1)
-        }
-    }
-
-    #[inline]
-    pub(crate) fn next_idx(&self) -> Option<usize> {
-        let idx = self.idx?;
-        if self.inner.closed() {
-            Some((idx + 1) % self.inner.len())
-        } else if idx < self.inner.len() - 1 {
-            Some(idx + 1)
-        } else {
-            None
-        }
+    pub fn peek_prev(&self) -> Option<&PathPoint> {
+        self.idx
+            .and_then(|idx| self.inner.prev_idx(idx))
+            .and_then(|idx| self.inner.points.as_ref().get(idx))
     }
 }
 
