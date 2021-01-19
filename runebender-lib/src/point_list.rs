@@ -1,7 +1,6 @@
 /// Raw storage for the points that make up a glyph contour
 use std::collections::HashSet;
 use std::ops::Range;
-use std::sync::Arc;
 
 use super::design_space::{DPoint, DVec2};
 use super::point::{EntityId, PathPoint};
@@ -12,13 +11,14 @@ use druid::Data;
 #[derive(Debug, Clone, Data)]
 pub struct PathPoints {
     path_id: EntityId,
-    points: Arc<Vec<PathPoint>>,
+    points: protected::RawPoints,
     trailing: Option<DPoint>,
     closed: bool,
 }
 
+/// A cursor for moving through a list of points.
 pub struct Cursor<'a> {
-    idx: usize,
+    idx: Option<usize>,
     inner: &'a mut PathPoints,
 }
 
@@ -33,62 +33,94 @@ pub enum Segment {
     Cubic(PathPoint, PathPoint, PathPoint, PathPoint),
 }
 
-impl Cursor<'_> {
-    pub fn point(&self) -> &PathPoint {
-        &self.inner.points[self.idx]
+/// A module to hide the implementation of the RawPoints type.
+///
+/// The motivation for this is simple: we want to be able to index into our
+/// vec of points using `EntityId`s; to do this we need to keep a map from
+/// those ids ot the actual indices in the underlying vec.
+///
+/// By hiding this implementation, we can ensure it is only used via the declared
+/// API; in that API we can ensure we always keep our map up to date.
+mod protected {
+    use super::{EntityId, PathPoint};
+    use druid::Data;
+    use std::cell::{Cell, RefCell};
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    #[derive(Debug, Clone, Data)]
+    pub(super) struct RawPoints {
+        points: Arc<Vec<PathPoint>>,
+        // these two use interior mutability so that we can rebuild the indices
+        // in things like getters
+        #[data(ignore)]
+        indices: RefCell<Arc<HashMap<EntityId, usize>>>,
+        #[data(ignore)]
+        needs_to_rebuild_indicies: Cell<bool>,
     }
 
-    pub fn point_mut(&mut self) -> &mut PathPoint {
-        &mut Arc::make_mut(&mut self.inner.points)[self.idx]
-    }
-
-    pub fn next(&self) -> Option<&PathPoint> {
-        self.next_idx().map(|idx| &self.inner.points[idx])
-    }
-
-    pub fn next_mut(&mut self) -> Option<&mut PathPoint> {
-        let idx = self.next_idx()?;
-        Some(&mut Arc::make_mut(&mut self.inner.points)[idx])
-    }
-
-    pub fn prev(&self) -> Option<&PathPoint> {
-        self.prev_idx().map(|idx| &self.inner.points[idx])
-    }
-
-    pub fn prev_mut(&mut self) -> Option<&mut PathPoint> {
-        let idx = self.prev_idx()?;
-        Some(&mut Arc::make_mut(&mut self.inner.points)[idx])
-    }
-
-    pub fn move_to_start(&mut self) {
-        self.idx = if self.inner.closed {
-            self.inner.len() - 1
-        } else {
-            0
-        };
-    }
-
-    pub fn move_to_end(&mut self) {
-        self.idx = self.inner.len() - 1
-    }
-
-    #[inline]
-    fn prev_idx(&self) -> Option<usize> {
-        if self.inner.closed() {
-            Some(((self.inner.len() + self.idx) - 1) % self.inner.len())
-        } else {
-            self.idx.checked_sub(1)
+    impl RawPoints {
+        pub(super) fn new(points: Vec<PathPoint>) -> Self {
+            RawPoints {
+                points: Arc::new(points),
+                indices: RefCell::new(Arc::new(HashMap::new())),
+                needs_to_rebuild_indicies: Cell::new(true),
+            }
         }
-    }
+        pub(super) fn len(&self) -> usize {
+            self.points.len()
+        }
 
-    #[inline]
-    pub(crate) fn next_idx(&self) -> Option<usize> {
-        if self.inner.closed() {
-            Some((self.idx + 1) % self.inner.len())
-        } else if self.idx < self.inner.len() - 1 {
-            Some(self.idx + 1)
-        } else {
-            None
+        pub(super) fn is_empty(&self) -> bool {
+            self.len() == 0
+        }
+
+        pub(super) fn as_ref(&self) -> &[PathPoint] {
+            &self.points
+        }
+
+        /// All mutable access invalidates the index map. It should be
+        /// avoided unless actual mutation is going to occur.
+        pub(super) fn as_mut(&mut self) -> &mut Vec<PathPoint> {
+            self.set_needs_rebuild();
+            Arc::make_mut(&mut self.points)
+        }
+
+        fn set_needs_rebuild(&self) {
+            self.needs_to_rebuild_indicies.set(true);
+        }
+
+        fn rebuild_if_needed(&self) {
+            if self.needs_to_rebuild_indicies.replace(false) {
+                let mut indices = self.indices.borrow_mut();
+                let indices = Arc::make_mut(&mut *indices);
+                indices.clear();
+                indices.extend(self.points.iter().enumerate().map(|(i, pt)| (pt.id, i)))
+            }
+        }
+
+        pub(super) fn index_for_point(&self, item: EntityId) -> Option<usize> {
+            self.rebuild_if_needed();
+            self.indices.borrow().get(&item).copied()
+        }
+
+        pub(super) fn get(&self, item: EntityId) -> Option<&PathPoint> {
+            let idx = self.index_for_point(item)?;
+            self.as_ref().get(idx)
+        }
+
+        /// update a point using a closure.
+        ///
+        /// This cannot remove the point, or change its id; this means we don't
+        /// need to invalidate our indicies.
+        pub(super) fn with_mut(&mut self, item: EntityId, f: impl FnOnce(&mut PathPoint)) {
+            self.rebuild_if_needed();
+            if let Some(idx) = self.index_for_point(item) {
+                if let Some(val) = Arc::make_mut(&mut self.points).get_mut(idx) {
+                    f(val);
+                    val.id = item;
+                }
+            }
         }
     }
 }
@@ -99,7 +131,7 @@ impl PathPoints {
         let start = PathPoint::on_curve(path_id, start_point);
         PathPoints {
             path_id,
-            points: Arc::new(vec![start]),
+            points: protected::RawPoints::new(vec![start]),
             closed: false,
             trailing: None,
         }
@@ -133,7 +165,7 @@ impl PathPoints {
 
         PathPoints {
             path_id,
-            points: Arc::new(points),
+            points: protected::RawPoints::new(points),
             trailing,
             closed,
         }
@@ -168,25 +200,24 @@ impl PathPoints {
     }
 
     pub fn as_slice(&self) -> &[PathPoint] {
-        &self.points
+        self.points.as_ref()
     }
 
     pub(crate) fn points_mut(&mut self) -> &mut Vec<PathPoint> {
-        Arc::make_mut(&mut self.points)
+        self.points.as_mut()
     }
 
     /// Iterates points in order.
-    //TODO: can we combine this with the one above?
     pub(crate) fn iter_points(&self) -> impl Iterator<Item = PathPoint> + '_ {
         let (first, remaining_n) = if self.closed {
-            (self.points.last().copied(), self.points.len() - 1)
+            (self.points.as_ref().last().copied(), self.points.len() - 1)
         } else {
             (None, self.points.len())
         };
 
         first
             .into_iter()
-            .chain(self.points.iter().take(remaining_n).copied())
+            .chain(self.points.as_ref().iter().take(remaining_n).copied())
     }
 
     pub fn iter_segments(&self) -> Segments {
@@ -203,22 +234,26 @@ impl PathPoints {
     ///
     /// If you pass a point id, the cursor will start at that point; if not
     /// it will start at the first point.
-    pub fn cursor(&mut self, id: Option<EntityId>) -> Option<Cursor> {
+    pub fn cursor(&mut self, id: Option<EntityId>) -> Cursor {
         let idx = id
-            .and_then(|id| self.idx_for_point(id))
-            .unwrap_or_else(|| self.first_idx());
-        Some(Cursor { idx, inner: self })
+            .map(|id| self.points.index_for_point(id))
+            .unwrap_or_else(|| Some(if self.closed { self.len() - 1 } else { 0 }));
+        Cursor { idx, inner: self }
     }
 
     pub fn close(&mut self) -> EntityId {
         assert!(!self.closed);
         self.points_mut().rotate_left(1);
         self.closed = true;
-        self.points.last().unwrap().id
+        self.points.as_ref().last().unwrap().id
     }
 
     pub(crate) fn reverse_contour(&mut self) {
-        let last = self.last_idx();
+        let last = if self.closed {
+            self.points.len() - 1
+        } else {
+            self.points.len()
+        };
         self.points_mut()[..last].reverse();
     }
 
@@ -227,14 +262,6 @@ impl PathPoints {
             self.len() - 1
         } else {
             0
-        }
-    }
-
-    fn last_idx(&self) -> usize {
-        if self.closed {
-            self.points.len() - 1
-        } else {
-            self.points.len()
         }
     }
 
@@ -262,32 +289,43 @@ impl PathPoints {
         (idx + 1) % self.points.len()
     }
 
-    fn idx_for_point(&self, point: EntityId) -> Option<usize> {
-        self.points.iter().position(|p| p.id == point)
-    }
-
     pub(crate) fn path_point_for_id(&self, point: EntityId) -> Option<PathPoint> {
         assert!(point.is_child_of(self.path_id));
-        self.idx_for_point(point).map(|idx| self.points[idx])
+        self.points.get(point).copied()
     }
 
     pub(crate) fn prev_point(&self, point: EntityId) -> PathPoint {
         assert!(point.is_child_of(self.path_id));
-        let idx = self.idx_for_point(point).expect("bad input to prev_point");
+        let idx = self
+            .points
+            .index_for_point(point)
+            .expect("bad input to prev_point");
         let idx = self.prev_idx(idx);
-        self.points[idx]
+        self.points.as_ref()[idx]
     }
 
     pub(crate) fn next_point(&self, point: EntityId) -> PathPoint {
         assert!(point.is_child_of(self.path_id));
-        let idx = self.idx_for_point(point).expect("bad input to next_point");
+        let idx = self
+            .points
+            .index_for_point(point)
+            .expect("bad input to next_point");
         let idx = self.next_idx(idx);
-        self.points[idx]
+        self.points.as_ref()[idx]
     }
 
     pub fn start_point(&self) -> &PathPoint {
         assert!(!self.points.is_empty(), "empty path is not constructable");
-        self.points.get(self.first_idx()).unwrap()
+        self.points.as_ref().get(self.first_idx()).unwrap()
+    }
+
+    /// The trailing on-curve point, if this path is not closed.
+    pub fn trailing_point_in_open_path(&self) -> Option<&PathPoint> {
+        if !self.closed {
+            self.points.as_ref().last()
+        } else {
+            None
+        }
     }
 
     //FIXME: this logic feels weird. What *is* an end point? in a closed path,
@@ -300,16 +338,17 @@ impl PathPoints {
         } else {
             self.points.len() - 1
         };
-        &self.points[idx]
+        &self.points.as_ref()[idx]
     }
 
     pub fn transform_all(&mut self, affine: Affine, anchor: DPoint) {
         let anchor = anchor.to_dvec2();
-        for idx in 0..self.points.len() {
-            self.transform_point(idx, affine, anchor);
-        }
+        self.points_mut()
+            .iter_mut()
+            .for_each(|pt| pt.transform(affine, anchor));
 
         if let Some(trailing) = self.trailing_mut() {
+            //FIXME: what about the anchor?
             let new_trailing = affine * trailing.to_raw();
             *trailing = DPoint::from_raw(new_trailing);
         }
@@ -324,59 +363,45 @@ impl PathPoints {
     pub fn transform_points(&mut self, points: &[EntityId], affine: Affine, anchor: DPoint) {
         let to_xform = self.points_for_points(points);
         let anchor = anchor.to_dvec2();
-        for idx in &to_xform {
-            self.transform_point(*idx, affine, anchor);
-            if !self.points[*idx].is_on_curve() {
-                if let Some((on_curve, handle)) = self.tangent_handle(*idx) {
-                    if !to_xform.contains(&handle) {
-                        self.adjust_handle_angle(*idx, on_curve, handle);
-                    }
+        for point in &to_xform {
+            self.points
+                .with_mut(*point, |pt| pt.transform(affine, anchor));
+            if let Some((on_curve, handle)) = self.tangent_handle(*point) {
+                if !to_xform.contains(&handle) {
+                    self.adjust_handle_angle(*point, on_curve, handle);
                 }
             }
         }
     }
 
-    fn transform_point(&mut self, idx: usize, affine: Affine, anchor: DVec2) {
-        let anchor = anchor.to_raw();
-        let point = self.points[idx].point.to_raw() - anchor;
-        let point = affine * point + anchor;
-        self.points_mut()[idx].point = DPoint::from_raw(point);
-    }
-
-    /// For a list of points, returns a set of indices for those points, including
-    /// any associated off-curve points.
-    fn points_for_points(&self, points: &[EntityId]) -> HashSet<usize> {
+    /// For a list of points, returns a set including those points and any
+    /// adjacent off-curve points.
+    fn points_for_points(&mut self, points: &[EntityId]) -> HashSet<EntityId> {
         let mut to_xform = HashSet::new();
         for point in points {
-            let idx = match self.points.iter().position(|p| p.id == *point) {
-                Some(idx) => idx,
-                None => continue,
-            };
-            to_xform.insert(idx);
-            if self.points[idx].is_on_curve() {
-                let prev = self.prev_idx(idx);
-                let next = self.next_idx(idx);
-                if !self.points[prev].is_on_curve() {
-                    to_xform.insert(prev);
+            let cursor = self.cursor(Some(*point));
+            if cursor.point().is_some() {
+                to_xform.insert(*point);
+                if let Some(prev) = cursor.peek_prev().filter(|pp| pp.is_off_curve()) {
+                    to_xform.insert(prev.id);
                 }
-                if !self.points[next].is_on_curve() {
-                    to_xform.insert(next);
+
+                if let Some(next) = cursor.peek_next().filter(|pp| pp.is_off_curve()) {
+                    to_xform.insert(next.id);
                 }
             }
         }
         to_xform
     }
 
-    pub fn update_handle(&mut self, point: EntityId, mut dpt: DPoint, is_locked: bool) {
-        if let Some(bcp1) = self.idx_for_point(point) {
-            if let Some((on_curve, bcp2)) = self.tangent_handle_opt(bcp1) {
-                if is_locked {
-                    dpt = dpt.axis_locked_to(self.points[on_curve].point);
-                }
-                self.points_mut()[bcp1].point = dpt;
-                if let Some(bcp2) = bcp2 {
-                    self.adjust_handle_angle(bcp1, on_curve, bcp2);
-                }
+    pub fn update_handle(&mut self, bcp1: EntityId, mut dpt: DPoint, is_locked: bool) {
+        if let Some((on_curve, bcp2)) = self.tangent_handle_opt(bcp1) {
+            if is_locked {
+                dpt = dpt.axis_locked_to(bail!(self.points.get(on_curve)).point);
+            }
+            self.points.with_mut(bcp1, |p| p.point = dpt);
+            if let Some(bcp2) = bcp2 {
+                self.adjust_handle_angle(bcp1, on_curve, bcp2);
             }
         }
     }
@@ -384,19 +409,22 @@ impl PathPoints {
     /// Update a tangent handle in response to the movement of the partner handle.
     /// `bcp1` is the handle that has moved, and `bcp2` is the handle that needs
     /// to be adjusted.
-    fn adjust_handle_angle(&mut self, bcp1: usize, on_curve: usize, bcp2: usize) {
-        let raw_angle = (self.points[bcp1].point - self.points[on_curve].point).to_raw();
+    fn adjust_handle_angle(&mut self, bcp1: EntityId, on_curve: EntityId, bcp2: EntityId) {
+        let p1 = bail!(self.points.get(bcp1));
+        let p2 = bail!(self.points.get(on_curve));
+        let p3 = bail!(self.points.get(bcp2));
+        let raw_angle = (p1.point - p2.point).to_raw();
         if raw_angle.hypot() == 0.0 {
             return;
         }
 
         // that angle is in the opposite direction, so flip it
         let norm_angle = raw_angle.normalize() * -1.0;
-        let handle_len = (self.points[bcp2].point - self.points[on_curve].point).hypot();
+        let handle_len = (p3.point - p2.point).hypot();
 
         let new_handle_offset = DVec2::from_raw(norm_angle * handle_len);
-        let new_pos = self.points[on_curve].point + new_handle_offset;
-        self.points_mut()[bcp2].point = new_pos;
+        let new_pos = p2.point + new_handle_offset;
+        self.points.with_mut(bcp2, |pt| pt.point = new_pos)
     }
 
     /// Given the idx of an off-curve point, check if that point has a tangent
@@ -405,8 +433,8 @@ impl PathPoints {
     ///
     /// Returns the index for the on_curve point and the 'other' handle
     /// for an offcurve point, if it exists.
-    fn tangent_handle(&self, idx: usize) -> Option<(usize, usize)> {
-        if let Some((on_curve, Some(bcp2))) = self.tangent_handle_opt(idx) {
+    fn tangent_handle(&mut self, point: EntityId) -> Option<(EntityId, EntityId)> {
+        if let Some((on_curve, Some(bcp2))) = self.tangent_handle_opt(point) {
             Some((on_curve, bcp2))
         } else {
             None
@@ -416,26 +444,31 @@ impl PathPoints {
     /// Given the idx of an off-curve point, return its neighbouring on-curve
     /// point; if that point is smooth and its other neighbour is also an
     /// off-curve, it returns that as well.
-    fn tangent_handle_opt(&self, idx: usize) -> Option<(usize, Option<usize>)> {
-        assert!(!self.points[idx].is_on_curve());
-        let prev = self.prev_idx(idx);
-        let next = self.next_idx(idx);
-        if self.points[prev].typ.is_on_curve() {
-            let prev2 = self.prev_idx(prev);
-            if self.points[prev].is_smooth() && !self.points[prev2].is_on_curve() {
-                return Some((prev, Some(prev2)));
+    fn tangent_handle_opt(&mut self, point: EntityId) -> Option<(EntityId, Option<EntityId>)> {
+        let cursor = self.cursor(Some(point));
+        if cursor.point().map(|pp| pp.is_off_curve()).unwrap_or(false) {
+            let on_curve = cursor
+                .peek_next()
+                .filter(|p| p.is_on_curve())
+                .or(cursor.peek_prev().filter(|p| p.is_on_curve()))
+                .copied()
+                .unwrap(); // all off curve points have one on_curve neighbour
+            if on_curve.is_smooth() {
+                let cursor = self.cursor(Some(on_curve.id));
+                let other_off_curve = cursor
+                    .peek_next()
+                    .filter(|p| p.is_off_curve() && p.id != point)
+                    .or(cursor
+                        .peek_prev()
+                        .filter(|p| p.is_off_curve() && p.id != point))
+                    .map(|p| p.id);
+                Some((on_curve.id, other_off_curve))
             } else {
-                return Some((prev, None));
+                Some((on_curve.id, None))
             }
-        } else if self.points[next].is_on_curve() {
-            let next2 = self.next_idx(next);
-            if self.points[next].is_smooth() && !self.points[next2].is_on_curve() {
-                return Some((next, Some(next2)));
-            } else {
-                return Some((next, None));
-            }
+        } else {
+            None
         }
-        None
     }
 
     pub fn delete_points(&mut self, points: &[EntityId]) {
@@ -447,10 +480,7 @@ impl PathPoints {
 
     //FIXME: this is currently buggy :(
     fn delete_point(&mut self, point_id: EntityId) {
-        let idx = match self.points.iter().position(|p| p.id == point_id) {
-            Some(idx) => idx,
-            None => return,
-        };
+        let idx = bail!(self.points.index_for_point(point_id));
 
         let prev_idx = self.prev_idx(idx);
         let next_idx = self.next_idx(idx);
@@ -458,14 +488,14 @@ impl PathPoints {
         eprintln!("deleting {:?}", idx);
         //self.debug_print_points();
 
-        match self.points[idx].typ {
+        match self.points.as_ref()[idx].typ {
             p if p.is_off_curve() => {
                 // delete both of the off curve points for this segment
-                let other_id = if self.points[prev_idx].is_off_curve() {
-                    self.points[prev_idx].id
+                let other_id = if self.points.as_ref()[prev_idx].is_off_curve() {
+                    self.points.as_ref()[prev_idx].id
                 } else {
-                    assert!(self.points[next_idx].is_off_curve());
-                    self.points[next_idx].id
+                    assert!(self.points.as_ref()[next_idx].is_off_curve());
+                    self.points.as_ref()[next_idx].id
                 };
                 self.points_mut()
                     .retain(|p| p.id != point_id && p.id != other_id);
@@ -479,18 +509,18 @@ impl PathPoints {
                     .retain(|p| p.is_on_curve() && p.id != point_id);
             }
 
-            _on_curve if self.points[prev_idx].is_on_curve() => {
+            _on_curve if self.points.as_ref()[prev_idx].is_on_curve() => {
                 // this is a line segment
                 self.points_mut().remove(idx);
             }
-            _on_curve if self.points[next_idx].is_on_curve() => {
+            _on_curve if self.points.as_ref()[next_idx].is_on_curve() => {
                 // if we neighbour a corner point, leave handles (neighbour becomes curve)
                 self.points_mut().remove(idx);
             }
             _ => {
                 assert!(self.points.len() > 4);
-                let prev = self.points[prev_idx];
-                let next = self.points[next_idx];
+                let prev = self.points.as_ref()[prev_idx];
+                let next = self.points.as_ref()[next_idx];
                 assert!(!prev.is_on_curve() && !next.is_on_curve());
                 let to_del = [prev.id, next.id, point_id];
                 self.points_mut().retain(|p| !to_del.contains(&p.id));
@@ -508,9 +538,9 @@ impl PathPoints {
             };
             let next_idx = (idx + 1) % self.points.len();
 
-            if self.points[idx].is_smooth()
-                && self.points[prev_idx].is_on_curve()
-                && self.points[next_idx].is_on_curve()
+            if self.points.as_ref()[idx].is_smooth()
+                && self.points.as_ref()[prev_idx].is_on_curve()
+                && self.points.as_ref()[next_idx].is_on_curve()
             {
                 self.points_mut()[idx].toggle_type();
             }
@@ -518,7 +548,10 @@ impl PathPoints {
 
         // normalize our representation
         let len = self.points.len();
-        if len > 2 && !self.points[0].is_on_curve() && !self.points[len - 1].is_on_curve() {
+        if len > 2
+            && !self.points.as_ref()[0].is_on_curve()
+            && !self.points.as_ref()[len - 1].is_on_curve()
+        {
             self.points_mut().rotate_left(1);
         }
 
@@ -530,7 +563,58 @@ impl PathPoints {
 
     pub fn last_segment_is_curve(&self) -> bool {
         let len = self.points.len();
-        len > 2 && !self.points[len - 2].is_on_curve()
+        len > 2 && !self.points.as_ref()[len - 2].is_on_curve()
+    }
+}
+
+impl Cursor<'_> {
+    pub fn point(&self) -> Option<&PathPoint> {
+        self.idx.map(|idx| &self.inner.points.as_ref()[idx])
+    }
+
+    pub fn point_mut(&mut self) -> Option<&mut PathPoint> {
+        let idx = self.idx?;
+        self.inner.points.as_mut().get_mut(idx)
+    }
+
+    #[allow(dead_code)]
+    pub fn move_next(&mut self) {
+        self.idx = self.next_idx();
+    }
+
+    pub fn move_prev(&mut self) {
+        self.idx = self.prev_idx();
+    }
+
+    pub fn peek_next(&self) -> Option<&PathPoint> {
+        self.next_idx().map(|idx| &self.inner.points.as_ref()[idx])
+    }
+
+    pub fn peek_prev(&self) -> Option<&PathPoint> {
+        self.prev_idx()
+            .and_then(|idx| self.inner.points.as_ref().get(idx))
+    }
+
+    #[inline]
+    fn prev_idx(&self) -> Option<usize> {
+        let idx = self.idx?;
+        if self.inner.closed() {
+            Some(((self.inner.len() + idx) - 1) % self.inner.len())
+        } else {
+            idx.checked_sub(1)
+        }
+    }
+
+    #[inline]
+    pub(crate) fn next_idx(&self) -> Option<usize> {
+        let idx = self.idx?;
+        if self.inner.closed() {
+            Some((idx + 1) % self.inner.len())
+        } else if idx < self.inner.len() - 1 {
+            Some(idx + 1)
+        } else {
+            None
+        }
     }
 }
 
@@ -615,7 +699,7 @@ impl Segment {
 
 /// An iterator over the segments in a path list.
 pub struct Segments {
-    points: Arc<Vec<PathPoint>>,
+    points: protected::RawPoints,
     prev_pt: PathPoint,
     idx: usize,
 }
@@ -628,10 +712,10 @@ impl Iterator for Segments {
             return None;
         }
         let seg_start = self.prev_pt;
-        let seg = if !self.points[self.idx].is_on_curve() {
-            let p1 = self.points[self.idx];
-            let p2 = self.points[self.idx + 1];
-            self.prev_pt = self.points[self.idx + 2];
+        let seg = if !self.points.as_ref()[self.idx].is_on_curve() {
+            let p1 = self.points.as_ref()[self.idx];
+            let p2 = self.points.as_ref()[self.idx + 1];
+            self.prev_pt = self.points.as_ref()[self.idx + 2];
             self.idx += 3;
             assert!(
                 self.prev_pt.typ.is_on_curve(),
@@ -641,7 +725,7 @@ impl Iterator for Segments {
             );
             Segment::Cubic(seg_start, p1, p2, self.prev_pt)
         } else {
-            self.prev_pt = self.points[self.idx];
+            self.prev_pt = self.points.as_ref()[self.idx];
             self.idx += 1;
             Segment::Line(seg_start, self.prev_pt)
         };

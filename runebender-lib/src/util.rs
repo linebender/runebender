@@ -9,7 +9,7 @@ use druid::kurbo::{Size, Vec2};
 /// This should generate less code than unwrap? Honestly it's a total
 /// experiment.
 macro_rules! bail {
-    ($cond:expr $(,)?) => {
+    ($opt:expr $(,)?) => {
         match $opt {
             Some(val) => val,
             None => {
