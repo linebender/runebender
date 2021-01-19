@@ -205,10 +205,6 @@ impl Path {
         self.points.start_point()
     }
 
-    fn end_point(&self) -> &PathPoint {
-        self.points.end_point()
-    }
-
     pub fn bezier(&self) -> BezPath {
         let mut bez = BezPath::new();
         self.append_to_bezier(&mut bez);
@@ -277,7 +273,9 @@ impl Path {
                         }
                     }
                 },
-                (false, true) if seg.end() == *self.end_point() && self.points.closed() => {
+                (false, true)
+                    if seg.end() == self.points.last_on_curve_point() && self.points.closed() =>
+                {
                     result.push(Path::new(seg.end().point));
                 }
                 // we can can just continue, nothing to add
@@ -296,7 +294,8 @@ impl Path {
         }
 
         // cleanup: if the last selected segment joins the first, combine them
-        if result.first().unwrap().start_point().point == result.last().unwrap().end_point().point
+        if result.first().unwrap().start_point().point
+            == result.last().unwrap().points.last_on_curve_point().point
             && self.points.closed()
         {
             let first = result.remove(0);
@@ -480,11 +479,11 @@ impl Path {
         self.points.path_point_for_id(point)
     }
 
-    pub(crate) fn prev_point(&self, point: EntityId) -> PathPoint {
+    pub(crate) fn prev_point(&self, point: EntityId) -> Option<PathPoint> {
         self.points.prev_point(point)
     }
 
-    pub(crate) fn next_point(&self, point: EntityId) -> PathPoint {
+    pub(crate) fn next_point(&self, point: EntityId) -> Option<PathPoint> {
         self.points.next_point(point)
     }
 
@@ -504,46 +503,29 @@ impl Path {
     }
 
     pub(crate) fn split_segment_at_point(&mut self, seg: Segment, t: f64) {
-        let (existing_control_pts, points_to_insert) = match seg {
-            Segment::Line(..) => (0, 1),
-            Segment::Cubic(..) => (2, 5),
-        };
-
         let mut pre_seg = seg.subsegment(0.0..t);
         if let Segment::Cubic(_, _, _, p3) = &mut pre_seg {
             p3.typ = PointType::OnCurve { smooth: true };
         }
         let post_seg = seg.subsegment(t..1.0);
-        let insert_idx = self.points.cursor(Some(seg.start_id())).next_idx().unwrap(); // the first point of a segment always has a next point
-
-        let iter = pre_seg
-            .into_iter()
-            .skip(1)
-            .chain(post_seg.into_iter().skip(1));
-        let self_id = self.id();
-        let points = self.points.points_mut();
-        points.splice(
-            insert_idx..insert_idx + existing_control_pts,
-            iter.take(points_to_insert).map(|mut next_pt| {
-                next_pt.reparent(self_id);
-                next_pt
-            }),
-        );
+        self.points.split_segment(seg, pre_seg, post_seg);
     }
 
     /// Upgrade a line segment to a cubic bezier.
     pub(crate) fn upgrade_line_seg(&mut self, seg: Segment) {
         let cursor = self.points.cursor(Some(seg.start_id()));
-        let p0 = bail!(cursor.point()).point;
-        let p3 = bail!(cursor.peek_next(), "segment has correct number of points").point;
-        let p1 = p0.lerp(p3, 1.0 / 3.0);
-        let p2 = p0.lerp(p3, 2.0 / 3.0);
+        let p0 = bail!(cursor.point());
+        let p3 = bail!(cursor.peek_next(), "segment has correct number of points");
+        let p1 = p0.point.lerp(p3.point, 1.0 / 3.0);
+        let p2 = p0.point.lerp(p3.point, 2.0 / 3.0);
         let path = seg.start_id().parent();
-        let insert_idx = cursor.next_idx().unwrap();
-        self.points.points_mut().splice(
-            insert_idx..insert_idx,
-            [p1, p2].iter().map(|p| PathPoint::off_curve(path, *p)),
+        let new_seg = Segment::Cubic(
+            *p0,
+            PathPoint::off_curve(path, p1),
+            PathPoint::off_curve(path, p2),
+            *p3,
         );
+        self.points.replace_segment(seg, new_seg);
     }
 }
 
