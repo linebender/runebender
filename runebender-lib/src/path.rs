@@ -384,14 +384,16 @@ impl Path {
     }
 
     pub fn toggle_on_curve_point_type(&mut self, id: EntityId) {
-        let mut cursor = self.points.cursor(Some(id)).unwrap();
+        let mut cursor = self.points.cursor(Some(id));
         let has_ctrl = cursor
-            .prev()
+            .peek_prev()
             .map(PathPoint::is_off_curve)
-            .or(cursor.next().map(PathPoint::is_off_curve))
+            .or(cursor.peek_next().map(PathPoint::is_off_curve))
             .unwrap_or(false);
-        if cursor.point().is_smooth() || cursor.point().is_on_curve() && has_ctrl {
-            cursor.point_mut().toggle_type()
+        if let Some(pt) = cursor.point_mut() {
+            if pt.is_smooth() || pt.is_on_curve() && has_ctrl {
+                pt.toggle_type();
+            }
         }
     }
 
@@ -432,26 +434,31 @@ impl Path {
 
     /// Update the curve while the user drags a new control point.
     fn update_trailing(&mut self, handle: DPoint) {
-        if self.points.len() > 1 {
-            let mut cursor = self.points.cursor(None).unwrap();
-            cursor.move_to_end();
-            assert!(cursor.point().is_on_curve());
-            assert!(cursor.prev().map(PathPoint::is_off_curve).unwrap_or(false));
-            let on_curve_pt = cursor.point().point;
+        if let Some(last_point) = self.points.trailing_point_in_open_path().copied() {
+            let mut cursor = self.points.cursor(Some(last_point.id));
+            assert!(last_point.is_on_curve());
+            assert!(cursor
+                .peek_prev()
+                .map(PathPoint::is_off_curve)
+                .unwrap_or(false));
+            let on_curve_pt = last_point.point;
             let new_p = on_curve_pt - (handle - on_curve_pt);
-            cursor.prev_mut().unwrap().point = new_p;
+            cursor.move_prev();
+            cursor.point_mut().unwrap().point = new_p;
+            self.points.set_trailing(handle);
         }
-        self.points.set_trailing(handle);
     }
 
     /// Set one of a given point's axes to a new value; used when aligning a set
     /// of points.
     pub(crate) fn align_point(&mut self, point: EntityId, val: f64, set_x: bool) {
-        let mut cursor = self.points.cursor(Some(point)).unwrap();
-        if set_x {
-            cursor.point_mut().point.x = val;
-        } else {
-            cursor.point_mut().point.y = val;
+        let mut cursor = self.points.cursor(Some(point));
+        if let Some(pt) = cursor.point_mut() {
+            if set_x {
+                pt.point.x = val;
+            } else {
+                pt.point.y = val;
+            }
         }
     }
 
@@ -507,11 +514,7 @@ impl Path {
             p3.typ = PointType::OnCurve { smooth: true };
         }
         let post_seg = seg.subsegment(t..1.0);
-        let insert_idx = self
-            .points
-            .cursor(Some(seg.start_id()))
-            .and_then(|c| c.next_idx())
-            .unwrap(); // the first point of a segment always has a next point
+        let insert_idx = self.points.cursor(Some(seg.start_id())).next_idx().unwrap(); // the first point of a segment always has a next point
 
         let iter = pre_seg
             .into_iter()
@@ -530,12 +533,9 @@ impl Path {
 
     /// Upgrade a line segment to a cubic bezier.
     pub(crate) fn upgrade_line_seg(&mut self, seg: Segment) {
-        let cursor = bail!(
-            self.points.cursor(Some(seg.start_id())),
-            "segment expected to exist"
-        );
-        let p0 = cursor.point().point;
-        let p3 = bail!(cursor.next(), "segment has correct number of points").point;
+        let cursor = self.points.cursor(Some(seg.start_id()));
+        let p0 = bail!(cursor.point()).point;
+        let p3 = bail!(cursor.peek_next(), "segment has correct number of points").point;
         let p1 = p0.lerp(p3, 1.0 / 3.0);
         let p2 = p0.lerp(p3, 2.0 / 3.0);
         let path = seg.start_id().parent();
