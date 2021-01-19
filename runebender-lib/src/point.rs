@@ -3,9 +3,9 @@
 //! This is intended to be agnostic to whether the path is a bezier or a
 //! hyperbezier.
 
-use super::design_space::{DPoint, ViewPort};
+use super::design_space::{DPoint, DVec2, ViewPort};
 
-use druid::kurbo::Point;
+use druid::kurbo::{Affine, Point};
 use druid::Data;
 use norad::glyph::PointType as NoradPointType;
 
@@ -167,6 +167,18 @@ impl PathPoint {
 
     pub fn reparent(&mut self, new_parent: EntityId) {
         self.id.parent = new_parent.point;
+    }
+
+    /// Apply the provided transform to the point.
+    ///
+    /// The `anchor` argument is a point that should be treated as the origin
+    /// when applying the transform, which is used for things like scaling from
+    /// a fixed point.
+    pub fn transform(&mut self, affine: Affine, anchor: DVec2) {
+        let anchor = anchor.to_raw();
+        let current = self.point.to_raw() - anchor;
+        let new = affine * current + anchor;
+        self.point = DPoint::from_raw(new);
     }
 
     pub fn to_kurbo(&self) -> Point {
