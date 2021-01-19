@@ -403,7 +403,7 @@ impl EditSession {
         let id = self.selection.iter().next().copied().unwrap();
         let id = self
             .path_for_point(id)
-            .map(|path| path.next_point(id).id)
+            .and_then(|path| path.next_point(id).map(|pp| pp.id))
             .unwrap_or(id);
         self.selection.select_one(id);
     }
@@ -417,7 +417,7 @@ impl EditSession {
         let id = self.selection.iter().next().copied().unwrap();
         let id = self
             .path_for_point(id)
-            .map(|path| path.prev_point(id).id)
+            .and_then(|path| path.prev_point(id).map(|pp| pp.id))
             .unwrap_or(id);
         self.selection.select_one(id);
     }
