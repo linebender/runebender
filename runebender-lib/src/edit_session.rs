@@ -333,7 +333,7 @@ impl EditSession {
             self.new_path(point);
         } else {
             let point = self.viewport.from_screen(point);
-            let new_point = self.active_path_mut().unwrap().append_point(point);
+            let new_point = self.active_path_mut().unwrap().line_to(point);
             self.selection.select_one(new_point);
         }
     }

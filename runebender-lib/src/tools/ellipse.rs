@@ -5,10 +5,10 @@
 use druid::kurbo::{PathEl, Shape};
 use druid::{Color, Env, EventCtx, KbKey, KeyEvent, PaintCtx, Rect, RenderContext};
 
+use crate::cubic_path::CubicPath;
 use crate::design_space::DPoint;
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
-use crate::path::Path;
 use crate::tools::{EditType, Tool};
 
 /// The state of the ellipse tool.
@@ -125,12 +125,12 @@ impl MouseDelegate<EditSession> for Ellipse {
         if let Some((start, current)) = self.pts_for_rect() {
             let rect = Rect::from_points(start.to_raw(), current.to_raw());
             let ellipse = rect.to_ellipse();
-            if let Ok(path) = Path::from_bezpath(
+            if let Ok(path) = CubicPath::from_bezpath(
                 ellipse
                     .path_elements(1.0)
                     .chain(std::iter::once(PathEl::ClosePath)),
             ) {
-                data.paste_paths(vec![path]);
+                data.paste_paths(vec![path.into()]);
             }
             self.gesture = GestureState::Finished;
         }
