@@ -16,6 +16,7 @@ mod bez_cache;
 mod clipboard;
 mod component;
 mod consts;
+mod cubic_path;
 mod design_space;
 mod draw;
 mod edit_session;

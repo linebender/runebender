@@ -5,10 +5,10 @@ use druid::{
     TextLayout,
 };
 
+use crate::cubic_path::CubicPath;
 use crate::design_space::DPoint;
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
-use crate::path::Path;
 use crate::point::{EntityId, PathPoint};
 use crate::tools::{EditType, Tool};
 
@@ -163,7 +163,7 @@ impl MouseDelegate<EditSession> for Rectangle {
     fn left_up(&mut self, _event: &MouseEvent, data: &mut EditSession) {
         if let Some((start, current)) = self.pts_for_rect() {
             let path = make_rect_path(start, current);
-            data.paste_paths(vec![path]);
+            data.paste_paths(vec![path.into()]);
             self.gesture = GestureState::Finished;
         }
     }
@@ -188,7 +188,7 @@ impl Default for GestureState {
     }
 }
 
-fn make_rect_path(p1: DPoint, p3: DPoint) -> Path {
+fn make_rect_path(p1: DPoint, p3: DPoint) -> CubicPath {
     let path_id = EntityId::next();
     let p2 = DPoint::new(p3.x, p1.y);
     let p4 = DPoint::new(p1.x, p3.y);
@@ -199,5 +199,5 @@ fn make_rect_path(p1: DPoint, p3: DPoint) -> Path {
         PathPoint::on_curve(path_id, p4),
         PathPoint::on_curve(path_id, p1),
     ];
-    Path::from_raw_parts(path_id, points, None, true)
+    CubicPath::from_raw_parts(path_id, points, None, true)
 }

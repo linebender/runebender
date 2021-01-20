@@ -495,9 +495,11 @@ impl PathPoints {
                 let other_off_curve = cursor
                     .peek_next()
                     .filter(|p| p.is_off_curve() && p.id != point)
-                    .or(cursor
-                        .peek_prev()
-                        .filter(|p| p.is_off_curve() && p.id != point))
+                    .or_else(|| {
+                        cursor
+                            .peek_prev()
+                            .filter(|p| p.is_off_curve() && p.id != point)
+                    })
                     .map(|p| p.id);
                 Some((on_curve.id, other_off_curve))
             } else {
