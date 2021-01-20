@@ -8,6 +8,7 @@ use druid::kurbo::{Affine, BezPath, PathEl, Point, Rect, Shape};
 use lopdf::content::{Content, Operation};
 use lopdf::{Document, Object, Stream};
 
+use crate::cubic_path::CubicPath;
 use crate::design_space::DPoint;
 use crate::edit_session::EditSession;
 use crate::path::Path;
@@ -87,7 +88,10 @@ pub fn make_glyphs_plist(session: &EditSession) -> Option<Vec<u8>> {
     let paths: Vec<_> = session
         .paths_for_selection()
         .iter()
-        .map(GlyphPlistPath::from)
+        .filter_map(|path| match path {
+            Path::Cubic(path) => Some(GlyphPlistPath::from(path)),
+            Path::Hyper(_) => None,
+        })
         .collect();
     if paths.is_empty() {
         return None;
@@ -110,7 +114,9 @@ pub fn make_glyphs_plist(session: &EditSession) -> Option<Vec<u8>> {
 pub fn from_glyphs_plist(data: Vec<u8>) -> Option<Vec<Path>> {
     let cursor = std::io::Cursor::new(data);
     match plist::from_reader(cursor) {
-        Ok(GlyphsPastePlist { paths, .. }) => Some(paths.iter().map(Path::from).collect()),
+        Ok(GlyphsPastePlist { paths, .. }) => {
+            Some(paths.iter().map(|p| CubicPath::from(p).into()).collect())
+        }
         Err(e) => {
             log::warn!("failed to parse glyphs plist: '{}'", e);
             None
@@ -138,8 +144,11 @@ fn paths_from_plist_dict(dict: HashMap<String, Plist>) -> Option<Vec<Path>> {
     let mut result = Vec::new();
     for path in paths {
         if let Plist::Dictionary(dict) = path {
-            if let Some(path) = GlyphPlistPath::from_dict(dict).as_ref().map(Path::from) {
-                result.push(path);
+            if let Some(path) = GlyphPlistPath::from_dict(dict)
+                .as_ref()
+                .map(CubicPath::from)
+            {
+                result.push(path.into());
             }
         }
     }
@@ -242,6 +251,7 @@ fn append_pdf_ops(ops: &mut Vec<Operation>, path: &BezPath) {
     }
 }
 
+// pdf paths have some weird duplication thing going on?
 fn paths_for_pdf_contents(contents: Content) -> Vec<Path> {
     //contents.operations.iter().for_each(|op| eprintln!("{}: [{:?}]", op.operator, op.operands));
     let bez = bez_path_for_pdf_contents(contents);
@@ -251,22 +261,26 @@ fn paths_for_pdf_contents(contents: Content) -> Vec<Path> {
             result.push(path)
         }
     }
-    result
+    result.into_iter().map(Path::from).collect()
 }
 
 //HACK: in some instances, at least on mac, a PDF on the pasteboard will have
 //two different paths for each of fill and stroke; we try to deduplicate that.
-fn approx_eq(path1: &Path, path2: &Path) -> bool {
+fn approx_eq(path1: &CubicPath, path2: &CubicPath) -> bool {
     // that's pretty close in my opinion
     const ARBITRARY_DISTANCE_THRESHOLD: f64 = 0.00001;
-    path1.points().len() == path2.points().len()
-        && path1.points().iter().zip(path2.points()).all(|(p1, p2)| {
-            p1.typ == p2.typ && (p1.point - p2.point).hypot() < ARBITRARY_DISTANCE_THRESHOLD
-        })
+    path1.path_points().len() == path2.path_points().len()
+        && path1
+            .path_points()
+            .iter_points()
+            .zip(path2.path_points().iter_points())
+            .all(|(p1, p2)| {
+                p1.typ == p2.typ && (p1.point - p2.point).hypot() < ARBITRARY_DISTANCE_THRESHOLD
+            })
 }
 
 // going to unjustifiable lengths to avoid an unecessary allocation :|
-fn iter_paths_for_bez_path(src: &BezPath) -> impl Iterator<Item = Path> + '_ {
+fn iter_paths_for_bez_path(src: &BezPath) -> impl Iterator<Item = CubicPath> + '_ {
     let mut cur_path_id = EntityId::next();
     let mut cur_points = Vec::new();
     let mut closed = false;
@@ -278,7 +292,7 @@ fn iter_paths_for_bez_path(src: &BezPath) -> impl Iterator<Item = Path> + '_ {
             None => {
                 if !cur_points.is_empty() {
                     let points = std::mem::replace(&mut cur_points, Vec::new());
-                    return Some(Path::from_raw_parts(cur_path_id, points, None, closed));
+                    return Some(CubicPath::from_raw_parts(cur_path_id, points, None, closed));
                 }
                 return None;
             }
@@ -290,7 +304,7 @@ fn iter_paths_for_bez_path(src: &BezPath) -> impl Iterator<Item = Path> + '_ {
                 let path = if points.is_empty() {
                     None
                 } else {
-                    Some(Path::from_raw_parts(cur_path_id, points, None, closed))
+                    Some(CubicPath::from_raw_parts(cur_path_id, points, None, closed))
                 };
                 cur_path_id = EntityId::next();
                 closed = false;
@@ -454,15 +468,17 @@ impl GlyphPlistPath {
     }
 }
 
-impl From<&Path> for GlyphPlistPath {
-    fn from(src: &Path) -> GlyphPlistPath {
+impl From<&CubicPath> for GlyphPlistPath {
+    fn from(src: &CubicPath) -> GlyphPlistPath {
         let mut next_is_curve = src
-            .points()
+            .path_points()
+            .as_slice()
             .last()
             .map(|p| p.is_off_curve())
             .unwrap_or(false);
         let nodes = src
-            .points()
+            .path_points()
+            .as_slice()
             .iter()
             .map(|p| {
                 let ptyp = match p.typ {
@@ -482,15 +498,15 @@ impl From<&Path> for GlyphPlistPath {
     }
 }
 
-impl From<&GlyphPlistPath> for Path {
-    fn from(src: &GlyphPlistPath) -> Path {
+impl From<&GlyphPlistPath> for CubicPath {
+    fn from(src: &GlyphPlistPath) -> CubicPath {
         let path_id = EntityId::next();
         let paths: Vec<PathPoint> = src
             .nodes
             .iter()
             .flat_map(|node| from_glyphs_plist_point(node, path_id))
             .collect();
-        Path::from_raw_parts(path_id, paths, None, src.closed > 0)
+        CubicPath::from_raw_parts(path_id, paths, None, src.closed > 0)
     }
 }
 
