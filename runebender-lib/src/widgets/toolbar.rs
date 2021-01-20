@@ -219,6 +219,12 @@ impl Default for Toolbar {
             hotkey: HotKey::new(None, "p"),
         };
 
+        let hyperpen = ToolbarItem {
+            name: "HyperPen",
+            icon: constrain_path(hyperpen_path()),
+            hotkey: HotKey::new(SysMods::Shift, "P"),
+        };
+
         let preview = ToolbarItem {
             name: "Preview",
             icon: constrain_path(preview_path()),
@@ -234,7 +240,7 @@ impl Default for Toolbar {
         let ellipse = ToolbarItem {
             name: "Ellipse",
             icon: constrain_path(ellipse_path()),
-            hotkey: HotKey::new(SysMods::Shift, "u"),
+            hotkey: HotKey::new(SysMods::Shift, "U"),
         };
 
         let knife = ToolbarItem {
@@ -250,7 +256,7 @@ impl Default for Toolbar {
         };
 
         Toolbar::new(vec![
-            select, pen, knife, preview, measure, rectangle, ellipse,
+            select, pen, hyperpen, knife, preview, measure, rectangle, ellipse,
         ])
     }
 }
@@ -305,6 +311,30 @@ fn pen_path() -> BezPath {
     bez.close_path();
     let circle = Circle::new((155.0, 361.0), 50.0);
     bez.extend(circle.path_elements(0.1));
+    bez
+}
+
+fn hyperpen_path() -> BezPath {
+    let mut bez = BezPath::new();
+
+    bez.move_to((87.0, 481.0));
+    bez.line_to((191.0, 481.0));
+    bez.line_to((191.0, 388.0));
+    bez.curve_to((191.0, 388.0), (278.0, 295.0), (278.0, 216.0));
+    bez.curve_to((278.0, 137.0), (139.0, 0.0), (139.0, 0.0));
+    bez.curve_to((139.0, 0.0), (0.0, 137.0), (0.0, 216.0));
+    bez.curve_to((0.0, 295.0), (87.0, 388.0), (87.0, 388.0));
+    bez.line_to((87.0, 481.0));
+    bez.close_path();
+
+    bez.move_to((82.0, 124.0));
+    bez.line_to((82.0, 324.0));
+
+    bez.move_to((196.0, 124.0));
+    bez.line_to((196.0, 324.0));
+
+    bez.move_to((82.0, 234.0));
+    bez.line_to((196.0, 234.0));
     bez
 }
 

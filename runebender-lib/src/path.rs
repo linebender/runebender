@@ -1,5 +1,6 @@
 use super::cubic_path::CubicPath;
 use super::design_space::{DPoint, DVec2, ViewPort};
+use super::hyper_path::HyperPath;
 use super::point::{EntityId, PathPoint};
 use super::point_list::{PathPoints, Segment};
 use druid::kurbo::{Affine, BezPath, ParamCurveNearest, Point, Vec2};
@@ -10,12 +11,16 @@ use crate::selection::Selection;
 #[derive(Debug, Clone, Data)]
 pub enum Path {
     Cubic(CubicPath),
-    Hyper(CubicPath),
+    Hyper(HyperPath),
 }
 
 impl Path {
     pub fn new(point: DPoint) -> Path {
         CubicPath::new(point).into()
+    }
+
+    pub fn new_hyper(point: DPoint) -> Path {
+        Path::Hyper(HyperPath::new(point))
     }
 
     pub fn from_norad(src: &norad::glyph::Contour) -> Path {
@@ -69,17 +74,17 @@ impl Path {
 
     pub(crate) fn paths_for_selection(&self, selection: &Selection) -> Vec<Path> {
         //FIXME: figure out how we're doing this bit
-        match self {
-            Path::Cubic(path) => path
-                .paths_for_selection(selection)
+        let paths = self.path_points().paths_for_selection(selection);
+        if matches!(self, Path::Cubic(_)) {
+            paths
                 .into_iter()
-                .map(Into::into)
-                .collect(),
-            Path::Hyper(path) => path
-                .paths_for_selection(selection)
+                .map(|pts| CubicPath::from(pts).into())
+                .collect()
+        } else {
+            paths
                 .into_iter()
-                .map(Into::into)
-                .collect(),
+                .map(|pts| HyperPath::from(pts).into())
+                .collect()
         }
     }
 
@@ -91,20 +96,23 @@ impl Path {
         let scale_xform = Affine::scale_non_uniform(scale.x, scale.y);
         self.path_points_mut()
             .transform_points(points, scale_xform, anchor);
+        self.after_change();
     }
 
     pub(crate) fn nudge_points(&mut self, points: &[EntityId], v: DVec2) {
         let affine = Affine::translate(v.to_raw());
         self.path_points_mut()
             .transform_points(points, affine, DPoint::ZERO);
+        self.after_change();
     }
 
     pub(crate) fn nudge_all_points(&mut self, v: DVec2) {
         let affine = Affine::translate(v.to_raw());
         self.path_points_mut().transform_all(affine, DPoint::ZERO);
+        self.after_change();
     }
 
-    pub fn trailing(&self) -> Option<&DPoint> {
+    pub fn trailing(&self) -> Option<DPoint> {
         self.path_points().trailing()
     }
 
@@ -118,14 +126,24 @@ impl Path {
 
     pub fn delete_points(&mut self, points: &[EntityId]) {
         self.path_points_mut().delete_points(points);
+        self.after_change();
     }
 
     pub fn close(&mut self) -> EntityId {
-        self.path_points_mut().close()
+        let id = self.path_points_mut().close();
+        self.after_change();
+        id
     }
 
     pub fn reverse_contour(&mut self) {
-        self.path_points_mut().reverse_contour()
+        self.path_points_mut().reverse_contour();
+        self.after_change();
+    }
+
+    fn after_change(&mut self) {
+        if let Path::Hyper(path) = self {
+            path.after_change();
+        }
     }
 
     /// Returns the distance from a point to any point on this path.
@@ -151,8 +169,9 @@ impl Path {
     pub(crate) fn split_segment_at_point(&mut self, seg: Segment, t: f64) {
         match self {
             Path::Cubic(path) => path.split_segment_at_point(seg, t),
-            Path::Hyper(path) => path.split_segment_at_point(seg, t),
+            Path::Hyper(_) => eprintln!("splitting hyper segments not implemented"), // path.split_segment_at_point(seg, t),
         }
+        self.after_change();
     }
 
     /// Upgrade a line segment to a cubic bezier.
@@ -170,6 +189,7 @@ impl Path {
             *p3,
         );
         self.path_points_mut().replace_segment(seg, new_seg);
+        self.after_change();
     }
 
     /// Upgrade a line segment to a cubic bezier.
@@ -205,15 +225,28 @@ impl Path {
     /// Add a new line segment at the end of the path.
     ///
     /// This is called when the user clicks with the pen tool.
-    pub fn line_to(&mut self, point: DPoint) -> EntityId {
-        self.path_points_mut().push_on_curve(point)
+    pub fn line_to(&mut self, point: DPoint, smooth: bool) -> EntityId {
+        match self {
+            Path::Cubic(path) => path.path_points_mut().push_on_curve(point),
+            Path::Hyper(path) => {
+                let id = if !smooth {
+                    path.path_points_mut().push_on_curve(point)
+                } else {
+                    path.spline_to(point, smooth);
+                    path.path_points().last_on_curve_point().id
+                };
+                self.after_change();
+                id
+            }
+        }
     }
 
     /// update an off-curve point in response to a drag.
     ///
     /// `is_locked` corresponds to the shift key being down.
     pub fn update_handle(&mut self, point: EntityId, dpt: DPoint, is_locked: bool) {
-        self.path_points_mut().update_handle(point, dpt, is_locked)
+        self.path_points_mut().update_handle(point, dpt, is_locked);
+        self.after_change();
     }
 
     /// Called when the user drags (modifying the bezier control points)
@@ -224,6 +257,7 @@ impl Path {
         } else {
             self.update_trailing(handle);
         }
+        self.after_change();
     }
 
     /// Update the curve while the user drags a new control point.
@@ -255,27 +289,10 @@ impl Path {
     ///
     /// This is pretty similar to the current behavior though.
     fn convert_last_to_curve(&mut self, handle: DPoint) {
-        if self.path_points().len() > 1 {
-            let mut prev = self.path_points_mut().points_mut().pop().unwrap();
-            assert!(prev.is_on_curve() && !prev.is_smooth());
-            prev.toggle_type();
-            let p1 = self.path_points().trailing().copied().unwrap_or_else(|| {
-                self.path_points()
-                    .as_slice()
-                    .last()
-                    .unwrap()
-                    .point
-                    .lerp(prev.point, 1.0 / 3.0)
-            });
-            let p2 = prev.point - (handle - prev.point);
-            let pts = &[
-                PathPoint::off_curve(self.id(), p1),
-                PathPoint::off_curve(self.id(), p2),
-                prev,
-            ];
-            self.path_points_mut().points_mut().extend(pts);
+        match self {
+            Path::Cubic(path) => path.convert_last_to_curve(handle),
+            Path::Hyper(path) => path.convert_last_to_curve(handle),
         }
-        self.path_points_mut().set_trailing(handle);
     }
 
     /// Set one of a given point's axes to a new value; used when aligning a set
@@ -289,6 +306,7 @@ impl Path {
                 pt.point.y = val;
             }
         }
+        self.after_change();
     }
 
     pub fn last_segment_is_curve(&self) -> bool {
@@ -321,6 +339,7 @@ impl Path {
                 pt.toggle_type();
             }
         }
+        self.after_change();
     }
 }
 
@@ -359,8 +378,15 @@ pub(crate) fn mark_tangent_handles(points: &mut [PathPoint]) {
         idx += 1;
     }
 }
+
 impl From<CubicPath> for Path {
     fn from(src: CubicPath) -> Path {
         Path::Cubic(src)
+    }
+}
+
+impl From<HyperPath> for Path {
+    fn from(src: HyperPath) -> Path {
+        Path::Hyper(src)
     }
 }

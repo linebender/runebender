@@ -1,4 +1,4 @@
-//! The bezier pen tool.
+//! The *hyper*bezier pen tool.
 
 use druid::{Env, EventCtx, KbKey, KeyEvent, MouseEvent};
 
@@ -9,12 +9,12 @@ use crate::tools::{EditType, Tool, ToolId};
 
 /// The state of the pen.
 #[derive(Debug, Default, Clone, PartialEq)]
-pub struct Pen {
+pub struct HyperPen {
     this_edit_type: Option<EditType>,
     is_draggable: bool,
 }
 
-impl MouseDelegate<EditSession> for Pen {
+impl MouseDelegate<EditSession> for HyperPen {
     fn cancel(&mut self, canvas: &mut EditSession) {
         canvas.selection.clear();
     }
@@ -63,7 +63,7 @@ impl MouseDelegate<EditSession> for Pen {
                 let is_smooth = event.mods.alt();
                 active.line_to(dpoint, is_smooth);
             } else {
-                let path = Path::new(dpoint);
+                let path = Path::new_hyper(dpoint);
                 data.add_path(path);
             }
 
@@ -105,7 +105,7 @@ impl MouseDelegate<EditSession> for Pen {
     }
 }
 
-impl Tool for Pen {
+impl Tool for HyperPen {
     fn mouse_event(
         &mut self,
         event: TaggedEvent,

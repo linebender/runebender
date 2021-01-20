@@ -308,13 +308,16 @@ impl EditSession {
         self.paths.iter().position(|p| p.contains(&point))
     }
 
-    fn new_path(&mut self, start: Point) {
-        let start = self.viewport.from_screen(start);
-        let path = Path::new(start);
+    pub(crate) fn add_path(&mut self, path: Path) {
         let point = path.points()[0].id;
-
         self.paths_mut().push(path);
         self.selection.select_one(point);
+    }
+
+    pub(crate) fn new_path(&mut self, start: Point) {
+        let start = self.viewport.from_screen(start);
+        let path = Path::new(start);
+        self.add_path(path);
     }
 
     pub fn paste_paths(&mut self, paths: Vec<Path>) {
@@ -324,19 +327,19 @@ impl EditSession {
         self.paths_mut().extend(paths);
     }
 
-    pub fn add_point(&mut self, point: Point) {
-        if self
-            .active_path_idx()
-            .map(|ix| self.paths[ix].is_closed())
-            .unwrap_or(true)
-        {
-            self.new_path(point);
-        } else {
-            let point = self.viewport.from_screen(point);
-            let new_point = self.active_path_mut().unwrap().line_to(point);
-            self.selection.select_one(new_point);
-        }
-    }
+    //pub fn add_point(&mut self, point: Point) {
+    //if self
+    //.active_path_idx()
+    //.map(|ix| self.paths[ix].is_closed())
+    //.unwrap_or(true)
+    //{
+    //self.new_path(point);
+    //} else {
+    //let point = self.viewport.from_screen(point);
+    //let new_point = self.active_path_mut().unwrap().line_to(point);
+    //self.selection.select_one(new_point);
+    //}
+    //}
 
     pub fn update_for_drag(&mut self, drag_point: Point) {
         let drag_point = self.viewport.from_screen(drag_point);

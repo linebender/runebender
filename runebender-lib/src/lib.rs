@@ -22,6 +22,7 @@ mod draw;
 mod edit_session;
 mod glyph_names;
 mod guides;
+mod hyper_path;
 mod path;
 mod plist;
 mod point;
