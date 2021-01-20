@@ -387,7 +387,7 @@ impl Path {
         let has_ctrl = cursor
             .peek_prev()
             .map(PathPoint::is_off_curve)
-            .or(cursor.peek_next().map(PathPoint::is_off_curve))
+            .or_else(|| cursor.peek_next().map(PathPoint::is_off_curve))
             .unwrap_or(false);
         if let Some(pt) = cursor.point_mut() {
             if pt.is_smooth() || pt.is_on_curve() && has_ctrl {

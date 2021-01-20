@@ -235,9 +235,12 @@ impl PathPoints {
     /// If you pass a point id, the cursor will start at that point; if not
     /// it will start at the first point.
     pub fn cursor(&mut self, id: Option<EntityId>) -> Cursor {
-        let idx = id
-            .map(|id| self.points.index_for_point(id))
-            .unwrap_or_else(|| Some(if self.closed { self.len() - 1 } else { 0 }));
+        let idx = match id {
+            Some(id) => self.points.index_for_point(id),
+            None if self.closed => self.len().checked_sub(1),
+            None if self.points.is_empty() => None,
+            None => Some(0),
+        };
         Cursor { idx, inner: self }
     }
 
@@ -487,7 +490,7 @@ impl PathPoints {
             let on_curve = cursor
                 .peek_next()
                 .filter(|p| p.is_on_curve())
-                .or(cursor.peek_prev().filter(|p| p.is_on_curve()))
+                .or_else(|| cursor.peek_prev().filter(|p| p.is_on_curve()))
                 .copied()
                 .unwrap(); // all off curve points have one on_curve neighbour
             if on_curve.is_smooth() {
@@ -495,9 +498,11 @@ impl PathPoints {
                 let other_off_curve = cursor
                     .peek_next()
                     .filter(|p| p.is_off_curve() && p.id != point)
-                    .or(cursor
-                        .peek_prev()
-                        .filter(|p| p.is_off_curve() && p.id != point))
+                    .or_else(|| {
+                        cursor
+                            .peek_prev()
+                            .filter(|p| p.is_off_curve() && p.id != point)
+                    })
                     .map(|p| p.id);
                 Some((on_curve.id, other_off_curve))
             } else {
@@ -516,8 +521,25 @@ impl PathPoints {
         }
 
         self.points_mut().retain(|p| !to_delete.contains(&p.id));
+
+        // normalize our representation
+        let len = self.points.len();
+        if len > 2
+            && !self.points.as_ref()[0].is_on_curve()
+            && !self.points.as_ref()[len - 1].is_on_curve()
+        {
+            self.points_mut().rotate_left(1);
+        }
+
+        // if we have fewer than three on_curve points we are open.
+        if self.points.len() < 3 {
+            self.closed = false;
+        }
+
+        // fixup smooth/corner types
         let mut cursor = self.cursor(None);
         let start_id = cursor.point().map(|pp| pp.id);
+
         loop {
             let next_is_on = cursor.peek_next().map(PathPoint::is_on_curve);
             let prev_is_on = cursor.peek_prev().map(PathPoint::is_on_curve);
@@ -533,20 +555,6 @@ impl PathPoints {
             if cursor.point().map(|pp| pp.id) == start_id {
                 break;
             }
-        }
-
-        // normalize our representation
-        let len = self.points.len();
-        if len > 2
-            && !self.points.as_ref()[0].is_on_curve()
-            && !self.points.as_ref()[len - 1].is_on_curve()
-        {
-            self.points_mut().rotate_left(1);
-        }
-
-        // if we have fewer than three on_curve points we are open.
-        if self.points.len() < 3 {
-            self.closed = false;
         }
     }
 
