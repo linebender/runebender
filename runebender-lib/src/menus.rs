@@ -202,6 +202,13 @@ fn tools_menu<T: Data>() -> MenuDesc<T> {
         )
         .append(
             MenuItem::new(
+                LocalizedString::new("menu-item-hyperpen-tool").with_placeholder("Pen"),
+                consts::cmd::SET_TOOL.with("HyperPen"),
+            )
+            .hotkey(SysMods::Shift, "P"),
+        )
+        .append(
+            MenuItem::new(
                 LocalizedString::new("menu-item-preview-tool").with_placeholder("Preview"),
                 consts::cmd::SET_TOOL.with("Preview"),
             )
@@ -219,7 +226,7 @@ fn tools_menu<T: Data>() -> MenuDesc<T> {
                 LocalizedString::new("menu-item-ellipse-tool").with_placeholder("Ellipse"),
                 consts::cmd::SET_TOOL.with("Ellipse"),
             )
-            .hotkey(SysMods::Shift, "u"),
+            .hotkey(SysMods::Shift, "U"),
         )
         .append(
             MenuItem::new(

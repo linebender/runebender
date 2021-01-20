@@ -149,8 +149,21 @@ impl PathPoint {
         }
     }
 
+    pub fn auto(path: EntityId, point: DPoint) -> PathPoint {
+        let id = EntityId::new_with_parent(path);
+        PathPoint {
+            id,
+            point,
+            typ: PointType::OffCurve { auto: true },
+        }
+    }
+
     pub fn is_on_curve(&self) -> bool {
         self.typ.is_on_curve()
+    }
+
+    pub fn is_auto(&self) -> bool {
+        matches!(self.typ, PointType::OffCurve { auto: true })
     }
 
     pub fn is_off_curve(&self) -> bool {
