@@ -1,13 +1,11 @@
 use std::sync::Arc;
 
 use super::design_space::DPoint;
-use super::point::{EntityId, PathPoint, PointType};
+use super::point::{EntityId, PathPoint};
 use super::point_list::{PathPoints, Segment};
-use druid::kurbo::{BezPath, PathEl, Point};
+use druid::kurbo::{BezPath, Point};
 use druid::Data;
 use spline::{Element, SplineSpec};
-
-use crate::selection::Selection;
 
 #[derive(Debug, Data, Clone)]
 pub struct HyperPath {
@@ -40,7 +38,7 @@ impl HyperPath {
             ContourPoint::new(pt.x as f32, pt.y as f32, typ, smooth, None, None, None)
         }
         let mut points = Vec::new();
-        if self.path_points().closed() {
+        if !self.path_points().closed() {
             let start = self.path_points().start_point().point;
             points.push(norad_point(start, NoradPType::Move, false));
         }
@@ -67,6 +65,20 @@ impl HyperPath {
         bez.extend(self.bezier.elements().iter().cloned());
     }
 
+    /// If smooth is true, adds a spline-to, else adds a line-to
+    pub(crate) fn close(&mut self, smooth: bool) -> EntityId {
+        assert!(!self.points.closed());
+        let start = self.points.as_slice()[0].point;
+        if smooth {
+            self.spline_to(start, smooth);
+            self.path_points_mut().close();
+            self.path_points_mut().points_mut().pop();
+            self.points.as_slice().last().unwrap().id
+        } else {
+            self.path_points_mut().close()
+        }
+    }
+
     pub(crate) fn spline_to(&mut self, p3: DPoint, smooth: bool) {
         let prev = self.points.as_slice().last().cloned().unwrap().point;
         let path_id = self.points.id();
@@ -83,9 +95,12 @@ impl HyperPath {
     }
 
     pub(crate) fn convert_last_to_curve(&mut self, _handle: DPoint) {
-        if let Some(prev_point) = self.points.points_mut().pop() {
-            assert!(self.points.trailing().is_none());
-            self.spline_to(prev_point.point, true);
+        if self.points.len() > 1 {
+            if let Some(prev_point) = self.points.points_mut().pop() {
+                // we should always clear trailing on mouseup?
+                assert!(self.points.trailing().is_none());
+                self.spline_to(prev_point.point, true);
+            }
         }
     }
 
@@ -149,11 +164,7 @@ impl HyperPath {
     }
 
     fn iter_spline_elements(&self) -> impl Iterator<Item = Element> {
-        let start = if !self.points.closed() {
-            Some(self.points.start_point().point.to_raw())
-        } else {
-            None
-        };
+        let start = Some(self.points.start_point().point.to_raw());
         SplineElementIter {
             start,
             segments: self.points.iter_segments(),
@@ -174,7 +185,6 @@ impl From<PathPoints> for HyperPath {
 struct SplineElementIter<I> {
     segments: I,
     start: Option<Point>,
-    //ix: usize,
 }
 
 impl<I> Iterator for SplineElementIter<I>

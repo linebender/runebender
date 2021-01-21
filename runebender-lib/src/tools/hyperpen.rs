@@ -23,25 +23,30 @@ impl MouseDelegate<EditSession> for HyperPen {
         self.is_draggable = false;
         let vport = data.viewport;
         if event.count == 1 {
-            let hit = data.hit_test_filtered(event.pos, None, |p| p.is_on_curve());
-            if let Some(hit) = hit {
-                if let Some(path) = data.active_path() {
+            // first see if this toggles a point
+            if let Some(path) = data.active_path() {
+                let hit =
+                    data.hit_test_filtered(event.pos, None, |pp| pp.id.is_child_of(path.id()));
+                if let Some(hit) = hit {
                     if path.start_point().id == hit && !path.is_closed() {
                         if let Some(path) = data.active_path_mut() {
-                            let start = path.start_point().id;
+                            let selection = path.close(event.mods.alt());
+                            data.selection.select_one(selection);
                             self.this_edit_type = Some(EditType::Normal);
-                            path.close();
-                            data.selection.select_one(start);
                             self.is_draggable = true;
-                            return;
                         }
+                    } else if event.mods.alt() {
+                        data.toggle_point_type(hit);
+                        self.this_edit_type = Some(EditType::Normal);
+                        self.is_draggable = true;
                     }
+                    return;
                 }
                 // TODO: more stuff when clicking on points
                 // If selection is empty, and point is endpoint of open path,
                 // select that point.
                 // Otherwise maybe cut path at that point?
-                return;
+                //return;
             }
 
             // Handle clicking on segment (split).
@@ -53,7 +58,7 @@ impl MouseDelegate<EditSession> for HyperPen {
             }
 
             let dpoint = vport.from_screen(event.pos);
-            if let Some(active) = data.active_path_mut() {
+            if let Some(active) = data.active_path_mut().filter(|path| !path.is_closed()) {
                 let dpoint = if event.mods.shift() {
                     let last_point = active.points().last().unwrap();
                     dpoint.axis_locked_to(last_point.point)
@@ -78,9 +83,7 @@ impl MouseDelegate<EditSession> for HyperPen {
 
     fn left_up(&mut self, _event: &MouseEvent, data: &mut EditSession) {
         if let Some(path) = data.active_path_mut() {
-            if path.is_closed() || path.points().len() > 1 && !path.last_segment_is_curve() {
-                path.clear_trailing();
-            }
+            path.clear_trailing();
         }
     }
 

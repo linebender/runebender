@@ -266,13 +266,8 @@ impl MouseDelegate<EditSession> for Select {
         } else if event.count == 2 {
             let sel = data.hit_test_all(event.pos, None);
             match sel {
-                Some(id)
-                    if data
-                        .path_point_for_id(id)
-                        .map(|p| p.is_on_curve())
-                        .unwrap_or(false) =>
-                {
-                    data.toggle_selected_on_curve_type();
+                Some(id) if data.path_point_for_id(id).is_some() => {
+                    data.toggle_point_type(id);
                     self.this_edit_type = Some(EditType::Normal);
                 }
                 Some(id) if id.is_guide() => {

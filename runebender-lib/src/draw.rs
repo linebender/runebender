@@ -194,6 +194,7 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
                 Segment::Line(_, p1) => end_point = p1.to_screen(self.space),
                 Segment::Cubic(p0, p1, p2, p3) => {
                     let r = self.space;
+                    //FIXME: draw auto handles as dashed lines
                     self.draw_control_handle(p0.to_screen(r), p1.to_screen(r));
                     self.draw_control_handle(p2.to_screen(r), p3.to_screen(r));
                     end_point = p3.to_screen(r);
@@ -224,8 +225,8 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
             Style::Open(seg) => self.draw_open_path_terminal(&seg, selected, env),
             Style::Close(seg) => self.draw_open_path_terminal(&seg, selected, env),
             Style::OffCurve => self.draw_off_curve_point(point, selected, env),
+            Style::OffCurveAuto => self.draw_auto_point(point, selected, env),
             Style::Smooth => self.draw_smooth_point(point, selected, env),
-            Style::Tangent => self.draw_smooth_point(point, selected, env),
             Style::Corner => self.draw_corner_point(point, selected, env),
         }
     }
@@ -289,6 +290,26 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         }
     }
 
+    fn draw_auto_point(&mut self, p: Point, selected: bool, env: &Env) {
+        let radius = if selected {
+            env.get(theme::OFF_CURVE_SELECTED_RADIUS)
+        } else {
+            env.get(theme::OFF_CURVE_RADIUS)
+        };
+        let rect = Rect::new(p.x - radius, p.y - radius, p.x + radius, p.y + radius);
+        let line1 = Line::new(rect.origin(), (rect.x1, rect.y1));
+        let line2 = Line::new((rect.x1, rect.y0), (rect.x0, rect.y1));
+        if selected {
+            self.stroke(line1, &env.get(theme::SELECTED_POINT_OUTER_COLOR), 4.0);
+            self.stroke(line2, &env.get(theme::SELECTED_POINT_OUTER_COLOR), 4.0);
+            self.stroke(line1, &env.get(theme::SELECTED_POINT_INNER_COLOR), 2.0);
+            self.stroke(line2, &env.get(theme::SELECTED_POINT_INNER_COLOR), 2.0);
+        } else {
+            self.stroke(line1, &env.get(theme::OFF_CURVE_HANDLE_COLOR), 1.0);
+            self.stroke(line2, &env.get(theme::OFF_CURVE_HANDLE_COLOR), 1.0);
+        }
+    }
+
     fn draw_direction_indicator(&mut self, path: &BezPath, env: &Env) {
         let first_seg = match path.segments().next().as_ref().map(|seg| seg.to_cubic()) {
             None => return,
@@ -327,8 +348,8 @@ enum Style {
     Close(kurbo::PathSeg),
     Corner,
     Smooth,
-    Tangent,
     OffCurve,
+    OffCurveAuto,
 }
 
 struct PointIter<'a> {
@@ -366,25 +387,10 @@ impl<'a> PointIter<'a> {
         }
 
         match this.typ {
+            PointType::OffCurve { auto: true } if self.path.is_hyper() => Style::OffCurveAuto,
             PointType::OffCurve { .. } => Style::OffCurve,
             PointType::OnCurve { smooth: false } => Style::Corner,
-            PointType::OnCurve { smooth: true } => {
-                let prev = self
-                    .path
-                    .prev_point(this.id)
-                    .map(|pp| pp.is_on_curve())
-                    .unwrap_or(false);
-                let next = self
-                    .path
-                    .next_point(this.id)
-                    .map(|pp| pp.is_on_curve())
-                    .unwrap_or(false);
-                match (prev, next) {
-                    (false, false) => Style::Smooth,
-                    (true, false) | (false, true) => Style::Tangent,
-                    _ => unreachable!(),
-                }
-            }
+            PointType::OnCurve { smooth: true } => Style::Smooth,
         }
     }
 }

@@ -30,7 +30,7 @@ impl MouseDelegate<EditSession> for Pen {
                         if let Some(path) = data.active_path_mut() {
                             let start = path.start_point().id;
                             self.this_edit_type = Some(EditType::Normal);
-                            path.close();
+                            path.close(false);
                             data.selection.select_one(start);
                             self.is_draggable = true;
                             return;
@@ -53,7 +53,7 @@ impl MouseDelegate<EditSession> for Pen {
             }
 
             let dpoint = vport.from_screen(event.pos);
-            if let Some(active) = data.active_path_mut() {
+            if let Some(active) = data.active_path_mut().filter(|path| !path.is_closed()) {
                 let dpoint = if event.mods.shift() {
                     let last_point = active.points().last().unwrap();
                     dpoint.axis_locked_to(last_point.point)
