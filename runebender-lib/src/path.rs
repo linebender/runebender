@@ -43,6 +43,10 @@ impl Path {
         }
     }
 
+    pub(crate) fn is_hyper(&self) -> bool {
+        matches!(self, Path::Hyper(_))
+    }
+
     fn path_points(&self) -> &PathPoints {
         match self {
             Path::Cubic(path) => path.path_points(),
@@ -75,17 +79,16 @@ impl Path {
     pub(crate) fn paths_for_selection(&self, selection: &Selection) -> Vec<Path> {
         //FIXME: figure out how we're doing this bit
         let paths = self.path_points().paths_for_selection(selection);
-        if matches!(self, Path::Cubic(_)) {
-            paths
-                .into_iter()
-                .map(|pts| CubicPath::from(pts).into())
-                .collect()
-        } else {
-            paths
-                .into_iter()
-                .map(|pts| HyperPath::from(pts).into())
-                .collect()
-        }
+        paths
+            .into_iter()
+            .map(|pts| {
+                if self.is_hyper() {
+                    HyperPath::from(pts).into()
+                } else {
+                    CubicPath::from(pts).into()
+                }
+            })
+            .collect()
     }
 
     /// Scale the selection.
@@ -101,8 +104,30 @@ impl Path {
 
     pub(crate) fn nudge_points(&mut self, points: &[EntityId], v: DVec2) {
         let affine = Affine::translate(v.to_raw());
-        self.path_points_mut()
+        let transformed = self
+            .path_points_mut()
             .transform_points(points, affine, DPoint::ZERO);
+        if self.is_hyper() {
+            for point in points {
+                // if this is an off-curve, and its neighbouring on-curve or
+                // its tangent off-curve are not also nudged, we set it to non-auto
+                if let Some((on_curve, other_handle)) =
+                    self.path_points_mut().tangent_handle_opt(*point)
+                {
+                    let others_selected = transformed.contains(&on_curve)
+                        && other_handle
+                            .map(|p| transformed.contains(&p))
+                            .unwrap_or(true);
+                    if !others_selected {
+                        self.path_points_mut().with_point_mut(*point, |pp| {
+                            if pp.is_auto() {
+                                pp.toggle_type()
+                            }
+                        })
+                    }
+                }
+            }
+        }
         self.after_change();
     }
 
@@ -129,10 +154,15 @@ impl Path {
         self.after_change();
     }
 
-    pub fn close(&mut self) -> EntityId {
-        let id = self.path_points_mut().close();
-        self.after_change();
-        id
+    pub fn close(&mut self, smooth: bool) -> EntityId {
+        match self {
+            Path::Cubic(path) => path.path_points_mut().close(),
+            Path::Hyper(path) => {
+                let id = path.close(smooth);
+                self.after_change();
+                id
+            }
+        }
     }
 
     pub fn reverse_contour(&mut self) {
@@ -246,6 +276,14 @@ impl Path {
     /// `is_locked` corresponds to the shift key being down.
     pub fn update_handle(&mut self, point: EntityId, dpt: DPoint, is_locked: bool) {
         self.path_points_mut().update_handle(point, dpt, is_locked);
+        // dragging handle makes it non-auto:
+        if self.is_hyper() {
+            self.path_points_mut().with_point_mut(point, |pp| {
+                if pp.is_auto() {
+                    pp.toggle_type();
+                }
+            })
+        }
         self.after_change();
     }
 
@@ -262,6 +300,7 @@ impl Path {
 
     /// Update the curve while the user drags a new control point.
     fn update_trailing(&mut self, handle: DPoint) {
+        let is_hyper = self.is_hyper();
         if let Some(last_point) = self.path_points().trailing_point_in_open_path().copied() {
             let mut cursor = self.path_points_mut().cursor(Some(last_point.id));
             assert!(last_point.is_on_curve());
@@ -272,9 +311,14 @@ impl Path {
             let on_curve_pt = last_point.point;
             let new_p = on_curve_pt - (handle - on_curve_pt);
             cursor.move_prev();
-            cursor.point_mut().unwrap().point = new_p;
-            self.path_points_mut().set_trailing(handle);
+            if let Some(prev) = cursor.point_mut() {
+                prev.point = new_p;
+                if prev.is_auto() && is_hyper {
+                    prev.toggle_type();
+                }
+            }
         }
+        self.path_points_mut().set_trailing(handle);
     }
 
     /// If the user drags after mousedown, we convert the last point to a curve.
@@ -298,14 +342,13 @@ impl Path {
     /// Set one of a given point's axes to a new value; used when aligning a set
     /// of points.
     pub(crate) fn align_point(&mut self, point: EntityId, val: f64, set_x: bool) {
-        let mut cursor = self.path_points_mut().cursor(Some(point));
-        if let Some(pt) = cursor.point_mut() {
+        self.path_points_mut().with_point_mut(point, |pp| {
             if set_x {
-                pt.point.x = val;
+                pp.point.x = val
             } else {
-                pt.point.y = val;
+                pp.point.y = val
             }
-        }
+        });
         self.after_change();
     }
 
@@ -327,6 +370,14 @@ impl Path {
         id.is_child_of(self.id())
     }
 
+    pub fn toggle_point_type(&mut self, id: EntityId) {
+        self.path_points_mut()
+            .with_point_mut(id, |pp| pp.toggle_type());
+        self.after_change();
+    }
+
+    /// Only toggles the point type if it is on-curve, and only makes it
+    /// smooth if it has a neighbouring off-curve
     pub fn toggle_on_curve_point_type(&mut self, id: EntityId) {
         let mut cursor = self.path_points_mut().cursor(Some(id));
         let has_ctrl = cursor

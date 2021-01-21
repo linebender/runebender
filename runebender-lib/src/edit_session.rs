@@ -314,12 +314,6 @@ impl EditSession {
         self.selection.select_one(point);
     }
 
-    pub(crate) fn new_path(&mut self, start: Point) {
-        let start = self.viewport.from_screen(start);
-        let path = Path::new(start);
-        self.add_path(path);
-    }
-
     pub fn paste_paths(&mut self, paths: Vec<Path>) {
         self.selection.clear();
         self.selection
@@ -327,31 +321,14 @@ impl EditSession {
         self.paths_mut().extend(paths);
     }
 
-    //pub fn add_point(&mut self, point: Point) {
-    //if self
-    //.active_path_idx()
-    //.map(|ix| self.paths[ix].is_closed())
-    //.unwrap_or(true)
-    //{
-    //self.new_path(point);
-    //} else {
-    //let point = self.viewport.from_screen(point);
-    //let new_point = self.active_path_mut().unwrap().line_to(point);
-    //self.selection.select_one(new_point);
-    //}
-    //}
-
     pub fn update_for_drag(&mut self, drag_point: Point) {
         let drag_point = self.viewport.from_screen(drag_point);
         self.active_path_mut().unwrap().update_for_drag(drag_point);
     }
 
-    /// If there is a single on curve point selected, toggle it between corner and smooth
-    pub fn toggle_selected_on_curve_type(&mut self) {
-        if self.selection.len() == 1 {
-            let point = self.selection.iter().copied().next().unwrap();
-            let path = self.active_path_mut().unwrap();
-            path.toggle_on_curve_point_type(point);
+    pub fn toggle_point_type(&mut self, id: EntityId) {
+        if let Some(path) = self.path_for_point_mut(id) {
+            path.toggle_point_type(id)
         }
     }
 

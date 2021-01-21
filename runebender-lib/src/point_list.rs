@@ -216,10 +216,17 @@ impl PathPoints {
         self.points.as_mut()
     }
 
+    pub(crate) fn with_point_mut(&mut self, point: EntityId, f: impl FnOnce(&mut PathPoint)) {
+        self.points.with_mut(point, f)
+    }
+
     /// Iterates points in order.
     pub(crate) fn iter_points(&self) -> impl Iterator<Item = PathPoint> + '_ {
         let (first, remaining_n) = if self.closed {
-            (self.points.as_ref().last().copied(), self.points.len() - 1)
+            (
+                self.points.as_ref().last().copied(),
+                self.points.len().saturating_sub(1),
+            )
         } else {
             (None, self.points.len())
         };
@@ -409,7 +416,12 @@ impl PathPoints {
     /// The `anchor` argument is a point that should be treated as the origin
     /// when applying the transform, which is used for things like scaling from
     /// a fixed point.
-    pub fn transform_points(&mut self, points: &[EntityId], affine: Affine, anchor: DPoint) {
+    pub fn transform_points(
+        &mut self,
+        points: &[EntityId],
+        affine: Affine,
+        anchor: DPoint,
+    ) -> HashSet<EntityId> {
         let to_xform = self.points_for_points(points);
         let anchor = anchor.to_dvec2();
         for point in &to_xform {
@@ -421,6 +433,7 @@ impl PathPoints {
                 }
             }
         }
+        to_xform
     }
 
     /// For a list of points, returns a set including those points and any
@@ -493,7 +506,10 @@ impl PathPoints {
     /// Given the idx of an off-curve point, return its neighbouring on-curve
     /// point; if that point is smooth and its other neighbour is also an
     /// off-curve, it returns that as well.
-    fn tangent_handle_opt(&mut self, point: EntityId) -> Option<(EntityId, Option<EntityId>)> {
+    pub(crate) fn tangent_handle_opt(
+        &mut self,
+        point: EntityId,
+    ) -> Option<(EntityId, Option<EntityId>)> {
         let cursor = self.cursor(Some(point));
         if cursor.point().map(|pp| pp.is_off_curve()).unwrap_or(false) {
             let on_curve = cursor
@@ -523,31 +539,53 @@ impl PathPoints {
     }
 
     pub fn delete_points(&mut self, points: &[EntityId]) {
-        eprintln!("deleting {:?}", points);
         let mut to_delete = HashSet::with_capacity(points.len());
         for point in points {
             self.points_to_delete(*point, &mut to_delete)
         }
 
         self.points_mut().retain(|p| !to_delete.contains(&p.id));
-
-        // normalize our representation
-        let len = self.points.len();
-        if len > 2
-            && !self.points.as_ref()[0].is_on_curve()
-            && !self.points.as_ref()[len - 1].is_on_curve()
-        {
-            self.points_mut().rotate_left(1);
+        if self.as_slice().is_empty() {
+            self.closed = false;
+            return;
         }
 
-        // if we have fewer than three on_curve points we are open.
-        if self.points.len() < 3 {
+        // normalize our representation
+        // if we're only two on-curve points, make us an open single-segment
+        let should_be_open = self
+            .iter_points()
+            .filter(PathPoint::is_on_curve)
+            .nth(2)
+            .is_none();
+        if self.closed && should_be_open {
             self.closed = false;
+            while self
+                .as_slice()
+                .first()
+                .map(PathPoint::is_off_curve)
+                .unwrap_or(false)
+            {
+                self.points_mut().rotate_right(1);
+            }
+            while self
+                .as_slice()
+                .last()
+                .map(PathPoint::is_off_curve)
+                .unwrap_or(false)
+            {
+                self.points_mut().pop();
+            }
+        // if we're closed, make sure we end with an off-curve
+        } else if self.closed
+            && self.as_slice()[0].is_off_curve()
+            && self.as_slice()[self.len() - 1].is_off_curve()
+        {
+            self.points_mut().rotate_right(1);
         }
 
         // fixup smooth/corner types
         let mut cursor = self.cursor(None);
-        let start_id = cursor.point().map(|pp| pp.id);
+        let start_id = bail!(cursor.point().map(|pp| pp.id));
 
         loop {
             let next_is_on = cursor.peek_next().map(PathPoint::is_on_curve);
@@ -561,7 +599,7 @@ impl PathPoints {
             }
 
             cursor.move_next();
-            if cursor.point().map(|pp| pp.id) == start_id {
+            if cursor.point().map(|pp| pp.id == start_id).unwrap_or(true) {
                 break;
             }
         }
@@ -829,8 +867,8 @@ impl Iterator for Segments {
             self.idx += 3;
             assert!(
                 self.prev_pt.typ.is_on_curve(),
-                "{:#?} idx{}",
-                &self.points,
+                "{:#?} idx {}",
+                self.points.as_ref(),
                 self.idx
             );
             Segment::Cubic(seg_start, p1, p2, self.prev_pt)
