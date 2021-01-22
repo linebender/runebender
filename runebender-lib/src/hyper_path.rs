@@ -7,6 +7,8 @@ use druid::kurbo::{BezPath, Point};
 use druid::Data;
 use spline::{Element, SplineSpec};
 
+pub(crate) static HYPERBEZ_LIB_KEY: &str = "org.linebender.hyperbezier-points";
+
 #[derive(Debug, Data, Clone)]
 pub struct HyperPath {
     points: PathPoints,
@@ -32,8 +34,62 @@ impl HyperPath {
         &mut self.points
     }
 
+    pub(crate) fn from_norad(src: &norad::glyph::Contour) -> Self {
+        let points: PathPoints = src
+            .lib()
+            .and_then(|lib| {
+                lib.get(HYPERBEZ_LIB_KEY).and_then(|b64| {
+                    b64.as_string().and_then(|b64| {
+                        base64::decode(b64)
+                            .ok()
+                            .and_then(|plist_data| plist::from_bytes(&plist_data).ok())
+                    })
+                })
+            })
+            .unwrap();
+
+        let mut this = Self {
+            points,
+            solver: SplineSpec::new(),
+            bezier: Arc::new(BezPath::new()),
+        };
+        this.after_change();
+        this
+    }
+
     pub(crate) fn to_norad(&self) -> norad::glyph::Contour {
-        use norad::glyph::{Contour, ContourPoint, PointType as NoradPType};
+        use norad::glyph::{Contour, ContourPoint, PointType};
+        use norad::Plist;
+
+        // until we can make improvements to the plist crate (https://github.com/ebarnard/rust-plist/issues/54)
+        // we just crame a b64 binary plist in the lib? :))
+        fn encode(t: &impl serde::Serialize) -> Result<String, plist::Error> {
+            let mut buffer = Vec::with_capacity(512);
+            plist::to_writer_binary(&mut buffer, t)?;
+            Ok(base64::encode(&buffer))
+        }
+
+        // Norad expects contours to have at least one point
+        let start_point = self.points.start_point().point;
+        let points = vec![ContourPoint::new(
+            start_point.x as f32,
+            start_point.y as f32,
+            PointType::Move,
+            false,
+            None,
+            None,
+            None,
+        )];
+
+        let mut lib = Plist::new();
+        let points_xml = encode(&self.points).unwrap();
+        lib.insert(HYPERBEZ_LIB_KEY.to_string(), points_xml.into());
+        let mut contour = Contour::new(points, None, None);
+        contour.replace_lib(lib);
+        contour
+
+        //I like this impl better than the one in cubic_path?
+        /*
         fn norad_point(pt: DPoint, typ: NoradPType, smooth: bool) -> ContourPoint {
             ContourPoint::new(pt.x as f32, pt.y as f32, typ, smooth, None, None, None)
         }
@@ -59,6 +115,7 @@ impl HyperPath {
             points.rotate_right(1);
         }
         Contour::new(points, None, None)
+        */
     }
 
     pub(crate) fn append_to_bezier(&self, bez: &mut BezPath) {

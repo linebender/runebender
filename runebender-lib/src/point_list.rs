@@ -123,6 +123,10 @@ mod protected {
                 }
             }
         }
+
+        pub(crate) fn clone_inner(&self) -> Vec<PathPoint> {
+            self.points.as_ref().to_owned()
+        }
     }
 }
 
@@ -539,12 +543,37 @@ impl PathPoints {
     }
 
     pub fn delete_points(&mut self, points: &[EntityId]) {
+        // stuff for debugging:
+        let pre_points = self.points.clone();
+        fn validate(points: &[PathPoint]) -> bool {
+            for window in points.windows(3) {
+                match window {
+                    &[a, b, c] if a.is_off_curve() && b.is_off_curve() && c.is_off_curve() => {
+                        return false
+                    }
+                    _ => continue,
+                }
+            }
+            true
+        }
+
         let mut to_delete = HashSet::with_capacity(points.len());
         for point in points {
             self.points_to_delete(*point, &mut to_delete)
         }
 
         self.points_mut().retain(|p| !to_delete.contains(&p.id));
+        if !validate(self.as_slice()) {
+            eprintln!(
+                "error deleting points: {:?}\nfrom points {:?}, to_delete: {:?}",
+                points,
+                pre_points.as_ref(),
+                &to_delete
+            );
+            self.points = pre_points;
+            return;
+        }
+
         if self.as_slice().is_empty() {
             self.closed = false;
             return;
@@ -553,8 +582,9 @@ impl PathPoints {
         // normalize our representation
         // if we're only two on-curve points, make us an open single-segment
         let should_be_open = self
-            .iter_points()
-            .filter(PathPoint::is_on_curve)
+            .as_slice()
+            .iter()
+            .filter(|pp| pp.is_on_curve())
             .nth(2)
             .is_none();
         if self.closed && should_be_open {
@@ -842,6 +872,37 @@ impl Segment {
             }
             PathSeg::Quad(_) => panic!("quads are not supported"),
         }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct SerializedPoints {
+    points: Vec<PathPoint>,
+    closed: bool,
+}
+
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+impl Serialize for PathPoints {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let points = SerializedPoints {
+            points: self.points.clone_inner(),
+            closed: self.closed,
+        };
+        points.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for PathPoints {
+    fn deserialize<D>(deserializer: D) -> Result<PathPoints, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let SerializedPoints { points, closed } = Deserialize::deserialize(deserializer)?;
+        Ok(PathPoints::from_points_ignoring_parent(points, closed))
     }
 }
 

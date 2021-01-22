@@ -1,6 +1,6 @@
 use super::cubic_path::CubicPath;
 use super::design_space::{DPoint, DVec2, ViewPort};
-use super::hyper_path::HyperPath;
+use super::hyper_path::{HyperPath, HYPERBEZ_LIB_KEY};
 use super::point::{EntityId, PathPoint};
 use super::point_list::{PathPoints, Segment};
 use druid::kurbo::{Affine, BezPath, ParamCurveNearest, Point, Vec2};
@@ -24,7 +24,15 @@ impl Path {
     }
 
     pub fn from_norad(src: &norad::glyph::Contour) -> Path {
-        CubicPath::from_norad(src).into()
+        if src
+            .lib()
+            .map(|lib| lib.contains_key(HYPERBEZ_LIB_KEY))
+            .unwrap_or(false)
+        {
+            HyperPath::from_norad(src).into()
+        } else {
+            CubicPath::from_norad(src).into()
+        }
     }
 
     pub fn from_raw_parts(
