@@ -468,6 +468,8 @@ fn order_points(path: &Path, start: Hit, end: Hit) -> (Hit, Hit) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cubic_path::CubicPath;
+
     use druid::kurbo::BezPath;
 
     #[must_use = "this should be unwrapped"]
@@ -519,10 +521,10 @@ mod tests {
 
     #[test]
     fn triangle() {
-        let mut path = Path::new(DPoint::new(10., 10.));
-        path.append_point(DPoint::new(0., 0.));
-        path.append_point(DPoint::new(20., 0.));
-        path.close();
+        let mut path: Path = CubicPath::new(DPoint::new(10., 10.)).into();
+        path.line_to(DPoint::new(0., 0.), false);
+        path.line_to(DPoint::new(20., 0.), false);
+        path.close(false);
 
         let line = Line::new((3., 6.), (8., -2.));
         let mut out = Vec::new();
@@ -568,7 +570,7 @@ mod tests {
         bez.curve_to((9.0, 5.0), (15.0, 0.0), (0.0, 0.0));
         bez.close_path();
 
-        let path = Path::from_bezpath(bez).unwrap();
+        let path: Path = CubicPath::from_bezpath(bez).unwrap().into();
 
         // first try slicing a non-first segment
         let slice_line1 = Line::new((10., 20.), (25., 10.));
@@ -609,7 +611,7 @@ mod tests {
         bez.move_to((0.0, 0.0));
         bez.curve_to((0.0, 15.0), (10.0, 15.0), (10.0, 0.0));
 
-        let path = Path::from_bezpath(bez).unwrap();
+        let path: Path = CubicPath::from_bezpath(bez).unwrap().into();
         let slice_line = Line::new((0., 8.), (10., 8.));
         let paths = slice_paths(&[path], slice_line);
         assert_eq!(paths.len(), 2);

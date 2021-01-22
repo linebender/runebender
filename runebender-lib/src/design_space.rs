@@ -34,7 +34,7 @@ pub struct ViewPort {
 ///
 /// This type should only be constructed through a function that has access to,
 /// and takes account of, the current viewport.
-#[derive(Clone, Copy, Data, Lens, PartialEq)]
+#[derive(Clone, Copy, Data, Lens, PartialEq, Serialize, Deserialize)]
 pub struct DPoint {
     pub x: f64,
     pub y: f64,

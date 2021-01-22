@@ -28,14 +28,15 @@ pub struct EntityId {
     point: IdComponent,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Data)]
+#[derive(Debug, Clone, Copy, PartialEq, Data, Deserialize, Serialize)]
 pub enum PointType {
     OnCurve { smooth: bool },
     OffCurve { auto: bool },
 }
 
-#[derive(Clone, Copy, Data, PartialEq)]
+#[derive(Clone, Copy, Data, PartialEq, Serialize, Deserialize)]
 pub struct PathPoint {
+    #[serde(skip, default = "EntityId::next")]
     pub id: EntityId,
     pub point: DPoint,
     pub typ: PointType,
