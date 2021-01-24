@@ -2,13 +2,14 @@
 
 use druid::kurbo::{Line, LineIntersection, ParamCurve, ParamCurveArclen};
 use druid::piet::StrokeStyle;
-use druid::{Color, Env, EventCtx, KbKey, KeyEvent, MouseEvent, PaintCtx, Point, RenderContext};
+use druid::{Env, EventCtx, KbKey, KeyEvent, MouseEvent, PaintCtx, Point, RenderContext};
 
 use crate::design_space::DPoint;
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
 use crate::path::{Path, PathSeg};
 use crate::point::{EntityId, PathPoint};
+use crate::theme;
 use crate::tools::{EditType, Tool};
 
 const MAX_RECURSE: usize = 16;
@@ -176,14 +177,14 @@ impl Tool for Knife {
             let unit_vec = (line.end() - line.start()).normalize();
             //let perp = druid::kurbo::Vec2::new(-unit_vec.y, unit_vec.x);
 
-            ctx.stroke_styled(line, &Color::BLACK, 1.0, &self.stroke_style);
+            ctx.stroke_styled(line, &_env.get(theme::KNIFE_GUIDE), 2.0, &self.stroke_style);
 
             for point in &self.intersections {
                 let point = data.viewport.to_screen(*point);
                 let cut_mark_start = point - (unit_vec * 4.0);
                 let cut_mark_end = point + (unit_vec * 4.0);
                 let cut_mark = Line::new(cut_mark_start, cut_mark_end);
-                ctx.stroke(cut_mark, &Color::rgb(0.7, 0., 0.), 2.0);
+                ctx.stroke(cut_mark, &_env.get(theme::KNIFE_GUIDE_INTERSECTION), 8.0);
 
                 //let cms1 = cut_mark_start + perp * 2.0;
                 //let cme1 = cut_mark_end + perp * 2.0;
