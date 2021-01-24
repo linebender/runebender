@@ -62,6 +62,10 @@ pub const OFF_CURVE_HANDLE_COLOR: Key<Color> = Key::new("runebender.off-curve-ha
 pub const DIRECTION_ARROW_COLOR: Key<Color> = Key::new("runebender.direction-arrow-color");
 pub const COMPONENT_FILL_COLOR: Key<Color> = Key::new("runebender.component-fill-color");
 
+// Colors used by tools in the tool menu
+pub const KNIFE_GUIDE: Key<Color> = Key::new("runebender.knife-guide");
+pub const KNIFE_GUIDE_INTERSECTION: Key<Color> = Key::new("runebender.knife-guide-intersection");
+
 pub const SMOOTH_RADIUS: Key<f64> = Key::new("runebender.smooth-point-radius");
 pub const SMOOTH_SELECTED_RADIUS: Key<f64> = Key::new("runebender.smooth-point-selected-radius");
 pub const CORNER_RADIUS: Key<f64> = Key::new("runebender.corner-point-radius");
@@ -112,6 +116,8 @@ druid_theme_loader::loadable_theme!(pub MyTheme {
     OFF_CURVE_HANDLE_COLOR,
     DIRECTION_ARROW_COLOR,
     COMPONENT_FILL_COLOR,
+    KNIFE_GUIDE,
+    KNIFE_GUIDE_INTERSECTION,
     SMOOTH_RADIUS,
     SMOOTH_SELECTED_RADIUS,
     CORNER_RADIUS,

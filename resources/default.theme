@@ -23,6 +23,10 @@ CURSOR_COLOR:                   #000
 BUTTON_DARK:                    #c8c8c8
 BUTTON_LIGHT:                   #fff
 
+// tools
+KNIFE_GUIDE:                    #888
+KNIFE_GUIDE_INTERSECTION:       #f00
+
 // drawing of paths and points in the editor
 
 PATH_STROKE_COLOR:              #000
