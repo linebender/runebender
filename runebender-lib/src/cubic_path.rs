@@ -112,9 +112,8 @@ impl CubicPath {
             .points
             .iter()
             .map(|src_point| {
-                //eprintln!("({}, {}): {:?}{}", src_point.x, src_point.y, src_point.typ, if src_point.smooth { " smooth" } else { "" });
                 let point = DPoint::new(src_point.x.round() as f64, src_point.y.round() as f64);
-                let typ = PointType::from_norad(&src_point.typ, src_point.smooth);
+                let typ = PointType::from_norad(&src_point);
                 let id = EntityId::new_with_parent(path_id);
                 PathPoint { id, point, typ }
             })

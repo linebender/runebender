@@ -521,7 +521,7 @@ mod tests {
 
     #[test]
     fn triangle() {
-        let mut path: Path = CubicPath::new(DPoint::new(10., 10.)).into();
+        let mut path = Path::new(DPoint::new(10., 10.));
         path.line_to(DPoint::new(0., 0.), false);
         path.line_to(DPoint::new(20., 0.), false);
         path.close(false);

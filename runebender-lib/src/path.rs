@@ -26,7 +26,7 @@ impl Path {
     pub fn from_norad(src: &norad::glyph::Contour) -> Path {
         if src
             .lib()
-            .map(|lib| lib.contains_key(HYPERBEZ_LIB_KEY))
+            .map(|lib| lib.contains_key(HYPERBEZ_LIB_VERSION_KEY))
             .unwrap_or(false)
         {
             HyperPath::from_norad(src).into()
