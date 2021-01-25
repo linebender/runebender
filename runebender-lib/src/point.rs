@@ -7,7 +7,9 @@ use super::design_space::{DPoint, DVec2, ViewPort};
 
 use druid::kurbo::{Affine, Point};
 use druid::Data;
-use norad::glyph::PointType as NoradPointType;
+use norad::glyph::{ContourPoint, PointType as NoradPointType};
+
+pub(crate) static HYPERBEZ_AUTO_POINT_KEY: &str = "org.linebender.hyperbezier-auto-point";
 
 const RESERVED_ID_COUNT: IdComponent = 5;
 const NO_PARENT_TYPE_ID: IdComponent = 0;
@@ -116,9 +118,20 @@ impl PointType {
         }
     }
 
-    pub fn from_norad(norad_type: &NoradPointType, smooth: bool) -> Self {
-        match norad_type {
-            NoradPointType::OffCurve => PointType::OffCurve { auto: false },
+    pub fn from_norad(norad_point: &ContourPoint) -> Self {
+        let smooth = norad_point.smooth;
+        let auto = norad_point
+            .lib()
+            .and_then(|lib| {
+                lib.get(HYPERBEZ_AUTO_POINT_KEY).map(|is_auto| {
+                    is_auto
+                        .as_boolean()
+                        .expect("invalid hyperbez auto key type?")
+                })
+            })
+            .unwrap_or(false);
+        match &norad_point.typ {
+            NoradPointType::OffCurve => PointType::OffCurve { auto },
             NoradPointType::QCurve => panic!(
                 "quadratics unsupported, we should have \
                          validated input before now"
@@ -150,12 +163,12 @@ impl PathPoint {
         }
     }
 
-    pub fn auto(path: EntityId, point: DPoint) -> PathPoint {
+    pub fn hyper_off_curve(path: EntityId, point: DPoint, auto: bool) -> PathPoint {
         let id = EntityId::new_with_parent(path);
         PathPoint {
             id,
             point,
-            typ: PointType::OffCurve { auto: true },
+            typ: PointType::OffCurve { auto },
         }
     }
 
