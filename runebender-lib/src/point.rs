@@ -163,6 +163,15 @@ impl PathPoint {
         }
     }
 
+    pub fn on_curve_smooth(path: EntityId, point: DPoint) -> PathPoint {
+        let id = EntityId::new_with_parent(path);
+        PathPoint {
+            id,
+            point,
+            typ: PointType::OnCurve { smooth: true },
+        }
+    }
+
     pub fn hyper_off_curve(path: EntityId, point: DPoint, auto: bool) -> PathPoint {
         let id = EntityId::new_with_parent(path);
         PathPoint {

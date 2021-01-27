@@ -3,7 +3,7 @@ use std::sync::Arc;
 use super::design_space::DPoint;
 use super::point::{EntityId, PathPoint};
 use super::point_list::{PathPoints, RawSegment};
-use druid::kurbo::{BezPath, PathEl, Point};
+use druid::kurbo::{BezPath, ParamCurve, ParamCurveNearest, PathEl, Point};
 use druid::Data;
 use spline::{Element, Segment as SplineSegment, SplineSpec};
 
@@ -231,6 +231,35 @@ impl HyperPath {
         }
     }
 
+    pub(crate) fn split_segment_at_point(&mut self, seg: HyperSegment, t: f64) {
+        let pt = DPoint::from_raw(seg.eval(t));
+        let path_id = seg.path_seg.start_id().parent();
+        let (pre, post) = match &seg.path_seg {
+            RawSegment::Line(p1, p2) => {
+                let pt = PathPoint::on_curve(path_id, pt);
+                (RawSegment::Line(*p1, pt), RawSegment::Line(pt, *p2))
+            }
+            RawSegment::Cubic(p1, p2, p3, p4) => {
+                let pt = PathPoint::on_curve_smooth(path_id, pt);
+                (
+                    RawSegment::Cubic(
+                        *p1,
+                        *p2,
+                        PathPoint::hyper_off_curve(path_id, p2.point, true),
+                        pt,
+                    ),
+                    RawSegment::Cubic(
+                        pt,
+                        PathPoint::hyper_off_curve(path_id, p3.point, true),
+                        *p3,
+                        *p4,
+                    ),
+                )
+            }
+        };
+        self.points.split_segment(seg.path_seg, pre, post);
+    }
+
     pub(crate) fn after_change(&mut self) {
         if self.points.len() > 1 {
             self.rebuild_solver();
@@ -300,9 +329,14 @@ impl HyperPath {
 }
 
 impl HyperSegment {
-    /// In the param returned by this method, the integer portion refers
-    /// to the segment in the rendered bezier containing the hit, and the
-    /// fractional portion refers to the position within that segment.
+    /// Find the nearest position in this segment to the provided point.
+    ///
+    /// # Hack
+    ///
+    /// If the param is calculated piecewise over the rendered bezier,
+    /// it will be returned as a negative number, the integer component
+    /// of which will correspond to the rendered segment and the fractional
+    /// component will correspond to the param within that segment.
     pub(crate) fn nearest(&self, point: DPoint) -> (f64, f64) {
         let point = point.to_raw();
         const ACC: f64 = druid::kurbo::DEFAULT_ACCURACY;
@@ -311,32 +345,57 @@ impl HyperSegment {
         } else {
             druid::kurbo::segments(self.spline_seg.render_elements())
                 .enumerate()
-                .fold((0.0, f64::MAX), |acc, (i, seg)| {
+                .fold((-0.0, f64::MAX), |acc, (i, seg)| {
                     let (t, dist) = seg.nearest(point, ACC);
                     if acc.1 < dist {
                         acc
                     } else {
-                        (t + i as f64, dist)
+                        (-t - i as f64, dist)
                     }
                 })
         }
     }
 
     /// The position in the segment corresponding to some param.
+    ///
+    /// # Hack
+    ///
+    /// If the provided param is positive, it will be treated as belonging
+    /// in the range [0.0, 1.0] over the whole curve.
+    ///
+    /// If it is *negative* it will be interpreted piecewise over the rendered
+    /// bezier segments. This behaviour will be removed once we have implemented
+    /// thie ParamCurve traits for the hyperbezier.
     pub(crate) fn eval(&self, param: f64) -> Point {
         if self.spline_seg.is_line() {
             self.path_seg.to_kurbo().eval(param)
         } else {
-            //TODO: when we get `eval` on the spline segment we can get rid of this
-            const INNER_SEGMENT_COUNT: usize = 64;
-            let param_scale = 1.0 / INNER_SEGMENT_COUNT as f64;
-            let to_skip = (param / param_scale) as usize;
-            let seg_param = param - (to_skip as f64 * param_scale);
-            druid::kurbo::segments(self.spline_seg.render_elements())
+            let (to_skip, seg_param) = if param.is_sign_negative() {
+                (param.abs().trunc() as usize, param.abs().fract())
+            } else {
+                //TODO: when we get `eval` on the spline segment we can get rid of this
+                const INNER_SEGMENT_COUNT: usize = 64;
+                let param_scale = 1.0 / INNER_SEGMENT_COUNT as f64;
+                let to_skip = (param / param_scale) as usize;
+                let seg_param = param - (to_skip as f64 * param_scale);
+                (to_skip, seg_param)
+            };
+            match druid::kurbo::segments(self.spline_seg.render_elements())
                 .skip(to_skip)
                 .next()
-                .unwrap()
-                .eval(seg_param)
+                .map(|seg| seg.eval(seg_param))
+            {
+                Some(pt) => pt,
+                None => {
+                    let seg_count =
+                        druid::kurbo::segments(self.spline_seg.render_elements()).count();
+                    eprintln!(
+                        "HyperBez::eval failed: skipped {} of {} segments",
+                        to_skip, seg_count
+                    );
+                    self.path_seg.start().point.to_raw()
+                }
+            }
         }
     }
 }
