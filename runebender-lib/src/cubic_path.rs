@@ -41,6 +41,14 @@ impl CubicPath {
         }
     }
 
+    /// Construct a new CubicPath from the provided `PathPoints`.
+    ///
+    /// The caller is responsible for ensuring that the points have valid
+    /// and unique identifiers, and are otherwise well-formed.
+    pub(crate) fn from_path_points_unchecked(points: PathPoints) -> Self {
+        CubicPath { points }
+    }
+
     /// Attempt to create a `Path` from a BezPath.
     ///
     /// - on the first 'segment' of the bezier will be used.

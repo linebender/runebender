@@ -5,6 +5,7 @@ use druid::FormatId;
 
 pub const CANVAS_SIZE: Size = Size::new(5000., 5000.);
 pub const GLYPHS_APP_PASTEBOARD_TYPE: FormatId = "Glyphs elements pasteboard type";
+pub const RUNEBENDER_PASTEBOARD_TYPE: FormatId = "org.linebender.runebender-json";
 
 /// Commands and Selectors
 pub mod cmd {

@@ -1663,6 +1663,7 @@ dependencies = [
  "plist",
  "serde",
  "serde_derive",
+ "serde_json",
  "spline",
  "svg",
 ]
