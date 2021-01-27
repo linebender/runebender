@@ -28,7 +28,8 @@ impl MouseDelegate<EditSession> for HyperPen {
                 let hit =
                     data.hit_test_filtered(event.pos, None, |pp| pp.id.is_child_of(path.id()));
                 if let Some(hit) = hit {
-                    if path.start_point().id == hit && !path.is_closed() {
+                    if path.points().len() > 1 && path.start_point().id == hit && !path.is_closed()
+                    {
                         if let Some(path) = data.active_path_mut() {
                             let selection = path.close(event.mods.alt());
                             data.selection.select_one(selection);

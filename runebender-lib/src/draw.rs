@@ -9,7 +9,7 @@ use crate::edit_session::EditSession;
 use crate::guides::{Guide, GuideLine};
 use crate::path::Path;
 use crate::point::PointType;
-use crate::point_list::Segment;
+use crate::point_list::RawSegment;
 use crate::selection::Selection;
 use crate::theme;
 
@@ -190,9 +190,9 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         let mut end_point = path.start_point().to_screen(self.space);
 
         for seg in path.iter_segments() {
-            match seg {
-                Segment::Line(_, p1) => end_point = p1.to_screen(self.space),
-                Segment::Cubic(p0, p1, p2, p3) => {
+            match seg.raw_segment() {
+                RawSegment::Line(_, p1) => end_point = p1.to_screen(self.space),
+                RawSegment::Cubic(p0, p1, p2, p3) => {
                     let r = self.space;
                     //FIXME: draw auto handles as dashed lines
                     self.draw_control_handle(p0.to_screen(r), p1.to_screen(r));

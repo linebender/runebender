@@ -29,7 +29,7 @@ pub struct Cursor<'a> {
 ///
 /// We do not currently support quadratics.
 #[derive(Clone, Copy, PartialEq)]
-pub enum Segment {
+pub enum RawSegment {
     Line(PathPoint, PathPoint),
     Cubic(PathPoint, PathPoint, PathPoint, PathPoint),
 }
@@ -298,15 +298,15 @@ impl PathPoints {
         point.id
     }
 
-    pub fn split_segment(&mut self, old: Segment, pre: Segment, post: Segment) {
+    pub fn split_segment(&mut self, old: RawSegment, pre: RawSegment, post: RawSegment) {
         let insert_idx = bail!(self
             .points
             .index_for_point(old.start_id())
             .and_then(|idx| self.next_idx(idx)));
 
         let (existing_control_pts, points_to_insert) = match old {
-            Segment::Line(..) => (0, 1),
-            Segment::Cubic(..) => (2, 5),
+            RawSegment::Line(..) => (0, 1),
+            RawSegment::Cubic(..) => (2, 5),
         };
 
         let iter = pre.into_iter().skip(1).chain(post.into_iter().skip(1));
@@ -320,11 +320,11 @@ impl PathPoints {
         );
     }
 
-    pub fn replace_segment(&mut self, old: Segment, new: Segment) {
+    pub fn replace_segment(&mut self, old: RawSegment, new: RawSegment) {
         let insert_idx = bail!(self.points.index_for_point(old.start_id()));
         let seg_len = match old {
-            Segment::Line(..) => 1,
-            Segment::Cubic(..) => 3,
+            RawSegment::Line(..) => 1,
+            RawSegment::Cubic(..) => 3,
         };
         self.points
             .as_mut()
@@ -796,18 +796,18 @@ impl Cursor<'_> {
     }
 }
 
-impl Segment {
+impl RawSegment {
     pub(crate) fn start(&self) -> PathPoint {
         match self {
-            Segment::Line(p1, _) => *p1,
-            Segment::Cubic(p1, ..) => *p1,
+            RawSegment::Line(p1, _) => *p1,
+            RawSegment::Cubic(p1, ..) => *p1,
         }
     }
 
     pub(crate) fn end(&self) -> PathPoint {
         match self {
-            Segment::Line(_, p2) => *p2,
-            Segment::Cubic(.., p2) => *p2,
+            RawSegment::Line(_, p2) => *p2,
+            RawSegment::Cubic(.., p2) => *p2,
         }
     }
 
@@ -826,10 +826,10 @@ impl Segment {
             idx += 1;
             match (&seg, idx) {
                 (_, 1) => Some(seg.start()),
-                (Segment::Line(_, p2), 2) => Some(*p2),
-                (Segment::Cubic(_, p2, _, _), 2) => Some(*p2),
-                (Segment::Cubic(_, _, p3, _), 3) => Some(*p3),
-                (Segment::Cubic(_, _, _, p4), 4) => Some(*p4),
+                (RawSegment::Line(_, p2), 2) => Some(*p2),
+                (RawSegment::Cubic(_, p2, _, _), 2) => Some(*p2),
+                (RawSegment::Cubic(_, _, p3, _), 3) => Some(*p3),
+                (RawSegment::Cubic(_, _, _, p4), 4) => Some(*p4),
                 _ => None,
             }
         })
@@ -838,15 +838,18 @@ impl Segment {
     // FIXME: why a vec? was I just lazy?
     pub(crate) fn ids(&self) -> Vec<EntityId> {
         match self {
-            Segment::Line(p1, p2) => vec![p1.id, p2.id],
-            Segment::Cubic(p1, p2, p3, p4) => vec![p1.id, p2.id, p3.id, p4.id],
+            RawSegment::Line(p1, p2) => vec![p1.id, p2.id],
+            RawSegment::Cubic(p1, p2, p3, p4) => vec![p1.id, p2.id, p3.id, p4.id],
         }
     }
 
+    /// Assumes that a cubic segment is a cubic bezier.
     pub(crate) fn to_kurbo(self) -> PathSeg {
         match self {
-            Segment::Line(p1, p2) => PathSeg::Line(Line::new(p1.point.to_raw(), p2.point.to_raw())),
-            Segment::Cubic(p1, p2, p3, p4) => PathSeg::Cubic(CubicBez::new(
+            RawSegment::Line(p1, p2) => {
+                PathSeg::Line(Line::new(p1.point.to_raw(), p2.point.to_raw()))
+            }
+            RawSegment::Cubic(p1, p2, p3, p4) => PathSeg::Cubic(CubicBez::new(
                 p1.point.to_raw(),
                 p2.point.to_raw(),
                 p3.point.to_raw(),
@@ -859,7 +862,7 @@ impl Segment {
         let subseg = self.to_kurbo().subsegment(range);
         let path_id = self.start_id().parent();
         match subseg {
-            PathSeg::Line(Line { p0, p1 }) => Segment::Line(
+            PathSeg::Line(Line { p0, p1 }) => RawSegment::Line(
                 PathPoint::on_curve(path_id, DPoint::from_raw(p0)),
                 PathPoint::on_curve(path_id, DPoint::from_raw(p1)),
             ),
@@ -868,7 +871,7 @@ impl Segment {
                 let p1 = PathPoint::off_curve(path_id, DPoint::from_raw(p1));
                 let p2 = PathPoint::off_curve(path_id, DPoint::from_raw(p2));
                 let p3 = PathPoint::on_curve(path_id, DPoint::from_raw(p3));
-                Segment::Cubic(p0, p1, p2, p3)
+                RawSegment::Cubic(p0, p1, p2, p3)
             }
             PathSeg::Quad(_) => panic!("quads are not supported"),
         }
@@ -914,9 +917,9 @@ pub struct Segments {
 }
 
 impl Iterator for Segments {
-    type Item = Segment;
+    type Item = RawSegment;
 
-    fn next(&mut self) -> Option<Segment> {
+    fn next(&mut self) -> Option<RawSegment> {
         if self.idx >= self.points.len() {
             return None;
         }
@@ -932,11 +935,11 @@ impl Iterator for Segments {
                 self.points.as_ref(),
                 self.idx
             );
-            Segment::Cubic(seg_start, p1, p2, self.prev_pt)
+            RawSegment::Cubic(seg_start, p1, p2, self.prev_pt)
         } else {
             self.prev_pt = self.points.as_ref()[self.idx];
             self.idx += 1;
-            Segment::Line(seg_start, self.prev_pt)
+            RawSegment::Line(seg_start, self.prev_pt)
         };
         Some(seg)
     }
@@ -944,11 +947,11 @@ impl Iterator for Segments {
 
 /// An iterator over the points in a segment
 pub struct SegmentPointIter {
-    seg: Segment,
+    seg: RawSegment,
     idx: usize,
 }
 
-impl std::iter::IntoIterator for Segment {
+impl std::iter::IntoIterator for RawSegment {
     type Item = PathPoint;
     type IntoIter = SegmentPointIter;
     fn into_iter(self) -> Self::IntoIter {
@@ -962,22 +965,22 @@ impl Iterator for SegmentPointIter {
     fn next(&mut self) -> Option<PathPoint> {
         self.idx += 1;
         match (self.idx, self.seg) {
-            (1, Segment::Line(p1, _)) => Some(p1),
-            (2, Segment::Line(_, p2)) => Some(p2),
-            (1, Segment::Cubic(p1, ..)) => Some(p1),
-            (2, Segment::Cubic(_, p2, ..)) => Some(p2),
-            (3, Segment::Cubic(_, _, p3, ..)) => Some(p3),
-            (4, Segment::Cubic(_, _, _, p4)) => Some(p4),
+            (1, RawSegment::Line(p1, _)) => Some(p1),
+            (2, RawSegment::Line(_, p2)) => Some(p2),
+            (1, RawSegment::Cubic(p1, ..)) => Some(p1),
+            (2, RawSegment::Cubic(_, p2, ..)) => Some(p2),
+            (3, RawSegment::Cubic(_, _, p3, ..)) => Some(p3),
+            (4, RawSegment::Cubic(_, _, _, p4)) => Some(p4),
             _ => None,
         }
     }
 }
 
-impl std::fmt::Debug for Segment {
+impl std::fmt::Debug for RawSegment {
     #[allow(clippy::many_single_char_names)]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Segment::Line(one, two) => write!(
+            RawSegment::Line(one, two) => write!(
                 f,
                 "({}->{}) Line({:?}, {:?})",
                 self.start_id(),
@@ -985,7 +988,7 @@ impl std::fmt::Debug for Segment {
                 one.point,
                 two.point
             ),
-            Segment::Cubic(a, b, c, d) => write!(
+            RawSegment::Cubic(a, b, c, d) => write!(
                 f,
                 "Cubic({:?}, {:?}, {:?}, {:?})",
                 a.point, b.point, c.point, d.point

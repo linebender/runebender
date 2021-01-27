@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use super::design_space::DPoint;
 use super::point::{EntityId, PathPoint};
-use super::point_list::{PathPoints, Segment};
+use super::point_list::{PathPoints, RawSegment};
 use druid::kurbo::{BezPath, PathEl, Point};
 use druid::Data;
-use spline::{Element, SplineSpec};
+use spline::{Element, Segment as SplineSegment, SplineSpec};
 
 pub(crate) static HYPERBEZ_LIB_VERSION_KEY: &str = "org.linebender.hyperbezier-version";
 pub(crate) static HYPERBEZ_IS_POINT_KEY: &str = "org.linebender.hyperbezier-point";
@@ -19,6 +19,12 @@ pub struct HyperPath {
     #[data(ignore)]
     solver: SplineSpec,
     bezier: Arc<BezPath>,
+}
+
+#[derive(Debug, Clone)]
+pub struct HyperSegment {
+    pub(crate) path_seg: RawSegment,
+    pub(crate) spline_seg: SplineSegment,
 }
 
 impl HyperPath {
@@ -36,6 +42,10 @@ impl HyperPath {
 
     pub(crate) fn path_points_mut(&mut self) -> &mut PathPoints {
         &mut self.points
+    }
+
+    pub(crate) fn hyper_segments(&self) -> Option<&[SplineSegment]> {
+        self.solver.segments()
     }
 
     pub(crate) fn from_norad(src: &norad::glyph::Contour) -> Self {
@@ -134,7 +144,7 @@ impl HyperPath {
                 .zip(spline.segments().iter())
             {
                 match segment {
-                    Segment::Line(_, end) => {
+                    RawSegment::Line(_, end) => {
                         extend_from_bezpath(&mut points, &[PathEl::LineTo(end.point.to_raw())]);
                         let mut last = points.last_mut().unwrap();
                         last.smooth = end.is_smooth();
@@ -142,7 +152,7 @@ impl HyperPath {
                         lib.insert(HYPERBEZ_IS_POINT_KEY.into(), true.into());
                         last.replace_lib(lib);
                     }
-                    Segment::Cubic(_, p1, p2, p3) => {
+                    RawSegment::Cubic(_, p1, p2, p3) => {
                         let mut segment_bez = BezPath::new();
                         spline_segment.render(&mut segment_bez);
                         extend_from_bezpath(&mut points, segment_bez.elements());
@@ -289,6 +299,48 @@ impl HyperPath {
     }
 }
 
+impl HyperSegment {
+    /// In the param returned by this method, the integer portion refers
+    /// to the segment in the rendered bezier containing the hit, and the
+    /// fractional portion refers to the position within that segment.
+    pub(crate) fn nearest(&self, point: DPoint) -> (f64, f64) {
+        let point = point.to_raw();
+        const ACC: f64 = druid::kurbo::DEFAULT_ACCURACY;
+        if self.spline_seg.is_line() {
+            self.path_seg.to_kurbo().nearest(point, ACC)
+        } else {
+            druid::kurbo::segments(self.spline_seg.render_elements())
+                .enumerate()
+                .fold((0.0, f64::MAX), |acc, (i, seg)| {
+                    let (t, dist) = seg.nearest(point, ACC);
+                    if acc.1 < dist {
+                        acc
+                    } else {
+                        (t + i as f64, dist)
+                    }
+                })
+        }
+    }
+
+    /// The position in the segment corresponding to some param.
+    pub(crate) fn eval(&self, param: f64) -> Point {
+        if self.spline_seg.is_line() {
+            self.path_seg.to_kurbo().eval(param)
+        } else {
+            //TODO: when we get `eval` on the spline segment we can get rid of this
+            const INNER_SEGMENT_COUNT: usize = 64;
+            let param_scale = 1.0 / INNER_SEGMENT_COUNT as f64;
+            let to_skip = (param / param_scale) as usize;
+            let seg_param = param - (to_skip as f64 * param_scale);
+            druid::kurbo::segments(self.spline_seg.render_elements())
+                .skip(to_skip)
+                .next()
+                .unwrap()
+                .eval(seg_param)
+        }
+    }
+}
+
 impl From<PathPoints> for HyperPath {
     fn from(points: PathPoints) -> HyperPath {
         HyperPath {
@@ -306,7 +358,7 @@ struct SplineElementIter<I> {
 
 impl<I> Iterator for SplineElementIter<I>
 where
-    I: Iterator<Item = Segment>,
+    I: Iterator<Item = RawSegment>,
 {
     type Item = Element;
     fn next(&mut self) -> Option<Self::Item> {
@@ -314,8 +366,8 @@ where
             return Some(Element::MoveTo(start));
         }
         match self.segments.next()? {
-            Segment::Line(_, p1) => Some(Element::LineTo(p1.point.to_raw(), p1.is_smooth())),
-            Segment::Cubic(_, p1, p2, p3) => {
+            RawSegment::Line(_, p1) => Some(Element::LineTo(p1.point.to_raw(), p1.is_smooth())),
+            RawSegment::Cubic(_, p1, p2, p3) => {
                 let p1 = if p1.is_auto() {
                     None
                 } else {

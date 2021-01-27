@@ -1,4 +1,4 @@
-use druid::kurbo::{Circle, Line, ParamCurve, Point, Rect, Size, Vec2};
+use druid::kurbo::{Circle, Line, Point, Rect, Size, Vec2};
 use druid::piet::{Color, FontFamily, RenderContext, Text, TextLayout, TextLayoutBuilder};
 use druid::{Data, Env, EventCtx, PaintCtx};
 
@@ -75,8 +75,7 @@ impl Measure {
         let mut intersections = vec![0, T_SCALE as u64];
         for path in &*data.paths {
             for seg in path.iter_segments() {
-                let kurbo_seg = seg.to_kurbo();
-                for intersection in kurbo_seg.intersect_line(design_line) {
+                for intersection in seg.intersect_line(design_line) {
                     let t_fixed = (intersection.line_t.max(0.0).min(1.0) * T_SCALE) as u64;
                     intersections.push(t_fixed);
                 }
@@ -123,10 +122,9 @@ impl Measure {
                 draw_label(ctx, label, scr_pt, color);
             }
             for seg in path.iter_segments() {
-                let kurbo_seg = seg.to_kurbo();
-                let mid_pt = kurbo_seg.eval(0.5);
+                let mid_pt = seg.eval(0.5);
                 let scr_pt = data.viewport.to_screen(DPoint::from_raw(mid_pt));
-                let delta = kurbo_seg.end() - kurbo_seg.start();
+                let delta = seg.raw_segment().start().point - seg.raw_segment().end().point;
                 let label = format_pt(DPoint::new(delta.x, delta.y));
                 // TODO: nudge placement of label to reduce crowding
                 draw_label(ctx, label, scr_pt, MEASURE_INFO_DELTA_COLOR);

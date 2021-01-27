@@ -4,12 +4,13 @@ use druid::kurbo::{Line, LineIntersection, ParamCurve, ParamCurveArclen};
 use druid::piet::StrokeStyle;
 use druid::{Env, EventCtx, KbKey, KeyEvent, MouseEvent, PaintCtx, Point, RenderContext};
 
+use crate::cubic_path::CubicPath;
 use crate::design_space::DPoint;
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
 use crate::path::Path;
 use crate::point::{EntityId, PathPoint};
-use crate::point_list::Segment;
+use crate::point_list::RawSegment;
 use crate::theme;
 use crate::tools::{EditType, Tool};
 
@@ -41,7 +42,7 @@ enum GestureState {
 struct Hit {
     intersection: LineIntersection,
     point: Point,
-    seg: Segment,
+    seg: RawSegment,
 }
 
 impl Default for Knife {
@@ -104,8 +105,7 @@ impl Knife {
             .iter()
             .flat_map(Path::iter_segments)
             .flat_map(|seg| {
-                seg.to_kurbo()
-                    .intersect_line(line)
+                seg.intersect_line(line)
                     .into_iter()
                     .map(move |hit| DPoint::from_raw(line.eval(hit.line_t)))
             });
@@ -243,7 +243,7 @@ impl MouseDelegate<EditSession> for Knife {
 }
 
 impl Hit {
-    fn new(line: Line, intersection: LineIntersection, seg: Segment) -> Self {
+    fn new(line: Line, intersection: LineIntersection, seg: RawSegment) -> Self {
         let point = line.eval(intersection.line_t);
         Hit {
             intersection,
@@ -290,14 +290,16 @@ fn slice_path(path: &Path, line: Line, acc: &mut Vec<Path>) {
     let mut hits = Vec::new();
     // we clone here; the impl is recursive and if this path isn't sliced the
     // clone will be returned in `acc`.
-    slice_path_impl(path.clone(), line, acc, &mut hits, 0)
+    if let Path::Cubic(path) = path {
+        slice_path_impl(path.clone(), line, acc, &mut hits, 0)
+    }
 }
 
 /// does the actual work
 /// - we reuse a vector for calculating hits, because... why not
 /// - we track recursions and bail at some limit, because I don't trust all the edge cases.
 fn slice_path_impl(
-    mut path: Path,
+    mut path: CubicPath,
     line: Line,
     acc: &mut Vec<Path>,
     hit_buf: &mut Vec<Hit>,
@@ -318,7 +320,7 @@ fn slice_path_impl(
         if recurse == MAX_RECURSE {
             log::info!("slice_path hit recurse limit");
         }
-        acc.push(path);
+        acc.push(path.into());
         return;
     }
 
@@ -361,8 +363,8 @@ fn slice_path_impl(
 ///
 /// The 'first' path includes the paths original start point, and may be open.
 /// The 'second' path is the part that is 'sliced off', and it always closed.
-fn split_path_at_intersections(path: &Path, start: Hit, end: Hit) -> (Path, Path) {
-    let one_id = path.id();
+fn split_path_at_intersections(path: &CubicPath, start: Hit, end: Hit) -> (CubicPath, CubicPath) {
+    let one_id = path.path_points().id();
     let two_id = EntityId::next();
     let mut one_points = Vec::new();
     let mut two_points = Vec::new();
@@ -422,17 +424,17 @@ fn split_path_at_intersections(path: &Path, start: Hit, end: Hit) -> (Path, Path
 }
 
 /// set tangent handles, set correct parent ids, and construct the path
-fn finalize_path(mut points: Vec<PathPoint>, parent_id: EntityId, closed: bool) -> Path {
+fn finalize_path(mut points: Vec<PathPoint>, parent_id: EntityId, closed: bool) -> CubicPath {
     crate::path::mark_tangent_handles(&mut points);
     points.iter_mut().for_each(|p| p.reparent(parent_id));
     if closed {
         points.rotate_left(1);
     }
 
-    Path::from_raw_parts(parent_id, points, None, closed)
+    CubicPath::from_raw_parts(parent_id, points, None, closed)
 }
 
-fn append_all_points(dest: &mut Vec<PathPoint>, seg: Segment) {
+fn append_all_points(dest: &mut Vec<PathPoint>, seg: RawSegment) {
     let mut iter = seg.into_iter();
     let first = iter.next().unwrap();
     // we skip the first point if it's the same as the current previous point
@@ -446,7 +448,7 @@ fn append_all_points(dest: &mut Vec<PathPoint>, seg: Segment) {
 ///
 /// this simplifies the two slice functions, since they can assume they will hit
 /// the start point first while iterating.
-fn order_points(path: &Path, start: Hit, end: Hit) -> (Hit, Hit) {
+fn order_points(path: &CubicPath, start: Hit, end: Hit) -> (Hit, Hit) {
     for seg in path.iter_segments() {
         if seg.start_id() == start.seg.start_id() {
             // in the special case that we're slicing a single segment,
@@ -536,7 +538,7 @@ mod tests {
 
         let one_segs = one
             .iter_segments()
-            .map(Segment::to_kurbo)
+            .map(|seg| seg.raw_segment().to_kurbo())
             .collect::<Vec<_>>();
         let exp = vec![
             Line::new((10., 10.), (4., 4.)).into(),
@@ -548,7 +550,7 @@ mod tests {
 
         let two_segs = two
             .iter_segments()
-            .map(Segment::to_kurbo)
+            .map(|seg| seg.raw_segment().to_kurbo())
             .collect::<Vec<_>>();
         let exp = vec![
             Line::new((4., 4.), (0., 0.)).into(),

@@ -1,6 +1,6 @@
 use super::design_space::DPoint;
 use super::point::{EntityId, PathPoint, PointType};
-use super::point_list::{PathPoints, Segment};
+use super::point_list::{PathPoints, RawSegment};
 use druid::kurbo::{BezPath, PathEl};
 use druid::Data;
 
@@ -156,6 +156,10 @@ impl CubicPath {
         Contour::new(points, None, None)
     }
 
+    pub(crate) fn iter_segments(&self) -> impl Iterator<Item = RawSegment> {
+        self.path_points().iter_segments()
+    }
+
     pub(crate) fn path_points(&self) -> &PathPoints {
         &self.points
     }
@@ -168,8 +172,8 @@ impl CubicPath {
         bez.move_to(self.points.start_point().point.to_raw());
         for segment in self.points.iter_segments() {
             match segment {
-                Segment::Line(_, p1) => bez.line_to(p1.point.to_raw()),
-                Segment::Cubic(_, p1, p2, p3) => {
+                RawSegment::Line(_, p1) => bez.line_to(p1.point.to_raw()),
+                RawSegment::Cubic(_, p1, p2, p3) => {
                     bez.curve_to(p1.to_kurbo(), p2.to_kurbo(), p3.to_kurbo())
                 }
             }
@@ -183,9 +187,9 @@ impl CubicPath {
         self.points.closed()
     }
 
-    pub(crate) fn split_segment_at_point(&mut self, seg: Segment, t: f64) {
+    pub(crate) fn split_segment_at_point(&mut self, seg: RawSegment, t: f64) {
         let mut pre_seg = seg.subsegment(0.0..t);
-        if let Segment::Cubic(_, _, _, p3) = &mut pre_seg {
+        if let RawSegment::Cubic(_, _, _, p3) = &mut pre_seg {
             p3.typ = PointType::OnCurve { smooth: true };
         }
         let post_seg = seg.subsegment(t..1.0);
@@ -225,7 +229,6 @@ impl From<PathPoints> for CubicPath {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::path::Path;
     use druid::kurbo::{Line, PathSeg, Point, Rect, Shape};
 
     #[test]
@@ -240,20 +243,19 @@ mod tests {
     #[test]
     fn iter_rect_segs() {
         let rect = Rect::new(0., 0., 10., 10.);
-        let path: Path = CubicPath::from_bezpath(rect.to_path(0.1)).unwrap().into();
+        let path = CubicPath::from_bezpath(rect.to_path(0.1)).unwrap();
 
         let mut seg_iter = path.iter_segments();
-        assert!(matches!(seg_iter.next().unwrap(), Segment::Line(..)));
-        assert!(matches!(seg_iter.next().unwrap(), Segment::Line(..)));
-        assert!(matches!(seg_iter.next().unwrap(), Segment::Line(..)));
-        assert!(matches!(seg_iter.next().unwrap(), Segment::Line(..)));
+        assert!(matches!(seg_iter.next().unwrap(), RawSegment::Line(..)));
+        assert!(matches!(seg_iter.next().unwrap(), RawSegment::Line(..)));
+        assert!(matches!(seg_iter.next().unwrap(), RawSegment::Line(..)));
+        assert!(matches!(seg_iter.next().unwrap(), RawSegment::Line(..)));
     }
 
     #[test]
     fn iter_line_sects() {
         let mut path = CubicPath::new(DPoint::new(0., 0.));
         path.path_points_mut().push_on_curve(DPoint::new(10., 10.));
-        let path: Path = path.into();
 
         let mut seg_iter = path.iter_segments();
         let seg = seg_iter.next().unwrap();
@@ -281,7 +283,7 @@ mod tests {
         assert!(path.points.closed());
         assert_eq!(path.points.len(), 3);
 
-        let mut iter = path.points.iter_segments().map(Segment::to_kurbo);
+        let mut iter = path.points.iter_segments().map(RawSegment::to_kurbo);
         assert_eq!(iter.next(), Some(Line::new((10., 10.), (0., 0.)).into()));
         assert_eq!(iter.next(), Some(Line::new((0., 0.), (20., 0.)).into()));
         assert_eq!(iter.next(), Some(Line::new((20., 0.), (10., 10.)).into()));
