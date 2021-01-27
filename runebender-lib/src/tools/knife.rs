@@ -276,7 +276,12 @@ impl Hit {
 fn slice_paths(paths: &[Path], line: Line) -> Vec<Path> {
     let mut out = Vec::new();
     for path in paths {
-        slice_path(path, line, &mut out);
+        if !path.is_hyper() {
+            slice_path(path, line, &mut out);
+        } else {
+            log::info!("slice not implemented for hyperbezier paths");
+            out.push(path.clone());
+        }
     }
     out
 }
