@@ -519,7 +519,23 @@ impl Segment {
     pub(crate) fn intersect_line(&self, line: Line) -> Vec<LineIntersection> {
         match self {
             Self::Cubic(seg) => seg.to_kurbo().intersect_line(line).into_iter().collect(),
-            Self::Hyper(..) => Vec::new(),
+            Self::Hyper(seg) if self.is_line() => seg
+                .path_seg
+                .to_kurbo()
+                .intersect_line(line)
+                .into_iter()
+                .collect(),
+            Self::Hyper(seg) => seg
+                .kurbo_segments()
+                .enumerate()
+                .flat_map(|(i, kseg)| {
+                    let hits = kseg.intersect_line(line);
+                    hits.into_iter().map(move |mut hit| {
+                        hit.segment_t = -hit.segment_t - i as f64;
+                        hit
+                    })
+                })
+                .collect(),
         }
     }
 
