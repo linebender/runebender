@@ -49,7 +49,7 @@ mod protected {
     use std::collections::HashMap;
     use std::sync::Arc;
 
-    #[derive(Debug, Clone, Data)]
+    #[derive(Clone, Data)]
     pub(super) struct RawPoints {
         points: Arc<Vec<PathPoint>>,
         // these two use interior mutability so that we can rebuild the indices
@@ -126,6 +126,15 @@ mod protected {
 
         pub(crate) fn clone_inner(&self) -> Vec<PathPoint> {
             self.points.as_ref().to_owned()
+        }
+    }
+
+    impl std::fmt::Debug for RawPoints {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            for pt in self.points.as_ref() {
+                writeln!(f, "{:?}", pt)?;
+            }
+            Ok(())
         }
     }
 }
@@ -545,30 +554,18 @@ impl PathPoints {
     pub fn delete_points(&mut self, points: &[EntityId]) {
         // stuff for debugging:
         let pre_points = self.points.clone();
-        fn validate(points: &[PathPoint]) -> bool {
-            for window in points.windows(3) {
-                match window {
-                    &[a, b, c] if a.is_off_curve() && b.is_off_curve() && c.is_off_curve() => {
-                        return false
-                    }
-                    _ => continue,
-                }
-            }
-            true
-        }
-
         let mut to_delete = HashSet::with_capacity(points.len());
         for point in points {
-            self.points_to_delete(*point, &mut to_delete)
+            self.points_to_delete(*point, &mut to_delete);
+            self.points_mut().retain(|p| !to_delete.contains(&p.id));
+            to_delete.clear();
         }
 
-        self.points_mut().retain(|p| !to_delete.contains(&p.id));
-        if !validate(self.as_slice()) {
+        self.normalize();
+        if !self.debug_validate() {
             eprintln!(
-                "error deleting points: {:?}\nfrom points {:?}, to_delete: {:?}",
-                points,
-                pre_points.as_ref(),
-                &to_delete
+                "error deleting points: {:?}\nfrom points\n{:?}, to_delete: {:?}\nresult:\n{:?}",
+                points, pre_points, &to_delete, &self.points,
             );
             self.points = pre_points;
             return;
@@ -577,61 +574,6 @@ impl PathPoints {
         if self.as_slice().is_empty() {
             self.closed = false;
             return;
-        }
-
-        // normalize our representation
-        // if we're only two on-curve points, make us an open single-segment
-        let should_be_open = self
-            .as_slice()
-            .iter()
-            .filter(|pp| pp.is_on_curve())
-            .nth(2)
-            .is_none();
-        if self.closed && should_be_open {
-            self.closed = false;
-            while self
-                .as_slice()
-                .first()
-                .map(PathPoint::is_off_curve)
-                .unwrap_or(false)
-            {
-                self.points_mut().rotate_right(1);
-            }
-            while self
-                .as_slice()
-                .last()
-                .map(PathPoint::is_off_curve)
-                .unwrap_or(false)
-            {
-                self.points_mut().pop();
-            }
-        // if we're closed, make sure we end with an off-curve
-        } else if self.closed
-            && self.as_slice()[0].is_off_curve()
-            && self.as_slice()[self.len() - 1].is_off_curve()
-        {
-            self.points_mut().rotate_right(1);
-        }
-
-        // fixup smooth/corner types
-        let mut cursor = self.cursor(None);
-        let start_id = bail!(cursor.point().map(|pp| pp.id));
-
-        loop {
-            let next_is_on = cursor.peek_next().map(PathPoint::is_on_curve);
-            let prev_is_on = cursor.peek_prev().map(PathPoint::is_on_curve);
-
-            if cursor.point().map(|pp| pp.is_smooth()).unwrap_or(false)
-                && prev_is_on.unwrap_or(false)
-                && next_is_on.unwrap_or(false)
-            {
-                cursor.point_mut().unwrap().toggle_type();
-            }
-
-            cursor.move_next();
-            if cursor.point().map(|pp| pp.id == start_id).unwrap_or(true) {
-                break;
-            }
         }
     }
 
@@ -648,8 +590,8 @@ impl PathPoints {
             )
         };
 
-        let prev_and_next_both_off_curve = prev.map(|pp| pp.is_off_curve()).unwrap_or(false)
-            && next.map(|pp| pp.is_off_curve()).unwrap_or(false);
+        let prev_is_offcurve = prev.map(|pp| pp.is_off_curve()).unwrap_or(false);
+        let next_is_offcurve = next.map(|pp| pp.is_off_curve()).unwrap_or(false);
 
         to_delete.insert(point.id);
         if point.is_off_curve() {
@@ -659,9 +601,70 @@ impl PathPoints {
             {
                 to_delete.insert(other_off_curve.id);
             }
-        } else if prev_and_next_both_off_curve {
+        } else if prev_is_offcurve && next_is_offcurve {
             to_delete.extend(prev.map(|pp| pp.id));
             to_delete.extend(next.map(|pp| pp.id));
+        // curve at end of open path: remove whole segment
+        } else if prev_is_offcurve && next.is_none() {
+            let prev2 = self
+                .cursor(prev.map(|pp| pp.id))
+                .peek_prev()
+                .map(|pp| pp.id);
+            to_delete.extend(prev.map(|pp| pp.id));
+            to_delete.extend(prev2);
+        } else if next_is_offcurve && prev.is_none() {
+            let next2 = self
+                .cursor(next.map(|pp| pp.id))
+                .peek_next()
+                .map(|pp| pp.id);
+            to_delete.extend(next.map(|pp| pp.id));
+            to_delete.extend(next2);
+        }
+    }
+
+    /// Check if our internal structure is consistent.
+    fn debug_validate(&self) -> bool {
+        for window in self.points.as_ref().windows(3) {
+            match window {
+                &[a, b, c] if a.is_off_curve() && b.is_off_curve() && c.is_off_curve() => {
+                    return false
+                }
+                _ => continue,
+            }
+        }
+        // a closed path should always end in a line-to
+        if self
+            .points
+            .as_ref()
+            .last()
+            .map(|pt| pt.is_off_curve())
+            .unwrap_or(false)
+            && self
+                .points
+                .as_ref()
+                .first()
+                .map(|pt| pt.is_on_curve())
+                .unwrap_or(false)
+        {
+            return false;
+        }
+        true
+    }
+
+    /// Normalize our representation, such as after deleting points.
+    ///
+    /// In particular, this ensures that a closed path always ends with
+    /// an on-curve point.
+    fn normalize(&mut self) {
+        // if we're closed, make sure we end with an on-curve
+        if self.closed {
+            let to_rotate = self
+                .as_slice()
+                .iter()
+                .rev()
+                .take_while(|pp| pp.is_off_curve())
+                .count();
+            self.points_mut().rotate_right(to_rotate);
         }
     }
 
@@ -930,7 +933,15 @@ impl Iterator for Segments {
         let seg = if !self.points.as_ref()[self.idx].is_on_curve() {
             let p1 = self.points.as_ref()[self.idx];
             let p2 = self.points.as_ref()[self.idx + 1];
-            self.prev_pt = self.points.as_ref()[self.idx + 2];
+            self.prev_pt = match self.points.as_ref().get(self.idx + 2) {
+                Some(pt) => *pt,
+                None => {
+                    panic!(
+                        "segment iter OOB: self.idx {}, points: {:?}",
+                        self.idx, &self.points
+                    );
+                }
+            };
             self.idx += 3;
             assert!(
                 self.prev_pt.typ.is_on_curve(),
