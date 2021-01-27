@@ -1,9 +1,11 @@
 use super::cubic_path::CubicPath;
 use super::design_space::{DPoint, DVec2, ViewPort};
-use super::hyper_path::{HyperPath, HYPERBEZ_LIB_KEY};
+use super::hyper_path::{HyperPath, HyperSegment, HYPERBEZ_LIB_VERSION_KEY};
 use super::point::{EntityId, PathPoint};
-use super::point_list::{PathPoints, Segment};
-use druid::kurbo::{Affine, BezPath, ParamCurveNearest, Point, Vec2};
+use super::point_list::{PathPoints, RawSegment};
+use druid::kurbo::{
+    Affine, BezPath, Line, LineIntersection, ParamCurve, ParamCurveNearest, Point, Vec2,
+};
 use druid::Data;
 
 use crate::selection::Selection;
@@ -12,6 +14,12 @@ use crate::selection::Selection;
 pub enum Path {
     Cubic(CubicPath),
     Hyper(HyperPath),
+}
+
+#[derive(Debug, Clone)]
+pub enum Segment {
+    Cubic(RawSegment),
+    Hyper(HyperSegment),
 }
 
 impl Path {
@@ -80,8 +88,29 @@ impl Path {
         }
     }
 
-    pub fn iter_segments(&self) -> impl Iterator<Item = Segment> {
-        self.path_points().iter_segments()
+    pub fn iter_segments<'a>(&'a self) -> impl Iterator<Item = Segment> + 'a {
+        //NOTE:
+        // in order to return `impl Iterator` we need to have a single concrete return type;
+        // we can't branch on the type of the path and return a different iterator for each.
+        // In order to make this work we have a slightly awkward implmenetation here.
+        let hyper_segments = match self {
+            Path::Cubic(_) => None,
+            Path::Hyper(path) => path.hyper_segments(),
+        };
+
+        self.path_points()
+            .iter_segments()
+            .enumerate()
+            .map(move |(i, path_seg)| {
+                if let Some(spline_seg) = hyper_segments.and_then(|segs| segs.get(i).cloned()) {
+                    Segment::Hyper(HyperSegment {
+                        spline_seg,
+                        path_seg,
+                    })
+                } else {
+                    Segment::Cubic(path_seg)
+                }
+            })
     }
 
     pub(crate) fn paths_for_selection(&self, selection: &Selection) -> Vec<Path> {
@@ -198,35 +227,45 @@ impl Path {
     pub(crate) fn segments_for_points<'a>(
         &'a self,
         points: &'a Selection,
-    ) -> impl Iterator<Item = Segment> + 'a {
+    ) -> impl Iterator<Item = RawSegment> + 'a {
         self.path_points()
             .iter_segments()
             .filter(move |seg| points.contains(&seg.start_id()) && points.contains(&seg.end_id()))
     }
 
     pub(crate) fn split_segment_at_point(&mut self, seg: Segment, t: f64) {
-        match self {
-            Path::Cubic(path) => path.split_segment_at_point(seg, t),
-            Path::Hyper(_) => eprintln!("splitting hyper segments not implemented"), // path.split_segment_at_point(seg, t),
-        }
-        self.after_change();
+        match (self, seg) {
+            (Path::Cubic(ref mut path), Segment::Cubic(seg)) => path.split_segment_at_point(seg, t),
+            (Path::Hyper(_), Segment::Hyper(_)) => {
+                eprintln!("splitting hyper segments not implemented")
+                //self.after_change();
+            }
+            (path, seg) => panic!("incorrect segment {:?} for path: {:?}", seg, path),
+        };
     }
 
     /// Upgrade a line segment to a cubic bezier.
     pub(crate) fn upgrade_line_seg(&mut self, seg: Segment) {
         let cursor = self.path_points_mut().cursor(Some(seg.start_id()));
-        let p0 = bail!(cursor.point());
-        let p3 = bail!(cursor.peek_next(), "segment has correct number of points");
+        let p0 = *bail!(cursor.point());
+        let p3 = *bail!(cursor.peek_next(), "segment has correct number of points");
         let p1 = p0.point.lerp(p3.point, 1.0 / 3.0);
         let p2 = p0.point.lerp(p3.point, 2.0 / 3.0);
         let path = seg.start_id().parent();
-        let new_seg = Segment::Cubic(
-            *p0,
-            PathPoint::off_curve(path, p1),
-            PathPoint::off_curve(path, p2),
-            *p3,
-        );
-        self.path_points_mut().replace_segment(seg, new_seg);
+        let (p1, p2) = if self.is_hyper() {
+            (
+                PathPoint::hyper_off_curve(path, p1, true),
+                PathPoint::hyper_off_curve(path, p2, true),
+            )
+        } else {
+            (
+                PathPoint::off_curve(path, p1),
+                PathPoint::off_curve(path, p2),
+            )
+        };
+        let new_seg = RawSegment::Cubic(p0, p1, p2, p3);
+        self.path_points_mut()
+            .replace_segment(*seg.raw_segment(), new_seg);
         self.after_change();
     }
 
@@ -438,6 +477,61 @@ pub(crate) fn mark_tangent_handles(points: &mut [PathPoint]) {
     }
 }
 
+impl Segment {
+    pub(crate) fn start_id(&self) -> EntityId {
+        match self {
+            Self::Cubic(seg) => seg.start_id(),
+            Self::Hyper(seg) => seg.path_seg.start_id(),
+        }
+    }
+
+    pub(crate) fn raw_segment(&self) -> &RawSegment {
+        match self {
+            Self::Cubic(seg) => seg,
+            Self::Hyper(seg) => &seg.path_seg,
+        }
+    }
+
+    pub(crate) fn is_line(&self) -> bool {
+        matches!(self.raw_segment(), RawSegment::Line(..))
+    }
+
+    pub(crate) fn nearest(&self, point: DPoint) -> (f64, f64) {
+        match self {
+            Self::Cubic(seg) => seg
+                .to_kurbo()
+                .nearest(point.to_raw(), druid::kurbo::DEFAULT_ACCURACY),
+            Self::Hyper(seg) => seg.nearest(point),
+        }
+    }
+
+    pub(crate) fn intersect_line(&self, line: Line) -> Vec<LineIntersection> {
+        match self {
+            Self::Cubic(seg) => seg.to_kurbo().intersect_line(line).into_iter().collect(),
+            Self::Hyper(..) => Vec::new(),
+        }
+    }
+
+    /// The position on the segment corresponding to some param,
+    /// generally in the range [0.0, 1.0].
+    pub(crate) fn eval(&self, param: f64) -> Point {
+        match self {
+            Self::Cubic(seg) => seg.to_kurbo().eval(param),
+            Self::Hyper(seg) => seg.eval(param),
+        }
+    }
+
+    //pub(crate) fn subsegment(self, range: Range<f64>) -> Self {
+    //match &self {
+    //Self::Cubic(seg) => Self::Cubic(seg.subsegment(range)),
+    //Self::Hyper(_seg) => {
+    //eprintln!("HyperBezier subsegment unimplemented");
+    //self
+    //}
+    //}
+    //}
+}
+
 impl From<CubicPath> for Path {
     fn from(src: CubicPath) -> Path {
         Path::Cubic(src)
@@ -447,5 +541,17 @@ impl From<CubicPath> for Path {
 impl From<HyperPath> for Path {
     fn from(src: HyperPath) -> Path {
         Path::Hyper(src)
+    }
+}
+
+impl From<RawSegment> for Segment {
+    fn from(src: RawSegment) -> Segment {
+        Segment::Cubic(src)
+    }
+}
+
+impl From<HyperSegment> for Segment {
+    fn from(src: HyperSegment) -> Segment {
+        Segment::Hyper(src)
     }
 }

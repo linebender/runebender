@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use druid::kurbo::{BezPath, ParamCurveNearest, Point, Rect, Shape, Size, Vec2};
+use druid::kurbo::{BezPath, Point, Rect, Shape, Size, Vec2};
 use druid::{Data, Lens};
 use norad::glyph::Outline;
 use norad::{Glyph, GlyphName};
@@ -10,9 +10,8 @@ use crate::component::Component;
 use crate::data::Workspace;
 use crate::design_space::{DPoint, DVec2, ViewPort};
 use crate::guides::Guide;
-use crate::path::Path;
+use crate::path::{Path, Segment};
 use crate::point::{EntityId, PathPoint};
-use crate::point_list::Segment;
 use crate::quadrant::Quadrant;
 use crate::selection::Selection;
 
@@ -249,9 +248,8 @@ impl EditSession {
         let mut best = None;
         for path in &*self.paths {
             for seg in path.iter_segments() {
-                let kurbo_seg = seg.to_kurbo();
-                let (t, d2) = kurbo_seg.nearest(dpt.to_raw(), 0.1);
-                if best.map(|(_seg, _t, d)| d2 < d).unwrap_or(true) {
+                let (t, d2) = seg.nearest(dpt);
+                if best.as_ref().map(|(_seg, _t, d)| d2 < *d).unwrap_or(true) {
                     best = Some((seg, t, d2));
                 }
             }

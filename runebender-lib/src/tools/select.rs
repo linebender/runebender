@@ -4,7 +4,6 @@ use druid::{Data, Env, EventCtx, HotKey, KbKey, KeyEvent, MouseEvent, PaintCtx, 
 
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
-use crate::point_list::Segment;
 use crate::tools::{EditType, Tool, ToolId};
 use crate::{
     design_space::{DPoint, DVec2, ViewPort},
@@ -235,12 +234,12 @@ impl MouseDelegate<EditSession> for Select {
                     data.selection.insert(point_id);
                 }
             } else if let Some((seg, _t)) = data.hit_test_segments(event.pos, None) {
-                let ids = seg.ids();
+                let ids = seg.raw_segment().ids();
                 let all_selected = ids.iter().all(|id| data.selection.contains(id));
                 let append_mode = event.mods.shift();
                 self.drag = DragState::Suppress;
 
-                if event.mods.alt() && matches!(seg, Segment::Line(..)) {
+                if event.mods.alt() && seg.is_line() {
                     let path = data.path_for_point_mut(seg.start_id()).unwrap();
                     path.upgrade_line_seg(seg);
                     self.this_edit_type = Some(EditType::Normal);
