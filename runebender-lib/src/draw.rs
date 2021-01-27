@@ -163,9 +163,11 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
         //of whether a path contained *any* selected points, and short-circuit.
         let selected_seg_color = self.env.get(theme::SELECTED_LINE_SEGMENT_COLOR);
         for segment in path.segments_for_points(sels) {
-            let seg = self.space.affine() * segment.to_kurbo();
-            //TODO: add width to theme
-            self.stroke(&seg, &selected_seg_color, 3.0);
+            for segment in segment.kurbo_segments() {
+                let seg = self.space.affine() * segment;
+                //TODO: add width to theme
+                self.stroke(&seg, &selected_seg_color, 3.0);
+            }
         }
     }
 

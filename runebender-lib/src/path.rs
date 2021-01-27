@@ -4,7 +4,7 @@ use super::hyper_path::{HyperPath, HyperSegment, HYPERBEZ_LIB_VERSION_KEY};
 use super::point::{EntityId, PathPoint};
 use super::point_list::{PathPoints, RawSegment};
 use druid::kurbo::{
-    Affine, BezPath, Line, LineIntersection, ParamCurve, ParamCurveNearest, Point, Vec2,
+    Affine, BezPath, Line, LineIntersection, ParamCurve, ParamCurveNearest, PathSeg, Point, Vec2,
 };
 use druid::Data;
 
@@ -227,9 +227,8 @@ impl Path {
     pub(crate) fn segments_for_points<'a>(
         &'a self,
         points: &'a Selection,
-    ) -> impl Iterator<Item = RawSegment> + 'a {
-        self.path_points()
-            .iter_segments()
+    ) -> impl Iterator<Item = Segment> + 'a {
+        self.iter_segments()
             .filter(move |seg| points.contains(&seg.start_id()) && points.contains(&seg.end_id()))
     }
 
@@ -490,6 +489,13 @@ impl Segment {
         }
     }
 
+    pub(crate) fn end_id(&self) -> EntityId {
+        match self {
+            Self::Cubic(seg) => seg.end_id(),
+            Self::Hyper(seg) => seg.path_seg.end_id(),
+        }
+    }
+
     pub(crate) fn raw_segment(&self) -> &RawSegment {
         match self {
             Self::Cubic(seg) => seg,
@@ -524,6 +530,14 @@ impl Segment {
             Self::Cubic(seg) => seg.to_kurbo().eval(param),
             Self::Hyper(seg) => seg.eval(param),
         }
+    }
+
+    pub(crate) fn kurbo_segments<'a>(&'a self) -> impl Iterator<Item = PathSeg> + 'a {
+        let (one_iter, two_iter) = match self {
+            Self::Cubic(seg) => (Some(seg.to_kurbo()), None),
+            Self::Hyper(seg) => (None, Some(seg.kurbo_segments())),
+        };
+        one_iter.into_iter().chain(two_iter.into_iter().flatten())
     }
 
     //pub(crate) fn subsegment(self, range: Range<f64>) -> Self {
