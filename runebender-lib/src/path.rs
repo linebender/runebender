@@ -234,14 +234,19 @@ impl Path {
     }
 
     pub(crate) fn split_segment_at_point(&mut self, seg: Segment, t: f64) {
-        match (self, seg) {
-            (Path::Cubic(ref mut path), Segment::Cubic(seg)) => path.split_segment_at_point(seg, t),
-            (Path::Hyper(_), Segment::Hyper(_)) => {
-                eprintln!("splitting hyper segments not implemented")
-                //self.after_change();
+        match self {
+            Path::Cubic(path) => {
+                if let Segment::Cubic(seg) = seg {
+                    path.split_segment_at_point(seg, t);
+                }
             }
-            (path, seg) => panic!("incorrect segment {:?} for path: {:?}", seg, path),
-        };
+            Path::Hyper(path) => {
+                if let Segment::Hyper(seg) = seg {
+                    path.split_segment_at_point(seg, t);
+                }
+            }
+        }
+        self.after_change();
     }
 
     /// Upgrade a line segment to a cubic bezier.
