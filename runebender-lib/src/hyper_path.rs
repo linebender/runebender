@@ -3,7 +3,7 @@ use std::sync::Arc;
 use super::design_space::DPoint;
 use super::point::{EntityId, PathPoint};
 use super::point_list::{PathPoints, RawSegment};
-use druid::kurbo::{BezPath, ParamCurve, ParamCurveNearest, PathEl, Point};
+use druid::kurbo::{BezPath, ParamCurve, ParamCurveNearest, PathEl, PathSeg, Point};
 use druid::Data;
 use spline::{Element, Segment as SplineSegment, SplineSpec};
 
@@ -343,7 +343,7 @@ impl HyperSegment {
         if self.spline_seg.is_line() {
             self.path_seg.to_kurbo().nearest(point, ACC)
         } else {
-            druid::kurbo::segments(self.spline_seg.render_elements())
+            self.kurbo_segments()
                 .enumerate()
                 .fold((-0.0, f64::MAX), |acc, (i, seg)| {
                     let (t, dist) = seg.nearest(point, ACC);
@@ -380,7 +380,8 @@ impl HyperSegment {
                 let seg_param = param - (to_skip as f64 * param_scale);
                 (to_skip, seg_param)
             };
-            match druid::kurbo::segments(self.spline_seg.render_elements())
+            match self
+                .kurbo_segments()
                 .skip(to_skip)
                 .next()
                 .map(|seg| seg.eval(seg_param))
@@ -397,6 +398,10 @@ impl HyperSegment {
                 }
             }
         }
+    }
+
+    pub(crate) fn kurbo_segments<'a>(&'a self) -> impl Iterator<Item = PathSeg> + 'a {
+        druid::kurbo::segments(self.spline_seg.render_elements())
     }
 }
 
