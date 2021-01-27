@@ -5,6 +5,8 @@
 
 use super::design_space::{DPoint, DVec2, ViewPort};
 
+use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
+
 use druid::kurbo::{Affine, Point};
 use druid::Data;
 use norad::glyph::{ContourPoint, PointType as NoradPointType};
@@ -30,7 +32,7 @@ pub struct EntityId {
     point: IdComponent,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Data, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Data)]
 pub enum PointType {
     OnCurve { smooth: bool },
     OffCurve { auto: bool },
@@ -41,6 +43,7 @@ pub struct PathPoint {
     #[serde(skip, default = "EntityId::next")]
     pub id: EntityId,
     pub point: DPoint,
+    #[serde(rename = "type")]
     pub typ: PointType,
 }
 
@@ -230,6 +233,42 @@ impl PathPoint {
     /// Convert this point to point in screen space.
     pub fn to_screen(&self, vport: ViewPort) -> Point {
         self.point.to_screen(vport)
+    }
+}
+
+const ON_CURVE_CORNER: &str = "OnCurve";
+const ON_CURVE_SMOOTH: &str = "OnCurveSmooth";
+const OFF_CURVE_MANUAL: &str = "OffCurve";
+const OFF_CURVE_AUTO: &str = "OffCurveAuto";
+
+impl Serialize for PointType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let s = match self {
+            PointType::OnCurve { smooth: false } => ON_CURVE_CORNER,
+            PointType::OnCurve { smooth: true } => ON_CURVE_SMOOTH,
+            PointType::OffCurve { auto: false } => OFF_CURVE_MANUAL,
+            PointType::OffCurve { auto: true } => OFF_CURVE_AUTO,
+        };
+        serializer.serialize_str(s)
+    }
+}
+
+impl<'de> Deserialize<'de> for PointType {
+    fn deserialize<D>(deserializer: D) -> Result<PointType, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let type_string: &str = Deserialize::deserialize(deserializer)?;
+        match type_string {
+            ON_CURVE_SMOOTH => Ok(PointType::OnCurve { smooth: true }),
+            ON_CURVE_CORNER => Ok(PointType::OnCurve { smooth: false }),
+            OFF_CURVE_MANUAL => Ok(PointType::OffCurve { auto: false }),
+            OFF_CURVE_AUTO => Ok(PointType::OffCurve { auto: true }),
+            other => Err(D::Error::custom(format!("invalid point type '{}'", other))),
+        }
     }
 }
 

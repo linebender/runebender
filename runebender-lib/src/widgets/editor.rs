@@ -92,6 +92,12 @@ impl Editor {
 
     fn do_copy(&self, data: &EditSession) {
         let mut formats = Vec::new();
+        if let Some(data) = crate::clipboard::make_json(data) {
+            formats.push(ClipboardFormat::new(
+                crate::consts::RUNEBENDER_PASTEBOARD_TYPE,
+                data,
+            ));
+        }
         if let Some(data) = crate::clipboard::make_glyphs_plist(data) {
             formats.push(ClipboardFormat::new(
                 crate::consts::GLYPHS_APP_PASTEBOARD_TYPE,
@@ -118,6 +124,7 @@ impl Editor {
 
     fn do_paste(&self, session: &mut EditSession, clipboard: &Clipboard) -> Option<EditType> {
         let paste_types = [
+            crate::consts::RUNEBENDER_PASTEBOARD_TYPE,
             crate::consts::GLYPHS_APP_PASTEBOARD_TYPE,
             ClipboardFormat::PDF,
             ClipboardFormat::SVG,
@@ -128,6 +135,9 @@ impl Editor {
                     log::warn!("no data returned for declared clipboard format {}", match_);
                     return None;
                 }
+                (crate::consts::RUNEBENDER_PASTEBOARD_TYPE, Some(data)) => String::from_utf8(data)
+                    .ok()
+                    .and_then(|s| crate::clipboard::from_json(&s)),
                 (crate::consts::GLYPHS_APP_PASTEBOARD_TYPE, Some(data)) => {
                     match String::from_utf8(data) {
                         Ok(s) => crate::clipboard::from_glyphs_plist_string(s),

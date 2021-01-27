@@ -25,6 +25,28 @@ use crate::point::{EntityId, PathPoint, PointType};
 /// Generates druid-compatible drawing code for all of the `Paths` in this
 /// session, if any exist.
 pub fn make_code_string(session: &EditSession) -> Option<String> {
+    fn append_path(path: &BezPath, out: &mut String) -> std::fmt::Result {
+        out.push('\n');
+        for element in path.elements() {
+            match element {
+                PathEl::MoveTo(p) => writeln!(out, "bez.move_to(({:.1}, {:.1}));", p.x, p.y)?,
+                PathEl::LineTo(p) => writeln!(out, "bez.line_to(({:.1}, {:.1}));", p.x, p.y)?,
+                PathEl::QuadTo(p1, p2) => writeln!(
+                    out,
+                    "bez.quad_to(({:.1}, {:.1}), ({:.1}, {:.1}));",
+                    p1.x, p1.y, p2.x, p2.y
+                )?,
+                PathEl::CurveTo(p1, p2, p3) => writeln!(
+                    out,
+                    "bez.curve_to(({:.1}, {:.1}), ({:.1}, {:.1}), ({:.1}, {:.1}));",
+                    p1.x, p1.y, p2.x, p2.y, p3.x, p3.y
+                )?,
+                PathEl::ClosePath => writeln!(out, "bez.close_path();")?,
+            }
+        }
+        Ok(())
+    }
+
     if session.paths.is_empty() {
         return None;
     }
@@ -62,26 +84,13 @@ pub fn make_code_string(session: &EditSession) -> Option<String> {
     Some(out)
 }
 
-fn append_path(path: &BezPath, out: &mut String) -> std::fmt::Result {
-    out.push('\n');
-    for element in path.elements() {
-        match element {
-            PathEl::MoveTo(p) => writeln!(out, "bez.move_to(({:.1}, {:.1}));", p.x, p.y)?,
-            PathEl::LineTo(p) => writeln!(out, "bez.line_to(({:.1}, {:.1}));", p.x, p.y)?,
-            PathEl::QuadTo(p1, p2) => writeln!(
-                out,
-                "bez.quad_to(({:.1}, {:.1}), ({:.1}, {:.1}));",
-                p1.x, p1.y, p2.x, p2.y
-            )?,
-            PathEl::CurveTo(p1, p2, p3) => writeln!(
-                out,
-                "bez.curve_to(({:.1}, {:.1}), ({:.1}, {:.1}), ({:.1}, {:.1}));",
-                p1.x, p1.y, p2.x, p2.y, p3.x, p3.y
-            )?,
-            PathEl::ClosePath => writeln!(out, "bez.close_path();")?,
-        }
-    }
-    Ok(())
+pub fn make_json(session: &EditSession) -> Option<String> {
+    let paths: Vec<_> = session.paths_for_selection();
+    serde_json::to_string(&paths).ok()
+}
+
+pub fn from_json(json: &str) -> Option<Vec<Path>> {
+    serde_json::from_str(json).ok()
 }
 
 pub fn make_glyphs_plist(session: &EditSession) -> Option<Vec<u8>> {

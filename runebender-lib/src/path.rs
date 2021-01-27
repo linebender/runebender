@@ -567,6 +567,41 @@ impl Segment {
     //}
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+enum SerializePath {
+    Cubic(PathPoints),
+    Hyper(PathPoints),
+}
+
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+impl Serialize for Path {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let to_ser = match self {
+            Path::Cubic(path) => SerializePath::Cubic(path.path_points().to_owned()),
+            Path::Hyper(path) => SerializePath::Hyper(path.path_points().to_owned()),
+        };
+        to_ser.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Path {
+    fn deserialize<D>(deserializer: D) -> Result<Path, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let path: SerializePath = Deserialize::deserialize(deserializer)?;
+        match path {
+            SerializePath::Cubic(path) => Ok(CubicPath::from_path_points_unchecked(path).into()),
+            SerializePath::Hyper(path) => Ok(HyperPath::from_path_points_unchecked(path).into()),
+        }
+    }
+}
+
 impl From<CubicPath> for Path {
     fn from(src: CubicPath) -> Path {
         Path::Cubic(src)

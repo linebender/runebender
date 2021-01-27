@@ -36,6 +36,20 @@ impl HyperPath {
         }
     }
 
+    /// Construct a new CubicPath from the provided `PathPoints`.
+    ///
+    /// The caller is responsible for ensuring that the points have valid
+    /// and unique identifiers, and are otherwise well-formed.
+    pub(crate) fn from_path_points_unchecked(points: PathPoints) -> Self {
+        let mut this = HyperPath {
+            points,
+            solver: SplineSpec::new(),
+            bezier: Arc::new(BezPath::new()),
+        };
+        this.after_change();
+        this
+    }
+
     pub(crate) fn path_points(&self) -> &PathPoints {
         &self.points
     }
