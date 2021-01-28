@@ -1,4 +1,4 @@
-//! The bezier pen tool.
+//! The bezier (and hyperbezier!) pen tool.
 
 use druid::{Env, EventCtx, KbKey, KeyEvent, MouseEvent};
 
@@ -10,8 +10,25 @@ use crate::tools::{EditType, Tool, ToolId};
 /// The state of the pen.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Pen {
+    hyperbezier_mode: bool,
     this_edit_type: Option<EditType>,
     is_draggable: bool,
+}
+
+impl Pen {
+    pub fn cubic() -> Self {
+        Pen {
+            hyperbezier_mode: false,
+            ..Default::default()
+        }
+    }
+
+    pub fn hyper() -> Self {
+        Pen {
+            hyperbezier_mode: true,
+            ..Default::default()
+        }
+    }
 }
 
 impl MouseDelegate<EditSession> for Pen {
@@ -23,25 +40,28 @@ impl MouseDelegate<EditSession> for Pen {
         self.is_draggable = false;
         let vport = data.viewport;
         if event.count == 1 {
-            let hit = data.hit_test_filtered(event.pos, None, |p| p.is_on_curve());
+            let hit = data.hit_test_filtered(event.pos, None, |_| true);
             if let Some(hit) = hit {
                 if let Some(path) = data.active_path() {
                     if path.start_point().id == hit && !path.is_closed() {
                         if let Some(path) = data.active_path_mut() {
-                            let start = path.start_point().id;
+                            let selection = path.close(event.mods.alt());
+                            data.selection.select_one(selection);
                             self.this_edit_type = Some(EditType::Normal);
-                            path.close(false);
-                            data.selection.select_one(start);
                             self.is_draggable = true;
                             return;
                         }
+                    } else if event.mods.alt() && path.is_hyper() {
+                        data.toggle_point_type(hit);
+                        self.this_edit_type = Some(EditType::Normal);
+                        self.is_draggable = true;
+                        return;
                     }
                 }
-                // TODO: more stuff when clicking on points
+
+                // TODO: hit-test *other* points? more stuff when clicking on
                 // If selection is empty, and point is endpoint of open path,
                 // select that point.
-                // Otherwise maybe cut path at that point?
-                return;
             }
 
             // Handle clicking on segment (split).
@@ -63,7 +83,11 @@ impl MouseDelegate<EditSession> for Pen {
                 let is_smooth = event.mods.alt();
                 active.line_to(dpoint, is_smooth);
             } else {
-                let path = Path::new(dpoint);
+                let path = if self.hyperbezier_mode {
+                    Path::new_hyper(dpoint)
+                } else {
+                    Path::new(dpoint)
+                };
                 data.add_path(path);
             }
 
@@ -78,7 +102,9 @@ impl MouseDelegate<EditSession> for Pen {
 
     fn left_up(&mut self, _event: &MouseEvent, data: &mut EditSession) {
         if let Some(path) = data.active_path_mut() {
-            if path.is_closed() || path.points().len() > 1 && !path.last_segment_is_curve() {
+            if path.is_hyper()
+                || (path.is_closed() || path.points().len() > 1 && !path.last_segment_is_curve())
+            {
                 path.clear_trailing();
             }
         }
