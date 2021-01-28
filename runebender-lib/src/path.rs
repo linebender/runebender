@@ -266,9 +266,8 @@ impl Path {
                 PathPoint::off_curve(path, p2),
             )
         };
-        let new_seg = RawSegment::Cubic(p0, p1, p2, p3);
         self.path_points_mut()
-            .replace_segment(*seg.raw_segment(), new_seg);
+            .upgrade_line_seg(seg.start_id(), p1, p2);
         self.after_change();
     }
 

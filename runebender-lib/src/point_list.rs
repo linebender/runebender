@@ -329,15 +329,14 @@ impl PathPoints {
         );
     }
 
-    pub fn replace_segment(&mut self, old: RawSegment, new: RawSegment) {
-        let insert_idx = bail!(self.points.index_for_point(old.start_id()));
-        let seg_len = match old {
-            RawSegment::Line(..) => 1,
-            RawSegment::Cubic(..) => 3,
-        };
-        self.points
-            .as_mut()
-            .splice(insert_idx..insert_idx + seg_len, new.into_iter());
+    pub(crate) fn upgrade_line_seg(&mut self, start: EntityId, p1: PathPoint, p2: PathPoint) {
+        let cursor = self.cursor(Some(start));
+        assert!(cursor.point().unwrap().is_on_curve());
+        assert!(cursor.peek_next().unwrap().is_on_curve());
+        let start_idx = bail!(self.points.index_for_point(start));
+        let insert_idx = bail!(self.next_idx(start_idx));
+        self.points.as_mut().insert(insert_idx, p1);
+        self.points.as_mut().insert(insert_idx + 1, p2);
     }
 
     fn prev_idx(&self, idx: usize) -> Option<usize> {
@@ -1019,5 +1018,38 @@ impl std::fmt::Debug for PathPoints {
             writeln!(f, "\t{:?}", pt)?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn upgrade_line_seg() {
+        let mut points = PathPoints::new(DPoint::new(10., 10.));
+        let p1 = points.push_on_curve(DPoint::new(10., 20.));
+        let p2 = points.push_on_curve(DPoint::new(20., 20.));
+        let p0 = points.close();
+
+        let path_id = points.id();
+        points.upgrade_line_seg(
+            p0,
+            PathPoint::off_curve(path_id, DPoint::new(15., 15.)),
+            PathPoint::off_curve(path_id, DPoint::new(5., 5.)),
+        );
+        assert!(points.debug_validate(), "{:?}", points);
+        points.upgrade_line_seg(
+            p1,
+            PathPoint::off_curve(path_id, DPoint::new(15., 15.)),
+            PathPoint::off_curve(path_id, DPoint::new(5., 5.)),
+        );
+        assert!(points.debug_validate(), "{:?}", points);
+        points.upgrade_line_seg(
+            p2,
+            PathPoint::off_curve(path_id, DPoint::new(15., 15.)),
+            PathPoint::off_curve(path_id, DPoint::new(5., 5.)),
+        );
+        assert!(points.debug_validate(), "{:?}", points);
     }
 }
