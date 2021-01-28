@@ -1,7 +1,6 @@
 //! A tool accepts user input and modifies the canvas.
 
 mod ellipse;
-mod hyperpen;
 mod knife;
 mod measure;
 mod pen;
@@ -10,7 +9,6 @@ mod rectangle;
 mod select;
 
 pub use ellipse::Ellipse;
-pub use hyperpen::HyperPen;
 pub use knife::Knife;
 pub use measure::Measure;
 pub use pen::Pen;
@@ -121,8 +119,8 @@ pub trait Tool {
 pub fn tool_for_id(id: ToolId) -> Option<Box<dyn Tool>> {
     match id {
         "Preview" => Some(Box::new(Preview::default())),
-        "Pen" => Some(Box::new(Pen::default())),
-        "HyperPen" => Some(Box::new(HyperPen::default())),
+        "Pen" => Some(Box::new(Pen::cubic())),
+        "HyperPen" => Some(Box::new(Pen::hyper())),
         "Select" => Some(Box::new(Select::default())),
         "Rectangle" => Some(Box::new(Rectangle::default())),
         "Ellipse" => Some(Box::new(Ellipse::default())),
