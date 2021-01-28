@@ -9,7 +9,7 @@ use super::selection::Selection;
 use druid::kurbo::{Affine, CubicBez, Line, ParamCurve, PathSeg};
 use druid::Data;
 
-#[derive(Debug, Clone, Data)]
+#[derive(Clone, Data)]
 pub struct PathPoints {
     path_id: EntityId,
     points: protected::RawPoints,
@@ -675,9 +675,12 @@ impl PathPoints {
     pub(crate) fn paths_for_selection(&self, selection: &Selection) -> Vec<PathPoints> {
         let (on_curve_count, selected_count) =
             self.iter_points().fold((0, 0), |(total, selected), point| {
-                let sel = if selection.contains(&point.id) { 1 } else { 0 };
-                let on_curve = if point.is_on_curve() { 1 } else { 0 };
-                (total + on_curve, selected + sel)
+                if point.is_on_curve() {
+                    let sel = if selection.contains(&point.id) { 1 } else { 0 };
+                    (total + 1, selected + sel)
+                } else {
+                    (total, selected)
+                }
             });
 
         // all our on-curves are selected, so just return us.
@@ -982,7 +985,7 @@ impl std::fmt::Debug for RawSegment {
         match self {
             RawSegment::Line(one, two) => write!(
                 f,
-                "({}->{}) Line({:?}, {:?})",
+                "({:?}->{:?}) Line({:?}, {:?})",
                 self.start_id(),
                 self.end_id(),
                 one.point,
@@ -994,5 +997,16 @@ impl std::fmt::Debug for RawSegment {
                 a.point, b.point, c.point, d.point
             ),
         }
+    }
+}
+
+impl std::fmt::Debug for PathPoints {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let closed = if self.closed { "Closed" } else { "Open" };
+        writeln!(f, "PathPoints(id: {:?}) ({}):", self.id(), closed)?;
+        for pt in self.points.as_ref() {
+            writeln!(f, "\t{:?}", pt)?;
+        }
+        Ok(())
     }
 }

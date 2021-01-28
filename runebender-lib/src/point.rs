@@ -19,7 +19,7 @@ const GUIDE_TYPE_ID: IdComponent = 1;
 
 type IdComponent = usize;
 
-#[derive(Debug, Clone, Copy, Data, PartialEq, PartialOrd, Hash, Eq, Ord)]
+#[derive(Clone, Copy, Data, PartialEq, PartialOrd, Hash, Eq, Ord)]
 /// A unique identifier for some entity, such as a point or a component.
 ///
 /// The entity has two parts; the first ('parent') identifies the type of the
@@ -101,6 +101,15 @@ impl EntityId {
 }
 
 impl PointType {
+    pub(crate) fn debug_name(self) -> &'static str {
+        match self {
+            PointType::OnCurve { smooth: false } => ON_CURVE_CORNER,
+            PointType::OnCurve { smooth: true } => ON_CURVE_SMOOTH,
+            PointType::OffCurve { auto: true } => OFF_CURVE_AUTO,
+            PointType::OffCurve { auto: false } => OFF_CURVE_MANUAL,
+        }
+    }
+
     pub fn is_on_curve(self) -> bool {
         matches!(self, PointType::OnCurve { .. })
     }
@@ -274,11 +283,17 @@ impl<'de> Deserialize<'de> for PointType {
 
 impl std::fmt::Debug for PathPoint {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}: {:.2} {:?}", self.id, self.point, self.typ)
+        write!(
+            f,
+            "Point({:?}): {}({:.2})",
+            self.id,
+            self.typ.debug_name(),
+            self.point
+        )
     }
 }
 
-impl std::fmt::Display for EntityId {
+impl std::fmt::Debug for EntityId {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "id{}.{}", self.parent, self.point)
     }

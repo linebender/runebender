@@ -114,7 +114,6 @@ impl Path {
     }
 
     pub(crate) fn paths_for_selection(&self, selection: &Selection) -> Vec<Path> {
-        //FIXME: figure out how we're doing this bit
         let paths = self.path_points().paths_for_selection(selection);
         paths
             .into_iter()
