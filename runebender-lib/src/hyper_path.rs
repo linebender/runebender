@@ -299,6 +299,17 @@ impl HyperPath {
     fn rebuild_spline(&mut self) {
         let HyperPath { solver, points, .. } = self;
         let spline = solver.solve();
+
+        // debugging some issues in the solver:
+        if spline
+            .segments()
+            .iter()
+            .any(|seg| !seg.p1.x.is_normal() || !seg.p2.x.is_normal())
+        {
+            std::mem::drop(spline);
+            eprintln!("spline problems: {:?}", solver.elements());
+            return;
+        }
         let mut ix = if points.closed() { 0 } else { 1 };
         let points = points.points_mut();
         for segment in spline.segments() {
