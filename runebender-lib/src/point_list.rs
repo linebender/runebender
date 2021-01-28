@@ -625,7 +625,7 @@ impl PathPoints {
     fn debug_validate(&self) -> bool {
         for window in self.points.as_ref().windows(3) {
             match window {
-                &[a, b, c] if a.is_off_curve() && b.is_off_curve() && c.is_off_curve() => {
+                [a, b, c] if a.is_off_curve() && b.is_off_curve() && c.is_off_curve() => {
                     return false
                 }
                 _ => continue,
