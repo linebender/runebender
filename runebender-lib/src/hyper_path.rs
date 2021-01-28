@@ -407,8 +407,7 @@ impl HyperSegment {
             };
             match self
                 .kurbo_segments()
-                .skip(to_skip)
-                .next()
+                .nth(to_skip)
                 .map(|seg| seg.eval(seg_param))
             {
                 Some(pt) => pt,
@@ -425,7 +424,7 @@ impl HyperSegment {
         }
     }
 
-    pub(crate) fn kurbo_segments<'a>(&'a self) -> impl Iterator<Item = PathSeg> + 'a {
+    pub(crate) fn kurbo_segments(&self) -> impl Iterator<Item = PathSeg> + '_ {
         let move_t = PathEl::MoveTo(self.path_seg.start().point.to_raw());
         let iter = std::iter::once(move_t).chain(self.spline_seg.render_elements());
         druid::kurbo::segments(iter)

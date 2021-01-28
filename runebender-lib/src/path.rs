@@ -88,7 +88,7 @@ impl Path {
         }
     }
 
-    pub fn iter_segments<'a>(&'a self) -> impl Iterator<Item = Segment> + 'a {
+    pub fn iter_segments(&self) -> impl Iterator<Item = Segment> + '_ {
         //NOTE:
         // in order to return `impl Iterator` we need to have a single concrete return type;
         // we can't branch on the type of the path and return a different iterator for each.
@@ -546,7 +546,7 @@ impl Segment {
         }
     }
 
-    pub(crate) fn kurbo_segments<'a>(&'a self) -> impl Iterator<Item = PathSeg> + 'a {
+    pub(crate) fn kurbo_segments(&self) -> impl Iterator<Item = PathSeg> + '_ {
         let (one_iter, two_iter) = match self {
             Self::Cubic(seg) => (Some(seg.to_kurbo()), None),
             Self::Hyper(seg) => (None, Some(seg.kurbo_segments())),
