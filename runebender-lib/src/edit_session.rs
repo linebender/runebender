@@ -319,11 +319,6 @@ impl EditSession {
         self.paths_mut().extend(paths);
     }
 
-    pub fn update_for_drag(&mut self, drag_point: Point) {
-        let drag_point = self.viewport.from_screen(drag_point);
-        self.active_path_mut().unwrap().update_for_drag(drag_point);
-    }
-
     pub fn toggle_point_type(&mut self, id: EntityId) {
         if let Some(path) = self.path_for_point_mut(id) {
             path.toggle_point_type(id)

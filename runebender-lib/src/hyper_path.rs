@@ -227,16 +227,6 @@ impl HyperPath {
         }
     }
 
-    pub(crate) fn convert_last_to_curve(&mut self, _handle: DPoint) {
-        if self.points.len() > 1 {
-            if let Some(prev_point) = self.points.points_mut().pop() {
-                // we should always clear trailing on mouseup?
-                assert!(self.points.trailing().is_none());
-                self.spline_to(prev_point.point, true);
-            }
-        }
-    }
-
     pub(crate) fn split_segment_at_point(&mut self, seg: HyperSegment, t: f64) {
         let pt = DPoint::from_raw(seg.eval(t));
         let path_id = seg.path_seg.start_id().parent();

@@ -241,7 +241,7 @@ impl MouseDelegate<EditSession> for Select {
 
                 if event.mods.alt() && seg.is_line() {
                     let path = data.path_for_point_mut(seg.start_id()).unwrap();
-                    path.upgrade_line_seg(seg);
+                    path.upgrade_line_seg(seg, false);
                     self.this_edit_type = Some(EditType::Normal);
                     return;
                 }
