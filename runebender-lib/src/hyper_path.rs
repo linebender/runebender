@@ -399,8 +399,9 @@ impl HyperSegment {
                 (param.abs().trunc() as usize, param.abs().fract())
             } else {
                 //TODO: when we get `eval` on the spline segment we can get rid of this
-                const INNER_SEGMENT_COUNT: usize = 64;
-                let param_scale = 1.0 / INNER_SEGMENT_COUNT as f64;
+                let segment_count = self.spline_seg.hb.render_subdivisions();
+                assert_eq!(self.kurbo_segments().count(), segment_count);
+                let param_scale = 1.0 / segment_count as f64;
                 let to_skip = (param / param_scale) as usize;
                 let seg_param = param - (to_skip as f64 * param_scale);
                 (to_skip, seg_param)

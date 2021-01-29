@@ -1790,7 +1790,7 @@ checksum = "1a55ca5f3b68e41c979bf8c46a6f1da892ca4db8f94023ce0bd32407573b1ac0"
 [[package]]
 name = "spline"
 version = "0.3.0"
-source = "git+https://github.com/linebender/spline.git?rev=c13a1df#c13a1df64a437e37a66e492231b4100f69568ba7"
+source = "git+https://github.com/linebender/spline.git?rev=229f7e7#229f7e728713998462791feaf7e905e642106fdf"
 dependencies = [
  "kurbo",
 ]
