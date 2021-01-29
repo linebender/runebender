@@ -157,6 +157,10 @@ impl DVec2 {
 }
 
 impl ViewPort {
+    pub fn offset(&self) -> Vec2 {
+        self.offset
+    }
+
     pub fn set_offset(&mut self, offset: Vec2) {
         self.offset = offset;
     }

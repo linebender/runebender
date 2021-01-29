@@ -138,6 +138,16 @@ impl Tool for Measure {
         "Measure"
     }
 
+    fn cancel(
+        &mut self,
+        mouse: &mut Mouse,
+        _ctx: &mut EventCtx,
+        data: &mut EditSession,
+    ) -> Option<EditType> {
+        mouse.cancel(data, self);
+        None
+    }
+
     fn paint(&mut self, ctx: &mut PaintCtx, data: &EditSession, _env: &Env) {
         self.paint_coords(ctx, data);
         if let Some(line) = self.line {

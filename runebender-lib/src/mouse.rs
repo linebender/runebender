@@ -371,8 +371,7 @@ impl Mouse {
         };
     }
 
-    #[allow(dead_code)]
-    fn cancel<T>(&mut self, data: &mut T, delegate: &mut dyn MouseDelegate<T>) {
+    pub fn cancel<T>(&mut self, data: &mut T, delegate: &mut dyn MouseDelegate<T>) {
         let prev_state = mem::replace(&mut self.state, MouseState::Transition);
         let last_event = match prev_state {
             MouseState::Down(event) => event,
