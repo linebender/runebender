@@ -81,13 +81,16 @@ impl MouseDelegate<EditSession> for Pen {
                     dpoint
                 };
                 let is_smooth = event.mods.alt();
-                active.line_to(dpoint, is_smooth);
+                let selection = active.line_to(dpoint, is_smooth);
+                data.selection.select_one(selection);
             } else {
                 let path = if self.hyperbezier_mode {
                     Path::new_hyper(dpoint)
                 } else {
                     Path::new(dpoint)
                 };
+                let selection = path.points().first().unwrap().id;
+                data.selection.select_one(selection);
                 data.add_path(path);
             }
 
