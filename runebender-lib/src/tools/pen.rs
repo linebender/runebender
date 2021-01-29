@@ -2,9 +2,11 @@
 
 use druid::{Env, EventCtx, KbKey, KeyEvent, MouseEvent};
 
+use crate::design_space::DPoint;
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
 use crate::path::Path;
+use crate::point::EntityId;
 use crate::tools::{EditType, Tool, ToolId};
 
 /// The state of the pen.
@@ -12,7 +14,7 @@ use crate::tools::{EditType, Tool, ToolId};
 pub struct Pen {
     hyperbezier_mode: bool,
     this_edit_type: Option<EditType>,
-    is_draggable: bool,
+    state: State,
 }
 
 impl Pen {
@@ -31,14 +33,24 @@ impl Pen {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum State {
+    Ready,
+    /// The mouse is down and has added a new point.
+    AddPoint(EntityId),
+    /// The mouse is dragging a handle after adding a new point.
+    DragHandle(EntityId),
+}
+
 impl MouseDelegate<EditSession> for Pen {
     fn cancel(&mut self, canvas: &mut EditSession) {
         canvas.selection.clear();
+        self.state = State::Ready;
     }
 
     fn left_down(&mut self, event: &MouseEvent, data: &mut EditSession) {
-        self.is_draggable = false;
         let vport = data.viewport;
+        assert!(matches!(self.state, State::Ready));
         if event.count == 1 {
             let hit = data.hit_test_filtered(event.pos, None, |_| true);
             if let Some(hit) = hit {
@@ -48,13 +60,12 @@ impl MouseDelegate<EditSession> for Pen {
                             let selection = path.close(event.mods.alt());
                             data.selection.select_one(selection);
                             self.this_edit_type = Some(EditType::Normal);
-                            self.is_draggable = true;
+                            self.state = State::AddPoint(selection);
                             return;
                         }
                     } else if event.mods.alt() && path.is_hyper() {
                         data.toggle_point_type(hit);
                         self.this_edit_type = Some(EditType::Normal);
-                        self.is_draggable = true;
                         return;
                     }
                 }
@@ -73,29 +84,30 @@ impl MouseDelegate<EditSession> for Pen {
             }
 
             let dpoint = vport.from_screen(event.pos);
-            if let Some(active) = data.active_path_mut().filter(|path| !path.is_closed()) {
-                let dpoint = if event.mods.shift() {
-                    let last_point = active.points().last().unwrap();
-                    dpoint.axis_locked_to(last_point.point)
+            let new_point =
+                if let Some(active) = data.active_path_mut().filter(|path| !path.is_closed()) {
+                    let dpoint = if event.mods.shift() {
+                        let last_point = active.points().last().unwrap();
+                        dpoint.axis_locked_to(last_point.point)
+                    } else {
+                        dpoint
+                    };
+                    let is_smooth = event.mods.alt();
+                    active.line_to(dpoint, is_smooth)
                 } else {
-                    dpoint
+                    let path = if self.hyperbezier_mode {
+                        Path::new_hyper(dpoint)
+                    } else {
+                        Path::new(dpoint)
+                    };
+                    let selection = path.points().first().unwrap().id;
+                    data.add_path(path);
+                    selection
                 };
-                let is_smooth = event.mods.alt();
-                let selection = active.line_to(dpoint, is_smooth);
-                data.selection.select_one(selection);
-            } else {
-                let path = if self.hyperbezier_mode {
-                    Path::new_hyper(dpoint)
-                } else {
-                    Path::new(dpoint)
-                };
-                let selection = path.points().first().unwrap().id;
-                data.selection.select_one(selection);
-                data.add_path(path);
-            }
 
+            data.selection.select_one(new_point);
+            self.state = State::AddPoint(new_point);
             self.this_edit_type = Some(EditType::Normal);
-            self.is_draggable = true;
         } else if event.count == 2 {
             // This is not what Glyphs does; rather, it sets the currently active
             // point to non-smooth.
@@ -111,26 +123,51 @@ impl MouseDelegate<EditSession> for Pen {
                 path.clear_trailing();
             }
         }
+        self.state = State::Ready;
     }
 
     fn left_drag_changed(&mut self, drag: Drag, data: &mut EditSession) {
-        if !self.is_draggable {
-            return;
+        if let State::DragHandle(id) = self.state {
+            let new_pos = current_drag_pos(&drag, data);
+            let path = bail!(data.path_for_point_mut(id));
+            path.update_trailing(id, new_pos);
+            self.this_edit_type = Some(EditType::Drag);
         }
-        let Drag { start, current, .. } = drag;
-        let handle_point = if current.mods.shift() {
-            super::axis_locked_point(current.pos, start.pos)
-        } else {
-            current.pos
-        };
-        data.update_for_drag(handle_point);
-        self.this_edit_type = Some(EditType::Drag);
+    }
+
+    fn left_drag_began(&mut self, drag: Drag, data: &mut EditSession) {
+        if let State::AddPoint(id) = self.state {
+            let pos = current_drag_pos(&drag, data);
+            let path = bail!(data.path_for_point_mut(id));
+            let seg = path.iter_segments().find(|seg| seg.end_id() == id);
+            if let Some(seg) = seg {
+                if seg.is_line() {
+                    if !seg.end().is_smooth() {
+                        path.toggle_point_type(id);
+                    }
+                    path.upgrade_line_seg(seg, true);
+                }
+            }
+            path.update_trailing(id, pos);
+            self.state = State::DragHandle(id);
+            self.this_edit_type = Some(EditType::Drag);
+        }
     }
 
     fn left_drag_ended(&mut self, _: Drag, _: &mut EditSession) {
         // TODO: this logic needs rework. A click-drag sequence should be a single
         // undo group.
         self.this_edit_type = Some(EditType::DragUp);
+    }
+}
+
+fn current_drag_pos(drag: &Drag, data: &EditSession) -> DPoint {
+    let start = data.viewport.from_screen(drag.start.pos);
+    let current = data.viewport.from_screen(drag.current.pos);
+    if drag.current.mods.shift() {
+        current.axis_locked_to(start)
+    } else {
+        current
     }
 }
 
@@ -170,5 +207,11 @@ impl Tool for Pen {
 
     fn name(&self) -> ToolId {
         "Pen"
+    }
+}
+
+impl Default for State {
+    fn default() -> Self {
+        State::Ready
     }
 }

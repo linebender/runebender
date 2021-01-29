@@ -203,29 +203,6 @@ impl CubicPath {
         let post_seg = seg.subsegment(t..1.0);
         self.points.split_segment(seg, pre_seg, post_seg);
     }
-
-    pub(crate) fn convert_last_to_curve(&mut self, handle: DPoint) {
-        if self.points.len() > 1 {
-            let mut prev = self.points.points_mut().pop().unwrap();
-            assert!(prev.is_on_curve() && !prev.is_smooth());
-            prev.toggle_type();
-            let p1 = self.path_points().trailing().unwrap_or_else(|| {
-                self.path_points()
-                    .trailing_point_in_open_path()
-                    .unwrap()
-                    .point
-                    .lerp(prev.point, 1.0 / 3.0)
-            });
-            let p2 = prev.point - (handle - prev.point);
-            let pts = &[
-                PathPoint::off_curve(self.points.id(), p1),
-                PathPoint::off_curve(self.points.id(), p2),
-                prev,
-            ];
-            self.path_points_mut().points_mut().extend(pts);
-        }
-        self.path_points_mut().set_trailing(handle);
-    }
 }
 
 impl From<PathPoints> for CubicPath {

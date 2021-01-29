@@ -178,7 +178,7 @@ impl Path {
     }
 
     pub fn clear_trailing(&mut self) {
-        self.path_points_mut().clear_trailing();
+        self.path_points_mut().take_trailing();
     }
 
     pub fn start_point(&self) -> &PathPoint {
@@ -248,11 +248,19 @@ impl Path {
     }
 
     /// Upgrade a line segment to a cubic bezier.
-    pub(crate) fn upgrade_line_seg(&mut self, seg: Segment) {
+    ///
+    /// If 'use trailing' is true, this will use the trailing point to populate
+    /// the first handle.
+    pub(crate) fn upgrade_line_seg(&mut self, seg: Segment, use_trailing: bool) {
         let cursor = self.path_points_mut().cursor(Some(seg.start_id()));
         let p0 = *bail!(cursor.point());
         let p3 = *bail!(cursor.peek_next(), "segment has correct number of points");
         let p1 = p0.point.lerp(p3.point, 1.0 / 3.0);
+        let p1 = if use_trailing {
+            self.path_points_mut().take_trailing().unwrap_or(p1)
+        } else {
+            p1
+        };
         let p2 = p0.point.lerp(p3.point, 2.0 / 3.0);
         let path = seg.start_id().parent();
         let (p1, p2) = if self.is_hyper() {
@@ -336,28 +344,17 @@ impl Path {
         self.after_change();
     }
 
-    /// Called when the user drags (modifying the bezier control points)
-    /// after clicking.
-    pub fn update_for_drag(&mut self, handle: DPoint) {
-        if !self.path_points().last_segment_is_curve() {
-            self.convert_last_to_curve(handle);
-        } else {
-            self.update_trailing(handle);
-        }
-        self.after_change();
-    }
-
     /// Update the curve while the user drags a new control point.
-    fn update_trailing(&mut self, handle: DPoint) {
-        let is_hyper = self.is_hyper();
-        if let Some(last_point) = self.path_points().trailing_point_in_open_path().copied() {
-            let mut cursor = self.path_points_mut().cursor(Some(last_point.id));
-            assert!(last_point.is_on_curve());
+    pub(crate) fn update_trailing(&mut self, point: EntityId, handle: DPoint) {
+        self.path_points_mut().set_trailing(handle);
+        if self.points().len() > 1 {
+            let is_hyper = self.is_hyper();
+            let mut cursor = self.path_points_mut().cursor(Some(point));
             assert!(cursor
                 .peek_prev()
                 .map(PathPoint::is_off_curve)
                 .unwrap_or(false));
-            let on_curve_pt = last_point.point;
+            let on_curve_pt = bail!(cursor.point()).point;
             let new_p = on_curve_pt - (handle - on_curve_pt);
             cursor.move_prev();
             if let Some(prev) = cursor.point_mut() {
@@ -366,25 +363,7 @@ impl Path {
                     prev.toggle_type();
                 }
             }
-        }
-        self.path_points_mut().set_trailing(handle);
-    }
-
-    /// If the user drags after mousedown, we convert the last point to a curve.
-    ///
-    /// TODO: So this doesn't quite match the Glyphs logic. There, the "trailing"
-    /// state is not stored in the path, but seems to be transitory to the pen tool
-    /// (selecting a different tool and back to pen seems to clear it). And, it
-    /// seems to be used only when the active point is not smooth (which includes
-    /// the start point). Otherwise, if the point before `prev` is off-curve, `p1`
-    /// is synthesized from mirroring that point. Then the 1/3 lerp is used as a
-    /// fallback.
-    ///
-    /// This is pretty similar to the current behavior though.
-    fn convert_last_to_curve(&mut self, handle: DPoint) {
-        match self {
-            Path::Cubic(path) => path.convert_last_to_curve(handle),
-            Path::Hyper(path) => path.convert_last_to_curve(handle),
+            self.after_change();
         }
     }
 
@@ -480,18 +459,26 @@ pub(crate) fn mark_tangent_handles(points: &mut [PathPoint]) {
 }
 
 impl Segment {
-    pub(crate) fn start_id(&self) -> EntityId {
+    pub(crate) fn start(&self) -> PathPoint {
         match self {
-            Self::Cubic(seg) => seg.start_id(),
-            Self::Hyper(seg) => seg.path_seg.start_id(),
+            Self::Cubic(seg) => seg.start(),
+            Self::Hyper(seg) => seg.path_seg.start(),
         }
     }
 
-    pub(crate) fn end_id(&self) -> EntityId {
+    pub(crate) fn end(&self) -> PathPoint {
         match self {
-            Self::Cubic(seg) => seg.end_id(),
-            Self::Hyper(seg) => seg.path_seg.end_id(),
+            Self::Cubic(seg) => seg.end(),
+            Self::Hyper(seg) => seg.path_seg.end(),
         }
+    }
+
+    pub(crate) fn start_id(&self) -> EntityId {
+        self.start().id
+    }
+
+    pub(crate) fn end_id(&self) -> EntityId {
+        self.end().id
     }
 
     pub(crate) fn raw_segment(&self) -> &RawSegment {

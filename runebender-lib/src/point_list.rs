@@ -209,16 +209,12 @@ impl PathPoints {
         self.path_id
     }
 
-    pub fn trailing(&self) -> Option<DPoint> {
+    pub(crate) fn trailing(&self) -> Option<DPoint> {
         self.trailing
     }
 
-    //fn trailing_mut(&mut self) -> Option<&mut DPoint> {
-    //self.trailing.as_mut()
-    //}
-
-    pub fn clear_trailing(&mut self) {
-        self.trailing = None;
+    pub fn take_trailing(&mut self) -> Option<DPoint> {
+        self.trailing.take()
     }
 
     pub fn set_trailing(&mut self, trailing: DPoint) {
@@ -387,15 +383,6 @@ impl PathPoints {
     pub fn start_point(&self) -> &PathPoint {
         assert!(!self.points.is_empty(), "empty path is not constructable");
         self.points.as_ref().get(self.first_idx()).unwrap()
-    }
-
-    /// The trailing on-curve point, if this path is not closed.
-    pub fn trailing_point_in_open_path(&self) -> Option<&PathPoint> {
-        if !self.closed {
-            self.points.as_ref().last()
-        } else {
-            None
-        }
     }
 
     /// Returns the 'last' on-curve point.
