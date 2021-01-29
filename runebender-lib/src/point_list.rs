@@ -96,7 +96,16 @@ mod protected {
                 let mut indices = self.indices.borrow_mut();
                 let indices = Arc::make_mut(&mut *indices);
                 indices.clear();
-                indices.extend(self.points.iter().enumerate().map(|(i, pt)| (pt.id, i)))
+                for (i, pt) in self.points.iter().enumerate() {
+                    // may as well take this opportunity to ensure we don't have
+                    // duplicate IDs somehow?
+                    if let Some(existing) = indices.insert(pt.id, i) {
+                        panic!(
+                            "id {:?} exists twice: ({} & {}).\n{:?}",
+                            pt.id, existing, i, self
+                        )
+                    }
+                }
             }
         }
 
@@ -161,7 +170,7 @@ impl PathPoints {
 
     pub fn from_raw_parts(
         path_id: EntityId,
-        mut points: Vec<PathPoint>,
+        points: Vec<PathPoint>,
         trailing: Option<DPoint>,
         closed: bool,
     ) -> Self {
@@ -174,23 +183,18 @@ impl PathPoints {
         if !closed {
             assert!(points.first().unwrap().is_on_curve());
         }
-        // normalize incoming representation
-        // if the path is closed, the last point should be an on-curve point,
-        // and is considered the start of the path.
-        if closed && !points.last().unwrap().is_on_curve() {
-            // we assume there is at least one on-curve point. One day,
-            // we will find out one day that this assumption was wrong.
-            let rotate_distance = points.iter().position(|p| p.is_on_curve()).unwrap() + 1;
 
-            points.rotate_left(rotate_distance);
-        }
-
-        PathPoints {
+        let mut this = PathPoints {
             path_id,
             points: protected::RawPoints::new(points),
             trailing,
             closed,
+        };
+        this.normalize();
+        if !this.debug_validate() {
+            panic!("constructed invalid points: {:?}", this);
         }
+        this
     }
 
     pub fn len(&self) -> usize {
@@ -645,6 +649,11 @@ impl PathPoints {
                 .map(|pt| pt.is_on_curve())
                 .unwrap_or(false)
         {
+            return false;
+        }
+
+        let path_id = self.id();
+        if self.iter_points().any(|pp| !pp.id.is_child_of(path_id)) {
             return false;
         }
         true

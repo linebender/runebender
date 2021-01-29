@@ -147,15 +147,10 @@ impl HyperPath {
         }
 
         if self.path_points().len() > 1 {
-            //FIXME: getting around the borrow checker because `solve` is `&mut` even
-            //though this is already solved, and our other signatures need to match,
-            //this feels bad but I want to get it working.
-            let mut solver = self.solver.clone();
-            let spline = solver.solve();
             for (segment, spline_segment) in self
                 .path_points()
                 .iter_segments()
-                .zip(spline.segments().iter())
+                .zip(self.solver.segments().unwrap())
             {
                 match segment {
                     RawSegment::Line(_, end) => {
@@ -185,9 +180,6 @@ impl HyperPath {
                         last.replace_lib(lib);
                     }
                 }
-            }
-            if self.points.closed() {
-                points.rotate_right(1);
             }
         }
 
