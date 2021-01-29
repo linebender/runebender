@@ -451,7 +451,7 @@ pub(crate) fn draw_session(
 
         if let Some(pt) = path.trailing() {
             if path.should_draw_trailing() {
-                draw_ctx.draw_off_curve_point(pt.to_screen(space), true, env);
+                draw_ctx.draw_auto_point(pt.to_screen(space), false, env);
             }
         }
     }
