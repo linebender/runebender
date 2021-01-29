@@ -232,11 +232,12 @@ impl<'a, 'b: 'a> DrawCtx<'a, 'b> {
 
     fn draw_open_path_terminal(&mut self, seg: &kurbo::PathSeg, selected: bool, env: &Env) {
         let cap = cap_line(seg.to_cubic(), 12.);
-        let handle_color = env.get(theme::OFF_CURVE_HANDLE_COLOR);
         if selected {
-            self.stroke(cap, &handle_color, 3.0);
+            let inner = cap_line(seg.to_cubic(), 8.);
+            self.stroke(cap, &env.get(theme::SELECTED_POINT_OUTER_COLOR), 4.0);
+            self.stroke(inner, &env.get(theme::SELECTED_POINT_INNER_COLOR), 2.0);
         } else {
-            self.stroke(cap, &handle_color, 2.0);
+            self.stroke(cap, &env.get(theme::OFF_CURVE_HANDLE_COLOR), 2.0);
         }
     }
 
