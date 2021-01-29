@@ -73,6 +73,16 @@ impl Tool for Rectangle {
         "Rectangle"
     }
 
+    fn cancel(
+        &mut self,
+        mouse: &mut Mouse,
+        _ctx: &mut EventCtx,
+        data: &mut EditSession,
+    ) -> Option<EditType> {
+        mouse.cancel(data, self);
+        None
+    }
+
     fn key_down(
         &mut self,
         key: &KeyEvent,

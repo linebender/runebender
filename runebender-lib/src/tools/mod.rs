@@ -19,7 +19,7 @@ pub use select::Select;
 use crate::edit_session::EditSession;
 use crate::mouse::{Mouse, TaggedEvent};
 use druid::kurbo::Point;
-use druid::{Env, EventCtx, KeyEvent, PaintCtx};
+use druid::{Cursor, Env, EventCtx, KeyEvent, PaintCtx};
 
 /// Something to pass around instead of a Box<dyn Tool>
 pub type ToolId = &'static str;
@@ -89,6 +89,24 @@ pub trait Tool {
         None
     }
 
+    /// Called whenever an action is canceled.
+    ///
+    /// The tool should reset the mouse (with [`Mosue::cancel`]) and then
+    /// reset any internal state. When it next receives an event, it should
+    /// behave as if it has been just instantiated.
+    ///
+    /// The tool may optionally return an edit here, if there was some action
+    /// in progress that needs a new undo group.
+    #[allow(unused)]
+    fn cancel(
+        &mut self,
+        mouse: &mut Mouse,
+        ctx: &mut EventCtx,
+        data: &mut EditSession,
+    ) -> Option<EditType> {
+        None
+    }
+
     /// Called whenever a tool is first activated, so that it can access or modify
     /// mouse settings.
     #[allow(unused)]
@@ -113,6 +131,10 @@ pub trait Tool {
     }
 
     fn name(&self) -> ToolId;
+
+    fn default_cursor(&self) -> Cursor {
+        Cursor::Arrow
+    }
 }
 
 /// Returns the tool for the given `ToolId`.

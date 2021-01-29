@@ -61,6 +61,16 @@ pub struct Select {
 }
 
 impl Tool for Select {
+    fn cancel(
+        &mut self,
+        mouse: &mut Mouse,
+        _ctx: &mut EventCtx,
+        data: &mut EditSession,
+    ) -> Option<EditType> {
+        mouse.cancel(data, self);
+        self.this_edit_type.take()
+    }
+
     fn paint(&mut self, ctx: &mut PaintCtx, data: &EditSession, env: &Env) {
         let selection_stroke = env.get(theme::SELECTION_RECT_STROKE_COLOR);
         match &self.drag {
@@ -378,8 +388,12 @@ impl MouseDelegate<EditSession> for Select {
 
     fn cancel(&mut self, data: &mut EditSession) {
         let old_state = std::mem::replace(&mut self.drag, DragState::None);
-        if let DragState::Select { previous, .. } = old_state {
-            data.selection = previous;
+        match old_state {
+            DragState::Select { previous, .. } => data.selection = previous,
+            DragState::Move { .. } | DragState::TransformSelection { .. } => {
+                self.this_edit_type = Some(EditType::DragUp)
+            }
+            _ => (),
         }
     }
 }

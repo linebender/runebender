@@ -11,16 +11,15 @@ use crate::draw;
 use crate::edit_session::EditSession;
 use crate::mouse::{Mouse, TaggedEvent};
 use crate::theme;
-use crate::tools::{EditType, Select, Tool};
+use crate::tools::{EditType, Preview, Select, Tool};
 use crate::undo::UndoState;
 
 /// The root widget of the glyph editor window.
 pub struct Editor {
     mouse: Mouse,
     tool: Box<dyn Tool>,
-    // in the case of the temporary preview (spacebar) this is the tool
-    // that will be restored when spacebar is released.
-    //prev_tool: Option<Box<dyn Tool>>,
+    /// Set only if we're temporarily in preview mode. (when spacebar is held)
+    temp_preview: Option<Box<dyn Tool>>,
     undo: UndoState<Arc<EditSession>>,
     last_edit: EditType,
     /// If true, this session should be drawn with all glyphs filled and
@@ -33,7 +32,7 @@ impl Editor {
         Editor {
             mouse: Mouse::default(),
             tool: Box::new(Select::default()),
-            //prev_tool: None,
+            temp_preview: None,
             undo: UndoState::new(session),
             last_edit: EditType::Normal,
             draw_filled_outlines: false,
@@ -56,9 +55,8 @@ impl Editor {
                 _ => (),
             };
 
-            return self
-                .tool
-                .mouse_event(event, &mut self.mouse, ctx, data.session_mut(), env);
+            let tool = self.temp_preview.as_mut().unwrap_or(&mut self.tool);
+            return tool.mouse_event(event, &mut self.mouse, ctx, data.session_mut(), env);
         } else if let TaggedEvent::Down(m) = event {
             let menu = crate::menus::make_context_menu(data, m.pos);
             let menu = ContextMenu::new(menu, m.window_pos);
@@ -164,14 +162,6 @@ impl Editor {
             c if c.is(consts::cmd::SELECT_ALL) => data.session_mut().select_all(),
             c if c.is(consts::cmd::DESELECT_ALL) => data.session_mut().selection.clear(),
             c if c.is(consts::cmd::DELETE) => data.session_mut().delete_selection(),
-            c if c.is(consts::cmd::TOGGLE_PREVIEW_TOOL) => {
-                let is_mouse_down: &bool = cmd.get_unchecked(consts::cmd::TOGGLE_PREVIEW_TOOL);
-                // we don't toggle preview if we're actually *in* preview
-                if self.tool.name() != "Preview" {
-                    self.draw_filled_outlines = *is_mouse_down;
-                    return (true, None);
-                }
-            }
             c if c.is(consts::cmd::ADD_GUIDE) => {
                 let point = cmd.get_unchecked(consts::cmd::ADD_GUIDE);
                 data.session_mut().add_guide(*point);
@@ -240,6 +230,27 @@ impl Editor {
         self.mouse.reset();
         self.tool.init_mouse(&mut self.mouse);
     }
+
+    fn toggle_temporary_preview(
+        &mut self,
+        ctx: &mut EventCtx,
+        data: &mut EditorState,
+        turn_on: bool,
+    ) -> Option<EditType> {
+        self.draw_filled_outlines = turn_on;
+        self.mouse.reset();
+        let edit = if turn_on {
+            self.temp_preview = Some(Box::new(Preview::default()));
+            self.tool.cancel(&mut self.mouse, ctx, data.session_mut())
+        } else {
+            self.temp_preview = None;
+            None
+        };
+        let tool = self.temp_preview.as_mut().unwrap_or(&mut self.tool);
+        tool.init_mouse(&mut self.mouse);
+        ctx.set_cursor(&tool.default_cursor());
+        edit
+    }
 }
 
 impl Widget<EditorState> for Editor {
@@ -289,8 +300,16 @@ impl Widget<EditorState> for Editor {
                     None
                 } else if let Some(tool) = cmd.get(consts::cmd::SET_TOOL) {
                     let tool = crate::tools::tool_for_id(tool).unwrap();
+                    ctx.set_cursor(&tool.default_cursor());
                     self.set_tool(tool);
                     None
+                } else if let Some(flag) = cmd.get(consts::cmd::TOGGLE_PREVIEW_TOOL) {
+                    // we don't toggle preview if we're actually *in* preview
+                    if self.tool.name() != "Preview" {
+                        self.toggle_temporary_preview(ctx, data, *flag)
+                    } else {
+                        None
+                    }
                 } else {
                     let (handled, edit) = self.handle_cmd(cmd, data);
                     if handled {

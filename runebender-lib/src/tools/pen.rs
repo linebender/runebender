@@ -43,8 +43,11 @@ enum State {
 }
 
 impl MouseDelegate<EditSession> for Pen {
-    fn cancel(&mut self, canvas: &mut EditSession) {
-        canvas.selection.clear();
+    fn cancel(&mut self, _canvas: &mut EditSession) {
+        self.this_edit_type = match &self.state {
+            State::DragHandle(..) => Some(EditType::DragUp),
+            _ => None,
+        };
         self.state = State::Ready;
     }
 
@@ -172,6 +175,16 @@ fn current_drag_pos(drag: &Drag, data: &EditSession) -> DPoint {
 }
 
 impl Tool for Pen {
+    fn cancel(
+        &mut self,
+        mouse: &mut Mouse,
+        _ctx: &mut EventCtx,
+        data: &mut EditSession,
+    ) -> Option<EditType> {
+        mouse.cancel(data, self);
+        self.this_edit_type.take()
+    }
+
     fn mouse_event(
         &mut self,
         event: TaggedEvent,
