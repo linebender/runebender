@@ -336,9 +336,17 @@ impl EditSession {
     pub fn delete_selection(&mut self) {
         let to_delete = self.selection.per_path_selection();
         self.selection.clear();
+        // if only deleting points from a single path, we will select a point
+        // in that path afterwards.
+        let set_sel = to_delete.path_len() == 1;
+
         for path_points in to_delete.iter() {
             if let Some(path) = self.path_for_point_mut(path_points[0]) {
-                path.delete_points(path_points);
+                if let Some(new_sel) = path.delete_points(path_points) {
+                    if set_sel {
+                        self.selection.select_one(new_sel);
+                    }
+                }
             } else if path_points[0].is_guide() {
                 self.guides_mut().retain(|g| !path_points.contains(&g.id));
             }

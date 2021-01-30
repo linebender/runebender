@@ -185,9 +185,15 @@ impl Path {
         self.path_points().start_point()
     }
 
-    pub fn delete_points(&mut self, points: &[EntityId]) {
-        self.path_points_mut().delete_points(points);
+    /// Delete a collection of points from this path.
+    ///
+    /// If only a single point was deleted from this path, we will return
+    /// the id of a point in the path that is suitable for setting as the
+    /// new selection.
+    pub fn delete_points(&mut self, points: &[EntityId]) -> Option<EntityId> {
+        let result = self.path_points_mut().delete_points(points);
         self.after_change();
+        result.filter(|_| points.len() == 1)
     }
 
     pub fn close(&mut self, smooth: bool) -> EntityId {
