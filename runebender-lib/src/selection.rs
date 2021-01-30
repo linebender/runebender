@@ -120,6 +120,17 @@ impl PathSelection {
             idx: 0,
         }
     }
+
+    /// The number of distinct paths represented in the selection.
+    pub fn path_len(&self) -> usize {
+        self.inner
+            .iter()
+            .fold((0, EntityId::next()), |(len, prev), id| {
+                let len = if id.parent_eq(prev) { len } else { len + 1 };
+                (len, *id)
+            })
+            .0
+    }
 }
 
 pub struct PathSelectionIter<'a> {

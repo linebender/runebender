@@ -541,12 +541,34 @@ impl PathPoints {
         }
     }
 
-    pub fn delete_points(&mut self, points: &[EntityId]) {
+    /// Delete the provided points, as well as any other points that would
+    /// not be valid in the absense of the provided point.
+    ///
+    /// For instance: if you delete a single cubic off-curve point, we will
+    /// delete both of the off-curves in that segment; or if you delete an
+    /// on curve that has off-curves on both sides, we will delete all three
+    /// points.
+    ///
+    /// Returns a point that can be used as a selection in the given path,
+    /// if appropriate: for instance if you delete the last point in the path
+    /// we will select the new last point; delete the first point and we will
+    /// select the new first point.
+    pub fn delete_points(&mut self, points: &[EntityId]) -> Option<EntityId> {
         // stuff for debugging:
         let pre_points = self.points.clone();
         let mut to_delete = HashSet::with_capacity(points.len());
+
+        let mut new_selection = None;
         for point in points {
             self.points_to_delete(*point, &mut to_delete);
+            new_selection = self
+                .iter_points()
+                .map(|pp| pp.id)
+                .take_while(|id| {
+                    !to_delete.contains(id)
+                        && (new_selection.is_none() || Some(*id) != new_selection)
+                })
+                .last();
             self.points_mut().retain(|p| !to_delete.contains(&p.id));
             to_delete.clear();
         }
@@ -558,13 +580,13 @@ impl PathPoints {
                 points, pre_points, &to_delete, &self.points,
             );
             self.points = pre_points;
-            return;
+            return None;
         }
 
         if self.as_slice().is_empty() {
             self.closed = false;
-            return;
         }
+        new_selection.or_else(|| self.iter_points().next().map(|pp| pp.id))
     }
 
     //FIXME: this is currently buggy :(
@@ -1047,5 +1069,31 @@ mod tests {
             PathPoint::off_curve(path_id, DPoint::new(5., 5.)),
         );
         assert!(points.debug_validate(), "{:?}", points);
+    }
+
+    #[test]
+    fn delete_points() {
+        let path_id = EntityId::next();
+        let p0 = PathPoint::on_curve(path_id, DPoint::new(10., 10.));
+        let p1 = PathPoint::on_curve(path_id, DPoint::new(20., 10.));
+        let p2 = PathPoint::on_curve(path_id, DPoint::new(20., 20.));
+        let points = PathPoints::from_raw_parts(path_id, vec![p0, p1, p2], None, false);
+
+        assert_eq!(
+            vec![p0.id, p1.id, p2.id],
+            points.iter_points().map(|pp| pp.id).collect::<Vec<_>>()
+        );
+        dbg!(p0.id, p1.id, p2.id);
+        assert_eq!(points.clone().delete_points(&[p0.id]), Some(p1.id));
+        assert_eq!(points.clone().delete_points(&[p1.id]), Some(p0.id));
+        assert_eq!(points.clone().delete_points(&[p2.id]), Some(p1.id));
+        let points = PathPoints::from_raw_parts(path_id, vec![p1, p2, p0], None, true);
+        assert_eq!(
+            vec![p0.id, p1.id, p2.id],
+            points.iter_points().map(|pp| pp.id).collect::<Vec<_>>()
+        );
+        assert_eq!(points.clone().delete_points(&[p1.id]), Some(p0.id));
+        assert_eq!(points.clone().delete_points(&[p2.id]), Some(p1.id));
+        assert_eq!(points.clone().delete_points(&[p0.id]), Some(p2.id));
     }
 }
