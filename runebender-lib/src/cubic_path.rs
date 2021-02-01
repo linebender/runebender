@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::design_space::DPoint;
 use super::point::{EntityId, PathPoint, PointType};
 use super::point_list::{PathPoints, RawSegment};
@@ -37,7 +39,7 @@ impl CubicPath {
         closed: bool,
     ) -> Self {
         CubicPath {
-            points: PathPoints::from_raw_parts(id, points, trailing, closed),
+            points: PathPoints::from_raw_parts(id, points, None, trailing, closed),
         }
     }
 
@@ -115,23 +117,31 @@ impl CubicPath {
         let closed = !matches!(src.points[0].typ, NoradPType::Move);
 
         let path_id = EntityId::next();
+        let mut points = Vec::new();
+        let mut idents = HashMap::new();
 
-        let mut points: Vec<PathPoint> = src
-            .points
-            .iter()
-            .map(|src_point| {
-                let point = DPoint::new(src_point.x.round() as f64, src_point.y.round() as f64);
-                let typ = PointType::from_norad(&src_point);
-                let id = EntityId::new_with_parent(path_id);
-                PathPoint { id, point, typ }
-            })
-            .collect();
+        if let Some(id) = src.identifier() {
+            idents.insert(path_id, id.clone());
+        }
 
+        for n_pt in &src.points {
+            let point = DPoint::new(n_pt.x.round() as f64, n_pt.y.round() as f64);
+            let typ = PointType::from_norad(&n_pt);
+            let id = EntityId::new_with_parent(path_id);
+            if let Some(ident) = n_pt.identifier() {
+                idents.insert(id, ident.to_owned());
+                points.push(PathPoint { id, point, typ });
+            }
+        }
+
+        //FIXME: this looks confused and is probably a bug? we should normalize
+        //points we get from norad, but not arbitrarily change the order?
         if closed {
             points.rotate_left(1);
         }
 
-        CubicPath::from_raw_parts(path_id, points, None, closed)
+        let points = PathPoints::from_raw_parts(path_id, points, Some(idents), None, closed);
+        CubicPath { points }
     }
 
     pub(crate) fn to_norad(&self) -> norad::glyph::Contour {
@@ -161,7 +171,8 @@ impl CubicPath {
         if self.points.closed() {
             points.rotate_right(1);
         }
-        Contour::new(points, None, None)
+        let ident = self.path_points().norad_id_for_id(self.path_points().id());
+        Contour::new(points, ident, None)
     }
 
     pub(crate) fn iter_segments(&self) -> impl Iterator<Item = RawSegment> {
