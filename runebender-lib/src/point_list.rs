@@ -1,6 +1,7 @@
 /// Raw storage for the points that make up a glyph contour
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::ops::Range;
+use std::sync::Arc;
 
 use super::design_space::{DPoint, DVec2};
 use super::point::{EntityId, PathPoint};
@@ -13,6 +14,10 @@ use druid::Data;
 pub struct PathPoints {
     path_id: EntityId,
     points: protected::RawPoints,
+    /// when loading from norad we stash the norad identifiers here, so that
+    /// we can reuse them on save.
+    #[data(ignore)]
+    stashed_ids: Arc<HashMap<EntityId, norad::Identifier>>,
     trailing: Option<DPoint>,
     closed: bool,
 }
@@ -157,6 +162,7 @@ impl PathPoints {
             points: protected::RawPoints::new(vec![start]),
             closed: false,
             trailing: None,
+            stashed_ids: Arc::new(HashMap::new()),
         }
     }
 
@@ -165,12 +171,13 @@ impl PathPoints {
         for pt in &mut points {
             pt.id = EntityId::new_with_parent(new_parent);
         }
-        PathPoints::from_raw_parts(new_parent, points, None, closed)
+        PathPoints::from_raw_parts(new_parent, points, None, None, closed)
     }
 
     pub fn from_raw_parts(
         path_id: EntityId,
         points: Vec<PathPoint>,
+        stashed_ids: Option<HashMap<EntityId, norad::Identifier>>,
         trailing: Option<DPoint>,
         closed: bool,
     ) -> Self {
@@ -184,9 +191,11 @@ impl PathPoints {
             assert!(points.first().unwrap().is_on_curve());
         }
 
+        let stashed_ids = Arc::new(stashed_ids.unwrap_or_default());
         let mut this = PathPoints {
             path_id,
             points: protected::RawPoints::new(points),
+            stashed_ids,
             trailing,
             closed,
         };
@@ -207,6 +216,10 @@ impl PathPoints {
 
     pub fn id(&self) -> EntityId {
         self.path_id
+    }
+
+    pub(crate) fn norad_id_for_id(&self, point_id: EntityId) -> Option<norad::Identifier> {
+        self.stashed_ids.get(&point_id).cloned()
     }
 
     pub(crate) fn trailing(&self) -> Option<DPoint> {
@@ -1077,7 +1090,7 @@ mod tests {
         let p0 = PathPoint::on_curve(path_id, DPoint::new(10., 10.));
         let p1 = PathPoint::on_curve(path_id, DPoint::new(20., 10.));
         let p2 = PathPoint::on_curve(path_id, DPoint::new(20., 20.));
-        let points = PathPoints::from_raw_parts(path_id, vec![p0, p1, p2], None, false);
+        let points = PathPoints::from_raw_parts(path_id, vec![p0, p1, p2], None, None, false);
 
         assert_eq!(
             vec![p0.id, p1.id, p2.id],
@@ -1087,7 +1100,7 @@ mod tests {
         assert_eq!(points.clone().delete_points(&[p0.id]), Some(p1.id));
         assert_eq!(points.clone().delete_points(&[p1.id]), Some(p0.id));
         assert_eq!(points.clone().delete_points(&[p2.id]), Some(p1.id));
-        let points = PathPoints::from_raw_parts(path_id, vec![p1, p2, p0], None, true);
+        let points = PathPoints::from_raw_parts(path_id, vec![p1, p2, p0], None, None, true);
         assert_eq!(
             vec![p0.id, p1.id, p2.id],
             points.iter_points().map(|pp| pp.id).collect::<Vec<_>>()

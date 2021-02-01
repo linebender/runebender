@@ -1,11 +1,16 @@
+use std::collections::HashMap;
 use std::sync::Arc;
+
+use druid::kurbo::{BezPath, ParamCurve, ParamCurveNearest, PathEl, PathSeg, Point};
+use druid::Data;
+use spline::{Element, Segment as SplineSegment, SplineSpec};
+
+use norad::glyph::{Contour, ContourPoint, PointType};
+use norad::Plist;
 
 use super::design_space::DPoint;
 use super::point::{EntityId, PathPoint};
 use super::point_list::{PathPoints, RawSegment};
-use druid::kurbo::{BezPath, ParamCurve, ParamCurveNearest, PathEl, PathSeg, Point};
-use druid::Data;
-use spline::{Element, Segment as SplineSegment, SplineSpec};
 
 pub(crate) static HYPERBEZ_LIB_VERSION_KEY: &str = "org.linebender.hyperbezier-version";
 pub(crate) static HYPERBEZ_IS_POINT_KEY: &str = "org.linebender.hyperbezier-point";
@@ -64,15 +69,29 @@ impl HyperPath {
 
     pub(crate) fn from_norad(src: &norad::glyph::Contour) -> Self {
         let mut points = Vec::new();
+        let mut identifier_map = HashMap::new();
         let path_id = EntityId::next();
+        if let Some(id) = src.identifier() {
+            identifier_map.insert(path_id, id.clone());
+        }
+
+        let mut add_id = |n_pt: &ContourPoint, pp: &PathPoint| {
+            if let Some(id) = n_pt.identifier() {
+                identifier_map.insert(pp.id, id.clone());
+            }
+        };
+
         let mut closed = true;
         for point in src.points.iter() {
             if matches!(point.typ, norad::PointType::Move) {
                 closed = false;
-                points.push(PathPoint::on_curve(
+                let start = PathPoint::on_curve(
                     path_id,
                     DPoint::from_raw((point.x as f64, point.y as f64)),
-                ));
+                );
+                add_id(point, &start);
+
+                points.push(start);
                 continue;
             }
             let lib = match point.lib() {
@@ -104,12 +123,14 @@ impl HyperPath {
             }
             let mut end =
                 PathPoint::on_curve(path_id, DPoint::from_raw((point.x as f64, point.y as f64)));
+            add_id(point, &end);
             if point.smooth {
                 end.toggle_type();
             }
             points.push(end);
         }
-        let points = PathPoints::from_raw_parts(path_id, points, None, closed);
+        let points =
+            PathPoints::from_raw_parts(path_id, points, Some(identifier_map), None, closed);
 
         let mut this = Self {
             points,
@@ -121,20 +142,25 @@ impl HyperPath {
     }
 
     pub(crate) fn to_norad(&self) -> norad::glyph::Contour {
-        use norad::glyph::{Contour, ContourPoint, PointType};
-        use norad::Plist;
-        fn norad_point(pt: Point, typ: PointType, smooth: bool) -> ContourPoint {
-            ContourPoint::new(pt.x as f32, pt.y as f32, typ, smooth, None, None, None)
+        fn norad_point(
+            pt: Point,
+            typ: PointType,
+            smooth: bool,
+            ident: Option<norad::Identifier>,
+        ) -> ContourPoint {
+            ContourPoint::new(pt.x as f32, pt.y as f32, typ, smooth, None, ident, None)
         }
 
         fn extend_from_bezpath(points: &mut Vec<ContourPoint>, path: &[PathEl]) {
             for el in path.iter() {
                 match el {
-                    PathEl::LineTo(pt) => points.push(norad_point(*pt, PointType::Curve, false)),
+                    PathEl::LineTo(pt) => {
+                        points.push(norad_point(*pt, PointType::Curve, false, None))
+                    }
                     PathEl::CurveTo(p1, p2, p3) => {
-                        points.push(norad_point(*p1, PointType::OffCurve, false));
-                        points.push(norad_point(*p2, PointType::OffCurve, false));
-                        points.push(norad_point(*p3, PointType::Curve, false));
+                        points.push(norad_point(*p1, PointType::OffCurve, false, None));
+                        points.push(norad_point(*p2, PointType::OffCurve, false, None));
+                        points.push(norad_point(*p3, PointType::Curve, false, None));
                     }
                     _ => (),
                 }
@@ -142,8 +168,14 @@ impl HyperPath {
         }
         let mut points = Vec::new();
         if !self.path_points().closed() {
-            let start = self.path_points().start_point().point;
-            points.push(norad_point(start.to_raw(), PointType::Move, false));
+            let start = self.path_points().start_point();
+            let ident = self.path_points().norad_id_for_id(start.id);
+            points.push(norad_point(
+                start.point.to_raw(),
+                PointType::Move,
+                false,
+                ident,
+            ));
         }
 
         if self.path_points().len() > 1 {
@@ -160,6 +192,9 @@ impl HyperPath {
                         let mut lib = Plist::new();
                         lib.insert(HYPERBEZ_IS_POINT_KEY.into(), true.into());
                         last.replace_lib(lib);
+                        if let Some(ident) = self.path_points().norad_id_for_id(end.id) {
+                            last.replace_identifier(ident);
+                        }
                     }
                     RawSegment::Cubic(_, p1, p2, p3) => {
                         let mut segment_bez = BezPath::new();
@@ -178,16 +213,18 @@ impl HyperPath {
                         lib.insert(HYPERBEZ_CONTROL_POINTS.into(), offcurves.into());
                         lib.insert(HYPERBEZ_IS_POINT_KEY.into(), true.into());
                         last.replace_lib(lib);
+                        if let Some(ident) = self.path_points().norad_id_for_id(p3.id) {
+                            last.replace_identifier(ident);
+                        }
                     }
                 }
             }
         }
 
-        let mut contour = Contour::new(points, None, None);
         let mut lib = Plist::new();
         lib.insert(HYPERBEZ_LIB_VERSION_KEY.into(), HYPERBEZ_UFO_VERSION.into());
-        contour.replace_lib(lib);
-        contour
+        let ident = self.path_points().norad_id_for_id(self.path_points().id());
+        Contour::new(points, ident, Some(lib))
     }
 
     pub(crate) fn append_to_bezier(&self, bez: &mut BezPath) {
