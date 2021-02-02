@@ -148,7 +148,7 @@ impl MouseDelegate<EditSession> for Pen {
                     if !seg.end().is_smooth() {
                         path.toggle_point_type(id);
                     }
-                    path.upgrade_line_seg(seg, true);
+                    path.upgrade_line_seg(&seg, true);
                 }
             }
             path.update_trailing(id, pos);

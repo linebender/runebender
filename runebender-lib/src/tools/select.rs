@@ -4,6 +4,8 @@ use druid::{Data, Env, EventCtx, HotKey, KbKey, KeyEvent, MouseEvent, PaintCtx, 
 
 use crate::edit_session::EditSession;
 use crate::mouse::{Drag, Mouse, MouseDelegate, TaggedEvent};
+use crate::path::Segment;
+use crate::point::EntityId;
 use crate::tools::{EditType, Tool, ToolId};
 use crate::{
     design_space::{DPoint, DVec2, ViewPort},
@@ -16,23 +18,46 @@ use crate::{
 const SELECTION_BBOX_HANDLE_PADDING: Insets = Insets::uniform(6.0);
 const SELECTION_HANDLE_RADIUS: f64 = 4.;
 
-/// A set of states that are possible while handling a mouse drag.
+/// An item that can be selected.
+#[derive(Debug, Clone)]
+enum Item {
+    SelectionHandle(Quadrant),
+    Point(EntityId),
+    Guide(EntityId),
+    Segment(Box<Segment>),
+}
+
+/// The internal state of the mouse.
+#[derive(Debug, Clone)]
+enum MouseState {
+    /// The mouse is idle; it may be hovering on an item.
+    Idle(Option<Item>),
+    /// The mouse has clicked, and may have clicked an item.
+    Down(Option<Item>),
+    /// The mouse is down but we should not transition to a drag if one
+    /// begins.
+    SuppressDrag,
+    /// A drag gesture is in progress.
+    Drag(DragState),
+    /// The mouse is up after clicking an item; if a double-click occurs
+    /// it will modify that item
+    WaitDoubleClick(Item),
+    /// Internal: the state is in transition. This should only be present
+    /// during event handling.
+    Transition,
+}
+
+/// The possible states for the select tool.
 #[derive(Debug, Clone)]
 enum DragState {
     /// State for a drag that is a rectangular selection.
     Select {
         previous: Selection,
         rect: Rect,
+        toggle: bool,
     },
     /// State for a drag that is moving a selected object.
-    Move {
-        delta: DVec2,
-    },
-    /// State for a drag that is moving an off-curve point.
-    MoveHandle,
-    /// State if some earlier gesture consumed the mouse-down, and we should not
-    /// recognize a drag.
-    Suppress,
+    Move { previous: EditSession, delta: DVec2 },
     TransformSelection {
         quadrant: Quadrant,
         previous: EditSession,
@@ -41,14 +66,13 @@ enum DragState {
         /// until the gesture completes
         pre_paths: BezPath,
     },
-    None,
 }
 
 /// The state of the selection tool.
 #[derive(Debug, Default, Clone)]
 pub struct Select {
-    /// the state preserved between drag events.
-    drag: DragState,
+    ///  state preserved between events.
+    state: MouseState,
     last_pos: Point,
     /// The edit type produced by the current event, if any.
     ///
@@ -73,44 +97,49 @@ impl Tool for Select {
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &EditSession, env: &Env) {
         let selection_stroke = env.get(theme::SELECTION_RECT_STROKE_COLOR);
-        match &self.drag {
-            DragState::Select { rect, .. } => {
-                ctx.fill(rect, &env.get(theme::SELECTION_RECT_FILL_COLOR));
-                ctx.stroke(rect, &selection_stroke, 1.0);
-            }
-            // draw the selection bounding box
-            DragState::None if data.selection.len() > 1 => {
-                let bbox = data.viewport.rect_to_screen(data.selection_dpoint_bbox());
-                let style = StrokeStyle::new().dash(vec![2.0, 4.0], 0.0);
-                ctx.stroke_styled(&bbox, &selection_stroke, 0.5, &style);
+        match &self.state {
+            MouseState::Idle(_) => {
+                if data.selection.len() > 1 {
+                    let bbox = data.viewport.rect_to_screen(data.selection_dpoint_bbox());
+                    let style = StrokeStyle::new().dash(vec![2.0, 4.0], 0.0);
+                    ctx.stroke_styled(&bbox, &selection_stroke, 0.5, &style);
 
-                for (_, circle) in iter_handle_circles(data) {
-                    if circle.contains(self.last_pos) {
-                        ctx.fill(circle, &selection_stroke);
+                    for (_, circle) in iter_handle_circles(data) {
+                        if circle.contains(self.last_pos) {
+                            ctx.fill(circle, &selection_stroke);
+                        }
+                        ctx.stroke(circle, &selection_stroke, 0.5);
                     }
-                    ctx.stroke(circle, &selection_stroke, 0.5);
                 }
             }
-            DragState::TransformSelection { pre_paths, .. } => {
-                ctx.stroke(
-                    data.viewport.affine() * pre_paths,
-                    &env.get(theme::PLACEHOLDER_GLYPH_COLOR),
-                    1.0,
-                );
-                let bbox = data.viewport.rect_to_screen(data.selection_dpoint_bbox());
-                let style = StrokeStyle::new().dash(vec![2.0, 4.0], 0.0);
-                ctx.stroke_styled(&bbox, &selection_stroke, 0.5, &style);
+            MouseState::Drag(drag_state) => match drag_state {
+                DragState::Select { rect, .. } => {
+                    ctx.fill(rect, &env.get(theme::SELECTION_RECT_FILL_COLOR));
+                    ctx.stroke(rect, &selection_stroke, 1.0);
+                }
+                // draw the selection bounding box
+                DragState::TransformSelection { pre_paths, .. } => {
+                    ctx.stroke(
+                        data.viewport.affine() * pre_paths,
+                        &env.get(theme::PLACEHOLDER_GLYPH_COLOR),
+                        1.0,
+                    );
+                    let bbox = data.viewport.rect_to_screen(data.selection_dpoint_bbox());
+                    let style = StrokeStyle::new().dash(vec![2.0, 4.0], 0.0);
+                    ctx.stroke_styled(&bbox, &selection_stroke, 0.5, &style);
 
-                for (_loc, circle) in iter_handle_circles(data) {
-                    //FIXME: we don't fill while dragging because we would
-                    //fill the wrong handle when scale goes negative. Lots of
-                    //ways to be fancy here, but for now we can just leave it.
-                    //if loc == *quadrant {
-                    //ctx.fill(circle, &selection_stroke);
-                    //}
-                    ctx.stroke(circle, &selection_stroke, 0.5);
+                    for (_loc, circle) in iter_handle_circles(data) {
+                        //FIXME: we don't fill while dragging because we would
+                        //fill the wrong handle when scale goes negative. Lots of
+                        //ways to be fancy here, but for now we can just leave it.
+                        //if loc == *quadrant {
+                        //ctx.fill(circle, &selection_stroke);
+                        //}
+                        ctx.stroke(circle, &selection_stroke, 0.5);
+                    }
                 }
-            }
+                _ => (),
+            },
             _ => (),
         }
     }
@@ -152,9 +181,9 @@ impl Tool for Select {
         _: &Env,
     ) -> Option<EditType> {
         assert!(self.this_edit_type.is_none());
-        let pre_rect = self.drag.drag_rect();
+        let pre_rect = self.state.drag_rect();
         mouse.mouse_event(event, data, self);
-        if !pre_rect.same(&self.drag.drag_rect()) {
+        if !pre_rect.same(&self.state.drag_rect()) {
             ctx.request_paint();
         }
         self.this_edit_type.take()
@@ -215,185 +244,233 @@ impl Select {
             None
         }
     }
+
+    fn hover_item_for_mos_pos(&self, data: &EditSession, pos: Point) -> Option<Item> {
+        if let Some(quadrant) = self.selection_handle_hit(data, pos) {
+            return Some(Item::SelectionHandle(quadrant));
+        }
+
+        if let Some(id) = data.hit_test_all(pos, None) {
+            if id.is_guide() {
+                Some(Item::Guide(id))
+            } else {
+                Some(Item::Point(id))
+            }
+        } else if let Some((seg, _t)) = data.hit_test_segments(pos, None) {
+            Some(Item::Segment(seg.into()))
+        } else {
+            None
+        }
+    }
 }
 
 impl MouseDelegate<EditSession> for Select {
-    fn mouse_moved(&mut self, event: &MouseEvent, _data: &mut EditSession) {
+    fn mouse_moved(&mut self, event: &MouseEvent, data: &mut EditSession) {
+        let hover_item = self.hover_item_for_mos_pos(data, event.pos);
+        self.state = MouseState::Idle(hover_item);
         self.last_pos = event.pos;
     }
 
     fn left_down(&mut self, event: &MouseEvent, data: &mut EditSession) {
-        assert!(matches!(self.drag, DragState::None));
+        if event.pos != self.last_pos {
+            log::info!(
+                "left_down pos != mouse_move pos: {:.2}/{:.2}",
+                event.pos,
+                self.last_pos
+            );
+        }
+
+        let append_mode = event.mods.shift();
         if event.count == 1 {
-            // if we have an existing multi-point selection we first hit-test
-            // our own selection handles. If we're on one of them, we don't
-            // do anything further; we will start a transform in drag_began
-            if self.selection_handle_hit(data, event.pos).is_some() {
-                return;
-            }
-
-            let sel = data.hit_test_all(event.pos, None);
-            if let Some(point_id) = sel {
-                if !event.mods.shift() {
-                    // when clicking a point, if it is not selected we set it as the selection,
-                    // otherwise we keep the selection intact for a drag.
-                    if !data.selection.contains(&point_id) {
-                        data.selection.select_one(point_id);
+            let item = match self.state.transition() {
+                MouseState::Idle(item) => item,
+                MouseState::WaitDoubleClick(item) => Some(item),
+                _ => None,
+            };
+            self.state = match item {
+                Some(Item::SelectionHandle(_)) => MouseState::Down(item),
+                Some(Item::Point(id)) | Some(Item::Guide(id)) => {
+                    if !append_mode {
+                        if !data.selection.contains(&id) {
+                            data.selection.select_one(id);
+                        }
+                    } else if !data.selection.remove(&id) {
+                        data.selection.insert(id);
                     }
-                } else if !data.selection.remove(&point_id) {
-                    data.selection.insert(point_id);
+                    MouseState::Down(item)
                 }
-            } else if let Some((seg, _t)) = data.hit_test_segments(event.pos, None) {
-                let ids = seg.raw_segment().ids();
-                let all_selected = ids.iter().all(|id| data.selection.contains(id));
-                let append_mode = event.mods.shift();
-                self.drag = DragState::Suppress;
-
-                if event.mods.alt() && seg.is_line() {
-                    let path = data.path_for_point_mut(seg.start_id()).unwrap();
-                    path.upgrade_line_seg(seg, false);
-                    self.this_edit_type = Some(EditType::Normal);
-                    return;
-                }
-                if !append_mode && !all_selected {
-                    data.selection.clear();
-                    data.selection.extend(ids);
-                } else if !append_mode && all_selected {
-                    // we allow a drag gesture to begin only if the clicked
-                    // segment was previously selected.
-                    self.drag = DragState::None;
-                } else if append_mode && all_selected {
-                    for id in &ids {
-                        data.selection.remove(id);
+                // toggle segment type
+                Some(Item::Segment(seg)) if event.mods.alt() => {
+                    if seg.is_line() {
+                        if let Some(path) = data.path_for_point_mut(seg.start_id()) {
+                            path.upgrade_line_seg(&seg, false);
+                            self.this_edit_type = Some(EditType::Normal);
+                        }
                     }
-                } else if append_mode {
-                    data.selection.extend(ids);
+                    MouseState::SuppressDrag
                 }
-            } else if !event.mods.shift() {
-                data.selection.clear();
-            }
+                Some(Item::Segment(seg)) => {
+                    let all_selected = seg
+                        .raw_segment()
+                        .iter_ids()
+                        .all(|id| data.selection.contains(&id));
+                    if !append_mode {
+                        data.selection.clear();
+                        data.selection.extend(seg.raw_segment().iter_ids());
+                        MouseState::Down(Some(Item::Segment(seg)))
+                    } else if all_selected {
+                        for id in seg.raw_segment().iter_ids() {
+                            data.selection.remove(&id);
+                        }
+                        MouseState::SuppressDrag
+                    } else {
+                        data.selection.extend(seg.raw_segment().iter_ids());
+                        MouseState::Down(Some(Item::Segment(seg)))
+                    }
+                }
+                None => MouseState::Down(None),
+            };
         } else if event.count == 2 {
-            let sel = data.hit_test_all(event.pos, None);
-            match sel {
-                Some(id) if data.path_point_for_id(id).is_some() => {
-                    data.toggle_point_type(id);
-                    self.this_edit_type = Some(EditType::Normal);
+            self.state = match self.state.transition() {
+                MouseState::WaitDoubleClick(item) => {
+                    match &item {
+                        Item::Point(id) => {
+                            data.toggle_point_type(*id);
+                            self.this_edit_type = Some(EditType::Normal);
+                        }
+                        Item::Guide(id) => {
+                            data.toggle_guide(*id, event.pos);
+                            self.this_edit_type = Some(EditType::Normal);
+                        }
+                        Item::Segment(seg) => {
+                            data.select_path(seg.start_id().parent(), append_mode);
+                        }
+                        Item::SelectionHandle(_) => (),
+                    };
+                    MouseState::WaitDoubleClick(item)
                 }
-                Some(id) if id.is_guide() => {
-                    data.toggle_guide(id, event.pos);
-                    self.this_edit_type = Some(EditType::Normal);
-                }
-                _ => {
-                    data.select_path(event.pos, event.mods.shift());
+                other => {
+                    log::debug!("double-click mouse state: {:?}", other);
+                    MouseState::SuppressDrag
                 }
             }
         }
     }
 
-    fn left_up(&mut self, _event: &MouseEvent, _data: &mut EditSession) {
-        self.drag = DragState::None;
+    fn left_up(&mut self, event: &MouseEvent, data: &mut EditSession) {
+        self.state = match self.state.transition() {
+            MouseState::Down(Some(Item::SelectionHandle(handle))) => {
+                MouseState::Idle(Some(Item::SelectionHandle(handle)))
+            }
+            MouseState::Down(Some(item)) => MouseState::WaitDoubleClick(item),
+            MouseState::Down(None) => {
+                data.selection.clear();
+                MouseState::Idle(self.hover_item_for_mos_pos(data, event.pos))
+            }
+            _ => MouseState::Idle(self.hover_item_for_mos_pos(data, event.pos)),
+        }
     }
 
     fn left_drag_began(&mut self, drag: Drag, data: &mut EditSession) {
-        if matches!(self.drag, DragState::Suppress) {
-            return;
-        }
-
-        // are we dragging a selection rect handle?
-        if let Some(quadrant) = self.selection_handle_hit(data, drag.start.pos) {
-            let pre_paths = data.to_bezier();
-            self.drag = DragState::TransformSelection {
-                delta: DVec2::ZERO,
-                quadrant,
-                previous: data.clone(),
-                pre_paths,
-            };
-            return;
-        }
-
-        // if we're starting a rectangular selection, we save the previous selection
-        let sel = data.hit_test_all(drag.start.pos, None);
-        self.drag = if let Some(pt) = sel.and_then(|id| data.path_point_for_id(id)) {
-            let is_handle = !pt.is_on_curve();
-            let is_dragging_handle = data.selection.len() == 1 && is_handle;
-            if is_dragging_handle {
-                DragState::MoveHandle
-            } else {
-                DragState::Move { delta: DVec2::ZERO }
-            }
-        } else if data.hit_test_segments(drag.start.pos, None).is_some() {
-            DragState::Move { delta: DVec2::ZERO }
-        } else {
-            // if we're starting a rectangular selection, we save the previous selection
-            DragState::Select {
+        self.state = match self.state.transition() {
+            // starting a rectangular selection
+            MouseState::Down(None) => MouseState::Drag(DragState::Select {
                 previous: data.selection.clone(),
                 rect: Rect::from_points(drag.start.pos, drag.current.pos),
+                toggle: drag.current.mods.shift(),
+            }),
+            MouseState::Down(Some(Item::SelectionHandle(handle))) => {
+                MouseState::Drag(DragState::TransformSelection {
+                    quadrant: handle,
+                    previous: data.clone(),
+                    delta: DVec2::ZERO,
+                    pre_paths: data.to_bezier(),
+                })
             }
-        }
+            MouseState::Down(Some(_)) => MouseState::Drag(DragState::Move {
+                previous: data.clone(),
+                delta: DVec2::ZERO,
+            }),
+            MouseState::SuppressDrag => MouseState::SuppressDrag,
+            other => {
+                log::debug!("unexpected drag_began state: {:?}", other);
+                MouseState::SuppressDrag
+            }
+        };
     }
 
     fn left_drag_changed(&mut self, drag: Drag, data: &mut EditSession) {
         self.last_pos = drag.current.pos;
-        match &mut self.drag {
-            DragState::Select { previous, rect } => {
-                *rect = Rect::from_points(drag.current.pos, drag.start.pos);
-                update_selection_for_drag(data, previous, *rect, drag.current.mods.shift());
-            }
-            DragState::Move { delta } => {
-                let mut new_delta = delta_for_drag_change(&drag, data.viewport);
-                if drag.current.mods.shift() {
-                    new_delta = new_delta.axis_locked();
+        if let Some(state) = self.state.drag_state_mut() {
+            match state {
+                DragState::Select {
+                    previous,
+                    rect,
+                    toggle,
+                } => {
+                    *rect = Rect::from_points(drag.current.pos, drag.start.pos);
+                    update_selection_for_drag(data, previous, *rect, *toggle);
                 }
-                let drag_delta = new_delta - *delta;
-                if drag_delta.hypot() > 0. {
-                    data.nudge_selection(drag_delta);
-                    *delta = new_delta;
+                DragState::Move { delta, .. } => {
+                    let mut new_delta = delta_for_drag_change(&drag, data.viewport);
+                    if drag.current.mods.shift() {
+                        new_delta = new_delta.axis_locked();
+                    }
+                    let drag_delta = new_delta - *delta;
+                    if drag_delta.hypot() > 0. {
+                        data.nudge_selection(drag_delta);
+                        *delta = new_delta;
+                    }
+                }
+                DragState::TransformSelection {
+                    quadrant,
+                    previous,
+                    delta,
+                    ..
+                } => {
+                    let new_delta = delta_for_drag_change(&drag, data.viewport);
+                    let new_delta = quadrant.lock_delta(new_delta);
+                    if new_delta.hypot() > 0.0 && new_delta != *delta {
+                        *delta = new_delta;
+                        let mut new_data = previous.clone();
+                        let sel_rect = previous.selection_dpoint_bbox();
+                        let scale = quadrant.scale_dspace_rect(sel_rect, new_delta);
+                        let anchor = quadrant.inverse().point_in_dspace_rect(sel_rect);
+                        new_data.scale_selection(scale, DPoint::from_raw(anchor));
+                        *data = new_data;
+                    }
                 }
             }
-            DragState::MoveHandle => {
-                data.update_handle(drag.current.pos, drag.current.mods.shift());
+            if matches!(state, DragState::Move {..} | DragState::TransformSelection { .. }) {
+                self.this_edit_type = Some(EditType::Drag);
             }
-            DragState::Suppress => (),
-            DragState::TransformSelection {
-                quadrant,
-                previous,
-                delta,
-                ..
-            } => {
-                let new_delta = delta_for_drag_change(&drag, data.viewport);
-                let new_delta = quadrant.lock_delta(new_delta);
-                if new_delta.hypot() > 0.0 && new_delta != *delta {
-                    *delta = new_delta;
-                    let mut new_data = previous.clone();
-                    let sel_rect = previous.selection_dpoint_bbox();
-                    let scale = quadrant.scale_dspace_rect(sel_rect, new_delta);
-                    let anchor = quadrant.inverse().point_in_dspace_rect(sel_rect);
-                    new_data.scale_selection(scale, DPoint::from_raw(anchor));
-                    *data = new_data;
-                }
-            }
-            DragState::None => unreachable!("invalid state"),
-        }
-
-        if self.drag.is_move() || self.drag.is_transform() {
-            self.this_edit_type = Some(EditType::Drag);
+        } else {
+            log::debug!("unexpected state in drag_changed: {:?}", self.state);
         }
     }
 
     fn left_drag_ended(&mut self, _drag: Drag, _data: &mut EditSession) {
-        if self.drag.is_move() || self.drag.is_transform() {
-            self.this_edit_type = Some(EditType::DragUp);
+        if let MouseState::Drag(state) = &self.state {
+            if matches!(state, DragState::Move {..} | DragState::TransformSelection { .. }) {
+                self.this_edit_type = Some(EditType::DragUp);
+            }
         }
     }
 
+    //FIXME: this is never actually called? :thinking:
     fn cancel(&mut self, data: &mut EditSession) {
-        let old_state = std::mem::replace(&mut self.drag, DragState::None);
-        match old_state {
-            DragState::Select { previous, .. } => data.selection = previous,
-            DragState::Move { .. } | DragState::TransformSelection { .. } => {
-                self.this_edit_type = Some(EditType::DragUp)
+        let old_state = std::mem::replace(&mut self.state, MouseState::Idle(None));
+        if let MouseState::Drag(state) = old_state {
+            match state {
+                DragState::Select { previous, .. } => data.selection = previous,
+                DragState::Move { previous, .. }
+                | DragState::TransformSelection { previous, .. } => {
+                    *data = previous;
+                    // we use 'Drag' and not 'DragUp' because we want this all to combine
+                    // with the previous undo group, and be a no-op?
+                    self.this_edit_type = Some(EditType::Drag);
+                }
             }
-            _ => (),
         }
     }
 }
@@ -429,23 +506,48 @@ fn update_selection_for_drag(
     data: &mut EditSession,
     prev_sel: &Selection,
     rect: Rect,
-    shift: bool,
+    //corresponds to shift being held
+    toggle: bool,
 ) {
     let in_select_rect = data
         .iter_points()
         .filter(|p| rect.contains(p.to_screen(data.viewport)))
         .map(|p| p.id)
         .collect();
-    data.selection = if shift {
+    data.selection = if toggle {
         prev_sel.symmetric_difference(&in_select_rect)
     } else {
-        prev_sel.union(&in_select_rect)
+        in_select_rect
     };
 }
 
-impl Default for DragState {
+impl MouseState {
+    /// Move to the Transition state, returning the previous state.
+    fn transition(&mut self) -> Self {
+        std::mem::replace(self, MouseState::Transition)
+    }
+
+    /// If we're in a drag gesture, return a mutable reference to the drag state.
+    fn drag_state_mut(&mut self) -> Option<&mut DragState> {
+        if let MouseState::Drag(s) = self {
+            Some(s)
+        } else {
+            None
+        }
+    }
+
+    fn drag_rect(&self) -> Option<Rect> {
+        if let MouseState::Drag(s) = self {
+            s.drag_rect()
+        } else {
+            None
+        }
+    }
+}
+
+impl Default for MouseState {
     fn default() -> Self {
-        DragState::None
+        MouseState::Idle(None)
     }
 }
 
@@ -456,13 +558,5 @@ impl DragState {
         } else {
             None
         }
-    }
-
-    fn is_move(&self) -> bool {
-        matches!(self, DragState::Move { .. })
-    }
-
-    fn is_transform(&self) -> bool {
-        matches!(self, DragState::TransformSelection{ .. })
     }
 }
