@@ -403,18 +403,12 @@ impl EditSession {
         self.selection.select_one(id);
     }
 
-    pub fn select_path(&mut self, point: Point, toggle: bool) -> bool {
-        let path_idx = match self
-            .paths
-            .iter()
-            .position(|p| p.screen_dist(self.viewport, point) < MIN_CLICK_DISTANCE)
-        {
-            Some(idx) => idx,
+    pub fn select_path(&mut self, id: EntityId, toggle: bool) -> bool {
+        let path = match self.paths.iter().find(|path| path.id() == id) {
+            Some(path) => path,
             None => return false,
         };
-
-        let points: Vec<_> = self.paths[path_idx].points().to_owned();
-        for point in points {
+        for point in path.points() {
             if !self.selection.insert(point.id) && toggle {
                 self.selection.remove(&point.id);
             }
@@ -476,17 +470,6 @@ impl EditSession {
                     path.scale_points(path_points, scale, anchor);
                 }
             }
-        }
-    }
-
-    /// Update an off-curve point in response to a drag.
-    ///
-    /// `is_locked` corresponds to the shift key being held.
-    pub(crate) fn update_handle(&mut self, point: Point, is_locked: bool) {
-        let dpoint = self.viewport.from_screen(point);
-        let id = *self.selection.iter().next().unwrap();
-        if let Some(path) = self.path_for_point_mut(id) {
-            path.update_handle(id, dpoint, is_locked);
         }
     }
 

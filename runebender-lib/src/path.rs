@@ -257,7 +257,7 @@ impl Path {
     ///
     /// If 'use trailing' is true, this will use the trailing point to populate
     /// the first handle.
-    pub(crate) fn upgrade_line_seg(&mut self, seg: Segment, use_trailing: bool) {
+    pub(crate) fn upgrade_line_seg(&mut self, seg: &Segment, use_trailing: bool) {
         let cursor = self.path_points_mut().cursor(Some(seg.start_id()));
         let p0 = *bail!(cursor.point());
         let p3 = *bail!(cursor.peek_next(), "segment has correct number of points");
@@ -332,22 +332,6 @@ impl Path {
                 id
             }
         }
-    }
-
-    /// update an off-curve point in response to a drag.
-    ///
-    /// `is_locked` corresponds to the shift key being down.
-    pub fn update_handle(&mut self, point: EntityId, dpt: DPoint, is_locked: bool) {
-        self.path_points_mut().update_handle(point, dpt, is_locked);
-        // dragging handle makes it non-auto:
-        if self.is_hyper() {
-            self.path_points_mut().with_point_mut(point, |pp| {
-                if pp.is_auto() {
-                    pp.toggle_type();
-                }
-            })
-        }
-        self.after_change();
     }
 
     /// Update the curve while the user drags a new control point.

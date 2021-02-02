@@ -871,12 +871,8 @@ impl RawSegment {
         })
     }
 
-    // FIXME: why a vec? was I just lazy?
-    pub(crate) fn ids(&self) -> Vec<EntityId> {
-        match self {
-            RawSegment::Line(p1, p2) => vec![p1.id, p2.id],
-            RawSegment::Cubic(p1, p2, p3, p4) => vec![p1.id, p2.id, p3.id, p4.id],
-        }
+    pub(crate) fn iter_ids(&self) -> impl Iterator<Item = EntityId> {
+        self.points().map(|point| point.id)
     }
 
     /// Assumes that a cubic segment is a cubic bezier.
