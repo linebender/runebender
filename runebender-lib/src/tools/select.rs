@@ -1,4 +1,4 @@
-use druid::kurbo::{BezPath, Circle, Insets, Point, Rect, Shape, Vec2};
+use druid::kurbo::{BezPath, Circle, Insets, Point, Rect, Vec2};
 use druid::piet::{RenderContext, StrokeStyle};
 use druid::{Data, Env, EventCtx, HotKey, KbKey, KeyEvent, MouseEvent, PaintCtx, RawMods};
 
@@ -98,18 +98,34 @@ impl Tool for Select {
     fn paint(&mut self, ctx: &mut PaintCtx, data: &EditSession, env: &Env) {
         let selection_stroke = env.get(theme::SELECTION_RECT_STROKE_COLOR);
         match &self.state {
-            MouseState::Idle(_) => {
-                if data.selection.len() > 1 {
-                    let bbox = data.viewport.rect_to_screen(data.selection_dpoint_bbox());
-                    let style = StrokeStyle::new().dash(vec![2.0, 4.0], 0.0);
-                    ctx.stroke_styled(&bbox, &selection_stroke, 0.5, &style);
-
-                    for (_, circle) in iter_handle_circles(data) {
-                        if circle.contains(self.last_pos) {
-                            ctx.fill(circle, &selection_stroke);
+            MouseState::Idle(item) => {
+                let quad = match &item {
+                    Some(Item::SelectionHandle(quad)) => Some(*quad),
+                    _ => None,
+                };
+                paint_selection_bbox(ctx, data, env, quad);
+                match item {
+                    Some(Item::Point(id)) => {
+                        if let Some(pp) = data.path_point_for_id(*id) {
+                            let point = data.viewport.to_screen(pp.point);
+                            paint_hover_indicator(ctx, data, point, env);
                         }
-                        ctx.stroke(circle, &selection_stroke, 0.5);
                     }
+                    Some(Item::Segment(seg)) => {
+                        let seg_point = data.viewport.affine()
+                            * seg.nearest_point(data.viewport.from_screen(self.last_pos));
+                        paint_hover_indicator(ctx, data, seg_point, env);
+                    }
+                    Some(Item::Guide(id)) => {
+                        if let Some(point) =
+                            data.guides.iter().find(|g| g.id == *id).map(|guide| {
+                                guide.nearest_screen_point(data.viewport, self.last_pos)
+                            })
+                        {
+                            paint_hover_indicator(ctx, data, point, env);
+                        }
+                    }
+                    Some(Item::SelectionHandle(_)) | None => (),
                 }
             }
             MouseState::Drag(drag_state) => match drag_state {
@@ -256,7 +272,9 @@ impl Select {
             } else {
                 Some(Item::Point(id))
             }
-        } else if let Some((seg, _t)) = data.hit_test_segments(pos, None) {
+        } else if let Some((seg, _t)) =
+            data.hit_test_segments(pos, Some(crate::edit_session::SEGMENT_CLICK_DISTANCE))
+        {
             Some(Item::Segment(seg.into()))
         } else {
             None
@@ -559,4 +577,33 @@ impl DragState {
             None
         }
     }
+}
+
+fn paint_selection_bbox(
+    ctx: &mut PaintCtx,
+    data: &EditSession,
+    env: &Env,
+    hot_quad: Option<Quadrant>,
+) {
+    if data.selection.len() > 1 {
+        let selection_stroke = env.get(theme::SELECTION_RECT_STROKE_COLOR);
+        let bbox = data.viewport.rect_to_screen(data.selection_dpoint_bbox());
+        let style = StrokeStyle::new().dash(vec![2.0, 4.0], 0.0);
+        ctx.stroke_styled(&bbox, &selection_stroke, 0.5, &style);
+
+        for (quad, circle) in iter_handle_circles(data) {
+            if Some(quad) == hot_quad {
+                ctx.fill(circle, &selection_stroke);
+            }
+            ctx.stroke(circle, &selection_stroke, 0.5);
+        }
+    }
+}
+
+const HOVER_ACCENT_COLOR: druid::Color = druid::Color::rgba8(0, 0, 0, 0x58);
+
+/// the point is in design space, but needn't be on the  grid.
+fn paint_hover_indicator(ctx: &mut PaintCtx, _: &EditSession, point: Point, _env: &Env) {
+    let circ = Circle::new(point, 3.0);
+    ctx.fill(circ, &HOVER_ACCENT_COLOR);
 }

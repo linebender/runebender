@@ -491,6 +491,13 @@ impl Segment {
         }
     }
 
+    /// This returns a point and not a DPoint because the location may
+    /// not fall on the grid.
+    pub(crate) fn nearest_point(&self, point: DPoint) -> Point {
+        let (t, _) = self.nearest(point);
+        self.eval(t)
+    }
+
     pub(crate) fn intersect_line(&self, line: Line) -> Vec<LineIntersection> {
         match self {
             Self::Cubic(seg) => seg.to_kurbo().intersect_line(line).into_iter().collect(),
