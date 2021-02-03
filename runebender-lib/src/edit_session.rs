@@ -19,6 +19,7 @@ use crate::selection::Selection;
 /// on a point?
 //TODO: this doesn't feel very robust; items themselves should have hitzones?
 pub const MIN_CLICK_DISTANCE: f64 = 10.0;
+pub const SEGMENT_CLICK_DISTANCE: f64 = 6.0;
 /// Amount of bias penalizing on-curve points; we want to break ties in favor
 /// of off-curve.
 pub const ON_CURVE_PENALTY: f64 = MIN_CLICK_DISTANCE / 2.0;

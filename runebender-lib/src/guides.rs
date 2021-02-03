@@ -1,4 +1,4 @@
-use druid::kurbo::{Line, ParamCurveNearest, Point, Vec2};
+use druid::kurbo::{Line, ParamCurve, ParamCurveNearest, Point, Vec2};
 use druid::Data;
 
 use crate::design_space::{DPoint, DVec2, ViewPort};
@@ -46,26 +46,29 @@ impl Guide {
     }
 
     pub fn screen_dist(&self, vport: ViewPort, point: Point) -> f64 {
+        self.nearest_screen_point(vport, point).distance(point)
+    }
+
+    pub(crate) fn nearest_screen_point(&self, vport: ViewPort, point: Point) -> Point {
         match self.guide {
             GuideLine::Horiz(p) => {
                 let Point { y, .. } = p.to_screen(vport);
-                (point.y - y).abs()
+                Point::new(point.x, y)
             }
             GuideLine::Vertical(p) => {
                 let Point { x, .. } = p.to_screen(vport);
-                (point.x - x).abs()
+                Point::new(x, point.y)
             }
             GuideLine::Angle { p1, p2 } => {
-                //FIXME: this line is not not infinite, which it should be.
+                //FIXME: this line is not infinite, which it should be.
                 let p1 = p1.to_screen(vport);
                 let p2 = p2.to_screen(vport);
                 let vec = (p2 - p1).normalize();
                 let p1 = p2 - vec * 5000.; // an arbitrary number
                 let p2 = p2 + vec * 5000.;
                 let line = Line::new(p1, p2);
-                //let line = vport.transform() * Line::new(p1.to_raw(), p2.to_raw());
-                let (x, y) = line.nearest(point, 0.1);
-                Vec2::new(x, y).hypot()
+                let (t, _) = line.nearest(point, 0.1);
+                line.eval(t)
             }
         }
     }
