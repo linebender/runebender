@@ -6,7 +6,7 @@ use druid::Data;
 use spline::{Element, Segment as SplineSegment, SplineSpec};
 
 use norad::glyph::{Contour, ContourPoint, PointType};
-use norad::Plist;
+use norad::{Identifier, Plist};
 
 use super::design_space::DPoint;
 use super::point::{EntityId, PathPoint};
@@ -223,8 +223,11 @@ impl HyperPath {
 
         let mut lib = Plist::new();
         lib.insert(HYPERBEZ_LIB_VERSION_KEY.into(), HYPERBEZ_UFO_VERSION.into());
-        let ident = self.path_points().norad_id_for_id(self.path_points().id());
-        Contour::new(points, ident, Some(lib))
+        let ident = self
+            .path_points()
+            .norad_id_for_id(self.path_points().id())
+            .unwrap_or_else(Identifier::from_uuidv4);
+        Contour::new(points, Some(ident), Some(lib))
     }
 
     pub(crate) fn append_to_bezier(&self, bez: &mut BezPath) {
