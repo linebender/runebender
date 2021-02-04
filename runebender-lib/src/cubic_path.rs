@@ -130,8 +130,8 @@ impl CubicPath {
             let id = EntityId::new_with_parent(path_id);
             if let Some(ident) = n_pt.identifier() {
                 idents.insert(id, ident.to_owned());
-                points.push(PathPoint { id, point, typ });
             }
+            points.push(PathPoint { id, point, typ });
         }
 
         //FIXME: this looks confused and is probably a bug? we should normalize
