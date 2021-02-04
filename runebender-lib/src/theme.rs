@@ -6,7 +6,9 @@ pub use druid::theme::{
 };
 use druid::{Color, Data, Env, FontDescriptor, Key, Widget};
 
-const THEME_FILE_PATH: &str = "resources/default.theme";
+// NOTE: Set the RB_THEME_PATH environment variable during compilation to change
+// the default theme path.
+include!(concat!(env!("OUT_DIR"), "/theme_path.rs"));
 
 pub const SIDEBAR_BACKGROUND: Key<Color> = Key::new("runebender.sidebar-background");
 pub const SIDEBAR_EDGE_STROKE: Key<Color> = Key::new("runebender.sidebar-edge-stroke");

@@ -7,10 +7,33 @@ use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::str::FromStr;
 
-const OUT_FILE: &str = "glyph_names_codegen.rs";
+const GLYPH_NAMES_FILE: &str = "glyph_names_codegen.rs";
+const THEME_PATH_FILE: &str = "theme_path.rs";
+const DEFAULT_THEME_PATH: &str = "resources/default.theme";
 
 fn main() {
-    let path = Path::new(&env::var("OUT_DIR").unwrap()).join(OUT_FILE);
+    println!("cargo:rerun-if-env-changed=RB_THEME_PATH");
+    println!("cargo:rerun-if-changed=../resources/aglfn.txt");
+    generate_glyph_names();
+    generate_theme_path();
+}
+
+fn generate_theme_path() {
+    let user_path: Option<&str> = option_env!("RB_THEME_PATH");
+    let theme_path = user_path.unwrap_or(DEFAULT_THEME_PATH);
+
+    let gen_path = Path::new(&env::var("OUT_DIR").unwrap()).join(THEME_PATH_FILE);
+    let mut file = BufWriter::new(File::create(&gen_path).unwrap());
+    writeln!(
+        &mut file,
+        "static THEME_FILE_PATH: &str = \"{}\";",
+        theme_path
+    )
+    .unwrap();
+}
+
+fn generate_glyph_names() {
+    let path = Path::new(&env::var("OUT_DIR").unwrap()).join(GLYPH_NAMES_FILE);
     let mut file = BufWriter::new(File::create(&path).unwrap());
     let names = include_str!("../resources/aglfn.txt");
 
