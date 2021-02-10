@@ -1,10 +1,10 @@
-use druid::kurbo::Shape;
+use druid::kurbo::{BezPath, Shape};
 use norad::{GlyphName, Ufo};
 use runebender_lib::BezCache;
 
 use std::collections::HashMap;
-
 use std::convert::TryInto;
+use std::sync::Arc;
 
 pub(crate) fn test(font: &Ufo) {
     //let font = make_test_font();
@@ -26,7 +26,7 @@ fn debug_print_cmap(map: &[u8]) {
     }
 }
 
-type GlyphId = u16;
+pub type GlyphId = u16;
 
 #[derive(Debug, Clone)]
 pub struct VirtualFont {
@@ -63,6 +63,12 @@ impl VirtualFont {
 
     fn glyph_for_id(&self, id: GlyphId) -> Option<GlyphName> {
         self.glyph_ids.get(&id).cloned()
+    }
+
+    pub fn bez_path_for_glyph(&self, id: GlyphId) -> Option<Arc<BezPath>> {
+        self.glyph_ids
+            .get(&id)
+            .and_then(|name| self.paths.get(name))
     }
 
     pub fn cmap(&self) -> &[u8] {

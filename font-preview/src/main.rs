@@ -5,11 +5,8 @@ use harfbuzz_rs::{Blob, Face, Font, UnicodeBuffer};
 use norad::Ufo;
 
 mod opentype;
+mod preview_widget;
 use opentype::VirtualFont;
-
-const CMAP: [u8; 4] = [b'c', b'm', b'a', b'p'];
-const HHEA: [u8; 4] = [b'h', b'h', b'e', b'a'];
-const HMTX: [u8; 4] = [b'h', b'm', b't', b'x'];
 
 #[derive(Debug, Clone, Data)]
 struct AppData {
@@ -34,7 +31,7 @@ fn main() {
 }
 
 fn make_ui() -> impl Widget<AppData> {
-    druid::widget::SizedBox::empty()
+    preview_widget::Preview::new(48.0)
 }
 
 /// If there was an argument passed at the command line, try to open it as a .ufo
@@ -53,7 +50,7 @@ fn get_initial_state() -> AppData {
         };
         return AppData {
             font: Arc::new(VirtualFont::new(ufo)),
-            text: "Hamburgler".into(),
+            text: "abcde ABCDE".into(),
         };
     } else {
         eprintln!("missing expected argument: path to Ufo file");
@@ -61,26 +58,26 @@ fn get_initial_state() -> AppData {
     };
 }
 
-fn test_harfbuzz_stuff(data: &AppData) {
-    //let virtual_font = opentype::VirtualFont::new(Ufo::clone(&data.font));
-    let face = Face::from_table_func(|tag| {
-        eprintln!("{}", tag);
-        match tag.to_bytes() {
-            CMAP => Some(Blob::with_bytes(data.font.cmap()).to_shared()),
-            HHEA => Some(Blob::with_bytes(data.font.hhea()).to_shared()),
-            HMTX => Some(Blob::with_bytes(data.font.hmtx()).to_shared()),
-            _ => None,
-        }
-    });
+//fn test_harfbuzz_stuff(data: &AppData) {
+////let virtual_font = opentype::VirtualFont::new(Ufo::clone(&data.font));
+//let face = Face::from_table_func(|tag| {
+//eprintln!("{}", tag);
+//match tag.to_bytes() {
+//CMAP => Some(Blob::with_bytes(data.font.cmap()).to_shared()),
+//HHEA => Some(Blob::with_bytes(data.font.hhea()).to_shared()),
+//HMTX => Some(Blob::with_bytes(data.font.hmtx()).to_shared()),
+//_ => None,
+//}
+//});
 
-    let font = Font::new(face);
-    let buffer = UnicodeBuffer::new().add_str("aA");
-    let output = harfbuzz_rs::shape(&font, buffer, &[]);
+//let font = Font::new(face);
+//let buffer = UnicodeBuffer::new().add_str("aA");
+//let output = harfbuzz_rs::shape(&font, buffer, &[]);
 
-    dbg!(&output);
+//dbg!(&output);
 
-    // The results of the shaping operation are stored in the `output` buffer.
+//// The results of the shaping operation are stored in the `output` buffer.
 
-    //let positions = output.get_glyph_positions();
-    //let infos = output.get_glyph_infos();
-}
+////let positions = output.get_glyph_positions();
+////let infos = output.get_glyph_infos();
+//}
