@@ -39,4 +39,5 @@ pub mod theme;
 pub mod widgets;
 
 pub use app_delegate::Delegate;
+pub use bez_cache::BezCache;
 pub use util::create_blank_font;

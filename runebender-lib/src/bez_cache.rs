@@ -17,7 +17,7 @@ const PRE_CACHE_SIZE: usize = 8;
 /// This plays nicely with `Data` by employing a cheap-to-clone pre-cache
 /// layer that will prevent needing to actually query the hashmap too often.
 #[derive(Debug, Clone, Default, Data)]
-pub(crate) struct BezCache {
+pub struct BezCache {
     beziers: Arc<HashMap<GlyphName, Arc<BezPath>>>,
     pre_cache: PreCache,
     components: ComponentMap,
@@ -103,7 +103,7 @@ impl PreCache {
 }
 
 impl BezCache {
-    pub(crate) fn reset<'a, F>(&mut self, ufo: &Ufo, getter: &'a F)
+    pub fn reset<'a, F>(&mut self, ufo: &Ufo, getter: &'a F)
     where
         F: Fn(&GlyphName) -> Option<&'a Arc<Glyph>> + 'a,
     {
@@ -114,13 +114,13 @@ impl BezCache {
         }
     }
 
-    pub(crate) fn get(&self, name: &GlyphName) -> Option<Arc<BezPath>> {
+    pub fn get(&self, name: &GlyphName) -> Option<Arc<BezPath>> {
         self.pre_cache
             .get(name)
             .or_else(|| self.beziers.get(name).cloned())
     }
 
-    pub(crate) fn set(&mut self, name: GlyphName, path: Arc<BezPath>) {
+    pub fn set(&mut self, name: GlyphName, path: Arc<BezPath>) {
         let result = self.pre_cache.try_insert(name, path);
         // we need to actually hit the main cache
         if let Err((name, path)) = result {
@@ -130,7 +130,7 @@ impl BezCache {
         }
     }
 
-    pub(crate) fn invalidate(&mut self, name: &GlyphName) {
+    pub fn invalidate(&mut self, name: &GlyphName) {
         let cache = Arc::make_mut(&mut self.beziers);
         for glyph in self.components.glyphs_containing_component(name).iter() {
             self.pre_cache.remove(glyph);
@@ -138,11 +138,7 @@ impl BezCache {
         }
     }
 
-    pub(crate) fn rebuild<'a, F>(
-        &mut self,
-        name: &GlyphName,
-        glyph_getter: &'a F,
-    ) -> Option<Arc<BezPath>>
+    pub fn rebuild<'a, F>(&mut self, name: &GlyphName, glyph_getter: &'a F) -> Option<Arc<BezPath>>
     where
         F: Fn(&GlyphName) -> Option<&'a Arc<Glyph>> + 'a,
     {
