@@ -4,21 +4,24 @@ use druid::{AppLauncher, Data, LocalizedString, Size, Widget, WindowDesc};
 use harfbuzz_rs::{Blob, Face, Font, UnicodeBuffer};
 use norad::Ufo;
 
-mod cmap;
+mod opentype;
+use opentype::VirtualFont;
 
 const CMAP: [u8; 4] = [b'c', b'm', b'a', b'p'];
+const HHEA: [u8; 4] = [b'h', b'h', b'e', b'a'];
+const HMTX: [u8; 4] = [b'h', b'm', b't', b'x'];
 
 #[derive(Debug, Clone, Data)]
 struct AppData {
     text: String,
-    font: Arc<Ufo>,
+    #[data(ignore)]
+    font: Arc<VirtualFont>,
 }
 fn main() {
-    //test_some_other_font();
     let data = get_initial_state();
-    cmap::test(&data.font);
-    //panic!("phew");
-    test_harfbuzz_stuff(&data);
+    //test_some_other_font();
+    //opentype::test(&data.font);
+    //test_harfbuzz_stuff(&data);
 
     let main_window = WindowDesc::new(make_ui)
         .title(LocalizedString::new("Font Preview"))
@@ -49,7 +52,7 @@ fn get_initial_state() -> AppData {
             }
         };
         return AppData {
-            font: Arc::new(ufo),
+            font: Arc::new(VirtualFont::new(ufo)),
             text: "Hamburgler".into(),
         };
     } else {
@@ -59,14 +62,13 @@ fn get_initial_state() -> AppData {
 }
 
 fn test_harfbuzz_stuff(data: &AppData) {
-    let virtual_font = cmap::UfOtf::new(Ufo::clone(&data.font));
+    //let virtual_font = opentype::VirtualFont::new(Ufo::clone(&data.font));
     let face = Face::from_table_func(|tag| {
         eprintln!("{}", tag);
         match tag.to_bytes() {
-            CMAP => Some(
-                Blob::with_bytes_owned(virtual_font.make_cmap_table(), |buf| buf.as_slice())
-                    .to_shared(),
-            ),
+            CMAP => Some(Blob::with_bytes(data.font.cmap()).to_shared()),
+            HHEA => Some(Blob::with_bytes(data.font.hhea()).to_shared()),
+            HMTX => Some(Blob::with_bytes(data.font.hmtx()).to_shared()),
             _ => None,
         }
     });
@@ -79,6 +81,6 @@ fn test_harfbuzz_stuff(data: &AppData) {
 
     // The results of the shaping operation are stored in the `output` buffer.
 
-    let positions = output.get_glyph_positions();
-    let infos = output.get_glyph_infos();
+    //let positions = output.get_glyph_positions();
+    //let infos = output.get_glyph_infos();
 }
