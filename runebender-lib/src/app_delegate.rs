@@ -3,16 +3,17 @@
 use std::sync::Arc;
 
 use druid::{
-    AppDelegate, Command, DelegateCtx, Env, Handled, Selector, Target, Widget, WindowDesc, WindowId,
+    AppDelegate, Command, DelegateCtx, Handled, Selector, Target, Widget, WindowDesc, WindowId,
 };
 
-use druid::kurbo::Size;
+use druid::kurbo::Line;
 use druid::lens::LensExt;
-use druid::widget::{Flex, TextBox, WidgetExt};
+use druid::text::format::ParseFormatter;
+use druid::widget::{prelude::*, Flex, Label, Painter, TextBox, WidgetExt};
 use norad::{GlyphName, Ufo};
 
 use crate::consts;
-use crate::data::{AppState, PreviewState, Workspace};
+use crate::data::{AppState, PreviewSession, PreviewState, Workspace};
 use crate::edit_session::{EditSession, SessionId};
 use crate::widgets::{Editor, EditorController, Preview, RootWindowController, ScrollZoom};
 
@@ -63,7 +64,7 @@ impl AppDelegate<AppState> for Delegate {
             Handled::Yes
         } else if cmd.is(consts::cmd::NEW_PREVIEW_WINDOW) {
             let session_id = data.workspace.new_preview_session();
-            let new_win = WindowDesc::new(move || make_preview(session_id))
+            let new_win = WindowDesc::new(make_preview(session_id))
                 .title("Preview")
                 .window_size(Size::new(800.0, 400.0))
                 .menu(crate::menus::make_menu(&data));
@@ -77,7 +78,7 @@ impl AppDelegate<AppState> for Delegate {
                 None => {
                     let session = data.workspace.get_or_create_session(&payload);
                     let session_id = session.id;
-                    let new_win = WindowDesc::new(move || make_editor(&session))
+                    let new_win = WindowDesc::new(make_editor(&session))
                         .title(move |d: &AppState, _: &_| {
                             d.workspace
                                 .sessions
@@ -134,15 +135,39 @@ fn make_editor(session: &Arc<EditSession>) -> impl Widget<AppState> {
 }
 
 fn make_preview(session: SessionId) -> impl Widget<AppState> {
+    // this is duplicated in main.rs
+    let hline_painter = Painter::new(|ctx, _: &PreviewState, env| {
+        let rect = ctx.size().to_rect();
+        let max_y = rect.height() - 0.5;
+        let line = Line::new((0.0, max_y), (rect.width(), max_y));
+
+        ctx.fill(rect, &env.get(crate::theme::GLYPH_LIST_BACKGROUND));
+        ctx.stroke(line, &env.get(crate::theme::SIDEBAR_EDGE_STROKE), 1.0);
+    });
     crate::theme::wrap_in_theme_loader(
         Flex::column()
+            .cross_axis_alignment(druid::widget::CrossAxisAlignment::Start)
             .with_child(
-                TextBox::multiline()
-                    .expand_width()
-                    .lens(PreviewState::text)
-                    .center(),
+                Flex::row()
+                    .cross_axis_alignment(druid::widget::CrossAxisAlignment::Baseline)
+                    .with_child(Label::new("Font Size:"))
+                    .with_default_spacer()
+                    .with_child(
+                        TextBox::new()
+                            .with_formatter(ParseFormatter::new())
+                            .lens(PreviewState::session.then(PreviewSession::font_size)),
+                    )
+                    .with_default_spacer()
+                    .with_flex_child(
+                        TextBox::multiline()
+                            .expand_width()
+                            .lens(PreviewState::session.then(PreviewSession::text)),
+                        1.0,
+                    )
+                    .padding(8.0)
+                    .background(hline_painter),
             )
-            .with_flex_child(Preview::new(48.0), 1.0)
+            .with_flex_child(Preview::default().padding(8.0), 1.0)
             .background(crate::theme::GLYPH_LIST_BACKGROUND)
             .lens(AppState::workspace.then(Workspace::preview_state(session)))
             .controller(RootWindowController::default()),

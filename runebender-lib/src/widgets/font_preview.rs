@@ -12,21 +12,10 @@ const CMAP: [u8; 4] = [b'c', b'm', b'a', b'p'];
 const HHEA: [u8; 4] = [b'h', b'h', b'e', b'a'];
 const HMTX: [u8; 4] = [b'h', b'm', b't', b'x'];
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Preview {
     virtual_font: VirtualFont,
     layout: Vec<(GlyphId, f64)>,
-    font_size: f64,
-}
-
-impl Preview {
-    pub fn new(font_size: f64) -> Preview {
-        Preview {
-            virtual_font: VirtualFont::default(),
-            layout: Vec::new(),
-            font_size,
-        }
-    }
 }
 
 impl Widget<PreviewState> for Preview {
@@ -78,12 +67,12 @@ impl Widget<PreviewState> for Preview {
 
         let mut font = Font::new(face);
         font.set_ppem(1000, 1000);
-        let buffer = UnicodeBuffer::new().add_str(&data.text);
+        let buffer = UnicodeBuffer::new().add_str(data.text());
         let output = harfbuzz_rs::shape(&font, buffer, &[]);
         let positions = output.get_glyph_positions();
         let info = output.get_glyph_infos();
         self.layout.clear();
-        let scale = self.font_size / 1000.0;
+        let scale = data.font_size() / 1000.0;
         let mut pos = 0.0;
         for (info, position) in info.iter().zip(positions.iter()) {
             self.layout.push((
@@ -103,9 +92,9 @@ impl Widget<PreviewState> for Preview {
                 .glyph_for_id(*glyph)
                 .and_then(|name| data.font.get_bezier(name))
             {
-                let scale = self.font_size / 1000.0;
+                let scale = data.font_size() / 1000.0;
                 //FIXME: actually calculate the baseline
-                let transform = Affine::new([scale, 0., 0., -scale, *pos, self.font_size]);
+                let transform = Affine::new([scale, 0., 0., -scale, *pos, data.font_size()]);
                 ctx.fill(transform * &*bez, &glyph_color);
             }
         }
