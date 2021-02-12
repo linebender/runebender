@@ -459,7 +459,10 @@ impl MouseDelegate<EditSession> for Select {
                     }
                 }
             }
-            if matches!(state, DragState::Move {..} | DragState::TransformSelection { .. }) {
+            if matches!(
+                state,
+                DragState::Move { .. } | DragState::TransformSelection { .. }
+            ) {
                 self.this_edit_type = Some(EditType::Drag);
             }
         } else {
@@ -469,7 +472,10 @@ impl MouseDelegate<EditSession> for Select {
 
     fn left_drag_ended(&mut self, _drag: Drag, _data: &mut EditSession) {
         if let MouseState::Drag(state) = &self.state {
-            if matches!(state, DragState::Move {..} | DragState::TransformSelection { .. }) {
+            if matches!(
+                state,
+                DragState::Move { .. } | DragState::TransformSelection { .. }
+            ) {
                 self.this_edit_type = Some(EditType::DragUp);
             }
         }

@@ -51,7 +51,7 @@ impl<W: Widget<CoordinateSelection>> Controller<CoordinateSelection, W> for Coor
         }
 
         // suppress clicks so that the editor doesn't handle them.
-        if matches!(event,Event::MouseUp(_) | Event::MouseDown(_)) {
+        if matches!(event, Event::MouseUp(_) | Event::MouseDown(_)) {
             ctx.set_handled();
         }
     }
