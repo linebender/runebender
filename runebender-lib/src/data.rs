@@ -17,6 +17,8 @@ use crate::edit_session::{EditSession, SessionId};
 /// This is by convention.
 const DEFAULT_UNITS_PER_EM: f64 = 1000.;
 
+const DEFAULT_PREVIEW_FONT_SIZE: f64 = 96.0;
+
 /// The top level data structure.
 ///
 /// Currently this just wraps `Workspace`; in the future multiple workspaces
@@ -36,7 +38,7 @@ pub struct Workspace {
     /// glyphs that are already open in an editor window
     pub open_glyphs: Arc<HashMap<GlyphName, WindowId>>,
     pub sessions: Arc<HashMap<SessionId, Arc<EditSession>>>,
-    pub previews: Arc<HashMap<SessionId, String>>,
+    pub(crate) previews: Arc<HashMap<SessionId, PreviewSession>>,
     session_map: Arc<HashMap<GlyphName, SessionId>>,
     // really just a store of the fully resolved Beziers of all glyphs.
     cache: Arc<BezCache>,
@@ -114,11 +116,18 @@ pub struct EditorState {
     pub session: Arc<EditSession>,
 }
 
-/// The state for a preview window.
+/// The data for a preview window
 #[derive(Clone, Data, Lens)]
 pub struct PreviewState {
-    pub text: String,
+    session: PreviewSession,
     pub font: Workspace,
+}
+
+/// The stuff we store separately for each preview window
+#[derive(Debug, Clone, Data, Lens)]
+pub(crate) struct PreviewSession {
+    font_size: f64,
+    text: Arc<String>,
 }
 
 /// A type constructed by a lens to represent our sidebearings.
@@ -222,8 +231,13 @@ impl Workspace {
 
     pub fn new_preview_session(&mut self) -> SessionId {
         let id = SessionId::next();
-        let text = "Hamburgler".to_string();
-        Arc::make_mut(&mut self.previews).insert(id, text);
+        Arc::make_mut(&mut self.previews).insert(
+            id,
+            PreviewSession {
+                text: "Hamburgler".to_string().into(),
+                font_size: DEFAULT_PREVIEW_FONT_SIZE,
+            },
+        );
         id
     }
 
@@ -446,6 +460,16 @@ impl EditorState {
     }
 }
 
+impl PreviewState {
+    pub(crate) fn text(&self) -> &str {
+        &self.session.text
+    }
+
+    pub(crate) fn font_size(&self) -> f64 {
+        self.session.font_size
+    }
+}
+
 impl FontObject {
     /// Update the actual `FontInfo` from the generated `SimpleFontInfo`
     #[allow(clippy::float_cmp)]
@@ -646,31 +670,31 @@ mod lenses {
     impl Lens<Workspace, PreviewState_> for PreviewState {
         fn with<V, F: FnOnce(&PreviewState_) -> V>(&self, data: &Workspace, f: F) -> V {
             //let metrics = data.info.metrics.clone();
-            let text = data.previews.get(&self.0).cloned().unwrap();
+            let session = data.previews.get(&self.0).cloned().unwrap();
             //let session = data.sessions.get(&self.0).cloned().unwrap();
             let session = PreviewState_ {
                 font: data.clone(),
-                text,
+                session,
             };
             f(&session)
         }
 
         fn with_mut<V, F: FnOnce(&mut PreviewState_) -> V>(&self, data: &mut Workspace, f: F) -> V {
             //let metrics = data.info.metrics.clone();
-            let text = data.previews.get(&self.0).cloned().unwrap();
+            let session = data.previews.get(&self.0).cloned().unwrap();
             //let session = data.sessions.get(&self.0).cloned().unwrap();
             let mut session = PreviewState_ {
                 font: data.clone(),
-                text,
+                session,
             };
             let v = f(&mut session);
             if !data
                 .previews
                 .get(&self.0)
-                .map(|s| s.same(&session.text))
+                .map(|s| s.same(&session.session))
                 .unwrap_or(true)
             {
-                Arc::make_mut(&mut data.previews).insert(self.0, session.text);
+                Arc::make_mut(&mut data.previews).insert(self.0, session.session);
             }
             v
         }

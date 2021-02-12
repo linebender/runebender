@@ -11,7 +11,7 @@ use runebender_lib::{menus, theme, Delegate};
 fn main() {
     let state = get_initial_state();
 
-    let main_window = WindowDesc::new(make_ui)
+    let main_window = WindowDesc::new(make_ui())
         .title(LocalizedString::new("Runebender"))
         .menu(menus::make_menu(&state))
         .window_size(Size::new(900.0, 800.0));
