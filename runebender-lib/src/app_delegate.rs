@@ -8,13 +8,13 @@ use druid::{
 
 use druid::kurbo::Size;
 use druid::lens::LensExt;
-use druid::widget::WidgetExt;
+use druid::widget::{Flex, TextBox, WidgetExt};
 use norad::{GlyphName, Ufo};
 
 use crate::consts;
-use crate::data::{AppState, Workspace};
-use crate::edit_session::EditSession;
-use crate::widgets::{Editor, EditorController, RootWindowController, ScrollZoom};
+use crate::data::{AppState, PreviewState, Workspace};
+use crate::edit_session::{EditSession, SessionId};
+use crate::widgets::{Editor, EditorController, Preview, RootWindowController, ScrollZoom};
 
 pub const EDIT_GLYPH: Selector<GlyphName> = Selector::new("runebender.open-editor-with-glyph");
 
@@ -62,7 +62,8 @@ impl AppDelegate<AppState> for Delegate {
             data.workspace.rename_glyph(old.clone(), new.clone());
             Handled::Yes
         } else if cmd.is(consts::cmd::NEW_PREVIEW_WINDOW) {
-            let new_win = WindowDesc::new(|| make_preview())
+            let session_id = data.workspace.new_preview_session();
+            let new_win = WindowDesc::new(move || make_preview(session_id))
                 .title("Preview")
                 .window_size(Size::new(800.0, 400.0))
                 .menu(crate::menus::make_menu(&data));
@@ -132,6 +133,18 @@ fn make_editor(session: &Arc<EditSession>) -> impl Widget<AppState> {
     )
 }
 
-fn make_preview() -> impl Widget<AppState> {
-    crate::theme::wrap_in_theme_loader(druid::widget::SizedBox::empty())
+fn make_preview(session: SessionId) -> impl Widget<AppState> {
+    crate::theme::wrap_in_theme_loader(
+        Flex::column()
+            .with_child(
+                TextBox::multiline()
+                    .expand_width()
+                    .lens(PreviewState::text)
+                    .center(),
+            )
+            .with_flex_child(Preview::new(48.0), 1.0)
+            .background(crate::theme::GLYPH_LIST_BACKGROUND)
+            .lens(AppState::workspace.then(Workspace::preview_state(session)))
+            .controller(RootWindowController::default()),
+    )
 }

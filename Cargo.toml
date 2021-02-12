@@ -24,4 +24,4 @@ druid = { version = "0.7.0", git = "https://github.com/linebender/druid.git", re
 spline = { version = "0.3.0", git = "https://github.com/linebender/spline.git", rev = "229f7e7" }
 
 [workspace]
-members = ["runebender-lib", "druid-theme-loader", "font-preview"]
+members = ["runebender-lib", "druid-theme-loader"]
