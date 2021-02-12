@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
-use druid::{AppLauncher, Data, LocalizedString, Size, Widget, WindowDesc};
-use harfbuzz_rs::{Blob, Face, Font, UnicodeBuffer};
+use druid::widget::{Flex, TextBox};
+use druid::{AppLauncher, Data, Lens, LocalizedString, Size, Widget, WidgetExt, WindowDesc};
 use norad::Ufo;
 
 mod opentype;
 mod preview_widget;
 use opentype::VirtualFont;
 
-#[derive(Debug, Clone, Data)]
+#[derive(Debug, Clone, Lens, Data)]
 struct AppData {
     text: String,
     #[data(ignore)]
@@ -16,9 +16,6 @@ struct AppData {
 }
 fn main() {
     let data = get_initial_state();
-    //test_some_other_font();
-    //opentype::test(&data.font);
-    //test_harfbuzz_stuff(&data);
 
     let main_window = WindowDesc::new(make_ui)
         .title(LocalizedString::new("Font Preview"))
@@ -31,7 +28,9 @@ fn main() {
 }
 
 fn make_ui() -> impl Widget<AppData> {
-    preview_widget::Preview::new(48.0)
+    Flex::column()
+        .with_child(TextBox::multiline().lens(AppData::text).center())
+        .with_flex_child(preview_widget::Preview::new(48.0), 1.0)
 }
 
 /// If there was an argument passed at the command line, try to open it as a .ufo
@@ -57,27 +56,3 @@ fn get_initial_state() -> AppData {
         std::process::exit(1);
     };
 }
-
-//fn test_harfbuzz_stuff(data: &AppData) {
-////let virtual_font = opentype::VirtualFont::new(Ufo::clone(&data.font));
-//let face = Face::from_table_func(|tag| {
-//eprintln!("{}", tag);
-//match tag.to_bytes() {
-//CMAP => Some(Blob::with_bytes(data.font.cmap()).to_shared()),
-//HHEA => Some(Blob::with_bytes(data.font.hhea()).to_shared()),
-//HMTX => Some(Blob::with_bytes(data.font.hmtx()).to_shared()),
-//_ => None,
-//}
-//});
-
-//let font = Font::new(face);
-//let buffer = UnicodeBuffer::new().add_str("aA");
-//let output = harfbuzz_rs::shape(&font, buffer, &[]);
-
-//dbg!(&output);
-
-//// The results of the shaping operation are stored in the `output` buffer.
-
-////let positions = output.get_glyph_positions();
-////let infos = output.get_glyph_infos();
-//}

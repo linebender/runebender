@@ -52,15 +52,11 @@ impl Widget<AppData> for Preview {
         data: &AppData,
         _env: &Env,
     ) -> Size {
-        //bc.max()
-        let face = Face::from_table_func(|tag| {
-            eprintln!("{}", tag);
-            match tag.to_bytes() {
-                CMAP => Some(Blob::with_bytes(data.font.cmap()).to_shared()),
-                HHEA => Some(Blob::with_bytes(data.font.hhea()).to_shared()),
-                HMTX => Some(Blob::with_bytes(data.font.hmtx()).to_shared()),
-                _ => None,
-            }
+        let face = Face::from_table_func(|tag| match tag.to_bytes() {
+            CMAP => Some(Blob::with_bytes(data.font.cmap()).to_shared()),
+            HHEA => Some(Blob::with_bytes(data.font.hhea()).to_shared()),
+            HMTX => Some(Blob::with_bytes(data.font.hmtx()).to_shared()),
+            _ => None,
         });
 
         let mut font = Font::new(face);
@@ -82,11 +78,9 @@ impl Widget<AppData> for Preview {
         bc.constrain((pos, bc.max().height))
     }
 
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &AppData, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &AppData, _env: &Env) {
         for (glyph, pos) in &self.layout {
-            dbg!(glyph, pos);
             if let Some(bez) = data.font.bez_path_for_glyph(*glyph) {
-                //let transform = Affine::translate((*pos, 400.0)) * Affine::FLIP_Y;
                 let scale = self.font_size / 1000.0;
                 let transform = Affine::new([scale, 0., 0., -scale, *pos, 400.0]);
                 ctx.fill(transform * &*bez, &Color::BLACK);
