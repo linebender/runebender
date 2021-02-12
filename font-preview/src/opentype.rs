@@ -2,55 +2,59 @@ use druid::kurbo::{BezPath, Shape};
 use norad::{GlyphName, Ufo};
 use runebender_lib::BezCache;
 
-use std::collections::HashMap;
 use std::convert::TryInto;
 use std::sync::Arc;
 
-pub(crate) fn test(font: &Ufo) {
-    //let font = make_test_font();
-    let thing = VirtualFont::new(font.clone());
-    //let cmap = thing.make_cmap_table();
-    let table = ttf_parser::cmap::parse(&thing.cmap())
-        .unwrap()
-        .next()
-        .unwrap();
-    table.codepoints(|c| eprintln!("{}", c));
-}
-
-fn debug_print_cmap(map: &[u8]) {
-    for (i, slice) in map.chunks(2).enumerate() {
-        if i % 8 == 0 {
-            eprintln!("");
-        }
-        eprintln!("{:02X} {:02X}", slice[0], slice[1]);
-    }
-}
-
 pub type GlyphId = u16;
 
+/// An object that acts like a font loaded from disk.
+///
+/// This lets us interact with harfbuzz as if we were just a normal compiled
+/// font file.
 #[derive(Debug, Clone)]
 pub struct VirtualFont {
     ufo: Ufo,
     paths: BezCache,
-    glyph_ids: HashMap<GlyphId, GlyphName>,
+    glyph_ids: Vec<(char, GlyphName)>,
     cmap: Vec<u8>,
     hhea: Vec<u8>,
     hmtx: Vec<u8>,
 }
 
+/// Given a ufo, generate a vector of (codepoint, glyph name) pairs,
+/// sorted by codepoint.
+///
+/// This is used as our 'glyphid' table.
+///
+/// NOTE:
+///
+/// Although multiple codepoints can map to the same glyph, we do
+/// not actually handle this well in practice.
+fn glyph_ids(font: &Ufo) -> Vec<(char, GlyphName)> {
+    let mut chars_and_names = Vec::with_capacity(font.glyph_count() + 1);
+    chars_and_names.push(('\0', GlyphName::from(".notdef")));
+    for glyph in font
+        .get_default_layer()
+        .iter()
+        .flat_map(|layer| layer.iter_contents())
+    {
+        for codepoint in glyph.codepoints.as_ref().iter().flat_map(|cps| cps.iter()) {
+            chars_and_names.push((*codepoint, glyph.name.clone()));
+        }
+    }
+    chars_and_names.sort();
+    chars_and_names
+}
+
 impl VirtualFont {
+    /// Given a loaded [`Ufo`] object, resolve the glyphs and generate
+    /// the font tables.
     pub fn new(ufo: Ufo) -> Self {
         let mut paths = BezCache::default();
         paths.reset(&ufo, &|name| ufo.get_glyph(name));
-        let glyph_ids = ufo
-            .get_default_layer()
-            .unwrap()
-            .iter_contents()
-            .enumerate()
-            .map(|(i, glyph)| (i as u16, glyph.name.clone()))
-            .collect();
-        let cmap = make_cmap_table(&ufo);
-        let (hhea, hmtx) = make_horiz_tables(&ufo, &paths);
+        let glyph_ids = glyph_ids(&ufo);
+        let cmap = make_cmap_table(&glyph_ids);
+        let (hhea, hmtx) = make_horiz_tables(&ufo, &glyph_ids, &paths);
         VirtualFont {
             ufo,
             paths,
@@ -61,14 +65,24 @@ impl VirtualFont {
         }
     }
 
-    fn glyph_for_id(&self, id: GlyphId) -> Option<GlyphName> {
-        self.glyph_ids.get(&id).cloned()
+    #[allow(dead_code)]
+    pub(crate) fn test_tables(&self) {
+        let table = ttf_parser::cmap::parse(self.cmap())
+            .unwrap()
+            .next()
+            .unwrap();
+        table.codepoints(|c| eprintln!("{}", c));
+        for chr in &[' ', 'A', 'B', 'F', 'a', 'b', 'c'] {
+            eprintln!("{}: {:?}", chr, table.glyph_index(*chr as u32));
+        }
+    }
+
+    fn glyph_for_id(&self, id: GlyphId) -> Option<&GlyphName> {
+        self.glyph_ids.get(id as usize).map(|(_, g)| g)
     }
 
     pub fn bez_path_for_glyph(&self, id: GlyphId) -> Option<Arc<BezPath>> {
-        self.glyph_ids
-            .get(&id)
-            .and_then(|name| self.paths.get(name))
+        self.glyph_for_id(id).and_then(|name| self.paths.get(name))
     }
 
     pub fn cmap(&self) -> &[u8] {
@@ -84,46 +98,23 @@ impl VirtualFont {
     }
 }
 
-fn make_cmap_table(font: &Ufo) -> Vec<u8> {
-    let mut data = font
-        .get_default_layer()
-        .unwrap()
-        .iter_contents()
-        .enumerate()
-        .flat_map(|(i, glyph)| {
-            glyph
-                .codepoints
-                .as_ref()
-                .and_then(|v| v.first().copied())
-                .map(|code| (code, i))
-        })
-        .flat_map(|(chr, glyph_id)| {
-            let chr: u16 = (chr as u32).try_into().ok()?;
-            let glyph_id: u16 = glyph_id.try_into().ok()?;
-            Some((chr, glyph_id))
-        })
-        .collect::<Vec<_>>();
-
-    data.sort();
-
+fn make_cmap_table(glyphs: &[(char, GlyphName)]) -> Vec<u8> {
     let mut start_codes = Vec::new();
     let mut end_codes: Vec<u16> = Vec::new();
     let mut offsets = Vec::new();
     let mut deltas = Vec::new();
-    let mut glyph_ids = Vec::with_capacity(data.len() + 1);
-    //glyph_ids.push(0_u16);
 
-    for (chr, glyph_id) in data.iter() {
-        if end_codes.last().map(|c| c + 1) == Some(*chr) {
+    for (i, (chr, _glyph_name)) in glyphs.iter().enumerate().skip(1) {
+        let chr: u16 = (*chr as u32).try_into().unwrap();
+        if end_codes.last().map(|c| c + 1) == Some(chr) {
             *end_codes.last_mut().unwrap() += 1;
         } else {
-            start_codes.push(*chr);
-            end_codes.push(*chr);
-            let delta = glyph_ids.len() as isize - *chr as isize;
+            start_codes.push(chr);
+            end_codes.push(chr);
+            let delta = i as isize - chr as isize;
             deltas.push(delta as i16);
             offsets.push(0_u16);
         }
-        glyph_ids.push(*glyph_id);
     }
 
     // and required end segment
@@ -132,12 +123,8 @@ fn make_cmap_table(font: &Ufo) -> Vec<u8> {
     deltas.push(1);
     offsets.push(0);
 
-    let length = 16 + start_codes.len() * 2 * 4 + glyph_ids.len() * 2;
+    let length = 16 + start_codes.len() * 2 * 4;
     let length = length as u16;
-    //for i in 0..start_codes.len() {
-    //eprintln!("{}..{} {}, {}", start_codes[i], end_codes[i], deltas[i], offsets[i]);
-    //}
-    //eprintln!("len: {}", length);
     let segment_count_x2 = (start_codes.len() * 2) as u16;
 
     let mut result = Vec::new();
@@ -170,26 +157,30 @@ fn make_cmap_table(font: &Ufo) -> Vec<u8> {
     offsets
         .iter()
         .for_each(|int| result.extend_from_slice(&int.to_be_bytes()));
-    glyph_ids
-        .iter()
-        .for_each(|int| result.extend_from_slice(&int.to_be_bytes()));
     result
 }
 
-fn make_horiz_tables(font: &Ufo, paths: &BezCache) -> (Vec<u8>, Vec<u8>) {
-    let records = font
-        .get_default_layer()
-        .unwrap()
-        .iter_contents()
-        .map(|glyph| HorizontalMetricRecord {
-            advance_width: glyph
+fn make_horiz_tables(
+    font: &Ufo,
+    glyphs: &[(char, GlyphName)],
+    paths: &BezCache,
+) -> (Vec<u8>, Vec<u8>) {
+    let records = glyphs
+        .iter()
+        .map(|(_, name)| {
+            let advance_width = font
+                .get_glyph(name)
+                .unwrap()
                 .advance_width()
                 .map(|adv| adv as u16)
-                .unwrap_or_default(),
-            left_side_bearing: paths
-                .get(&glyph.name)
-                .map(|path| path.bounding_box().x0 as i16)
-                .unwrap_or_default(),
+                .unwrap_or_default();
+            HorizontalMetricRecord {
+                advance_width,
+                left_side_bearing: paths
+                    .get(name)
+                    .map(|path| path.bounding_box().x0 as i16)
+                    .unwrap_or_default(),
+            }
         })
         .collect();
     let metrics = HorizontalMetrics {
@@ -302,5 +293,14 @@ impl HorizontalMetrics {
             result.extend_from_slice(&lsb.to_be_bytes());
         }
         result
+    }
+}
+
+fn debug_print_cmap(map: &[u8]) {
+    for (i, slice) in map.chunks(2).enumerate() {
+        if i % 8 == 0 {
+            eprintln!("");
+        }
+        eprintln!("{:02X} {:02X}", slice[0], slice[1]);
     }
 }
