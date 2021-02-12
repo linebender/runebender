@@ -50,7 +50,7 @@ impl<W: Widget<Sidebearings>> Controller<Sidebearings, W> for GlyphPane {
             ctx.submit_command(consts::cmd::ADJUST_SIDEBEARING.with(args));
         }
         // suppress clicks so that the editor doesn't handle them.
-        if matches!(event,Event::MouseUp(_) | Event::MouseDown(_)) {
+        if matches!(event, Event::MouseUp(_) | Event::MouseDown(_)) {
             ctx.set_handled();
         }
     }
