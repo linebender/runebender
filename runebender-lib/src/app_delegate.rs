@@ -61,6 +61,13 @@ impl AppDelegate<AppState> for Delegate {
         {
             data.workspace.rename_glyph(old.clone(), new.clone());
             Handled::Yes
+        } else if cmd.is(consts::cmd::NEW_PREVIEW_WINDOW) {
+            let new_win = WindowDesc::new(|| make_preview())
+                .title("Preview")
+                .window_size(Size::new(800.0, 400.0))
+                .menu(crate::menus::make_menu(&data));
+            ctx.new_window(new_win);
+            Handled::Yes
         } else if let Some(payload) = cmd.get(EDIT_GLYPH) {
             match data.workspace.open_glyphs.get(payload).to_owned() {
                 Some(id) => {
@@ -123,4 +130,8 @@ fn make_editor(session: &Arc<EditSession>) -> impl Widget<AppState> {
             .lens(AppState::workspace.then(Workspace::editor_state(session.id)))
             .controller(RootWindowController::default()),
     )
+}
+
+fn make_preview() -> impl Widget<AppState> {
+    crate::theme::wrap_in_theme_loader(druid::widget::SizedBox::empty())
 }

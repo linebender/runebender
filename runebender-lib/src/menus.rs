@@ -46,6 +46,7 @@ pub fn make_menu(data: &AppState) -> MenuDesc<AppState> {
         .append(glyph_menu(data))
         .append(paths_menu())
         .append(tools_menu())
+        .append(window_menu(data))
 }
 
 fn file_menu(data: &AppState) -> MenuDesc<AppState> {
@@ -242,4 +243,14 @@ fn tools_menu<T: Data>() -> MenuDesc<T> {
             )
             .hotkey(SysMods::None, "m"),
         )
+}
+
+fn window_menu(_app_state: &AppState) -> MenuDesc<AppState> {
+    MenuDesc::new(LocalizedString::new("menu-window-menu").with_placeholder("Window")).append(
+        MenuItem::new(
+            LocalizedString::new("menu-item-new-preview").with_placeholder("New Preview"),
+            consts::cmd::NEW_PREVIEW_WINDOW,
+        )
+        .hotkey(SysMods::AltCmd, "p"),
+    )
 }

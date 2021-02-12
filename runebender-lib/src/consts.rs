@@ -32,6 +32,9 @@ pub mod cmd {
     /// sent by the 'new glyph' menu item
     pub const NEW_GLYPH: Selector = Selector::new("runebender.new-glyph");
 
+    /// sent by the 'window->new text preview' menu item
+    pub const NEW_PREVIEW_WINDOW: Selector = Selector::new("runebender.new-preview-window");
+
     /// sent by the 'delete glyph' menu item
     pub const DELETE_SELECTED_GLYPH: Selector = Selector::new("runebender.delete-selected-glyph");
 
