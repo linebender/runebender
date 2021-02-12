@@ -36,10 +36,23 @@ pub struct Workspace {
     /// glyphs that are already open in an editor window
     pub open_glyphs: Arc<HashMap<GlyphName, WindowId>>,
     pub sessions: Arc<HashMap<SessionId, Arc<EditSession>>>,
+    pub previews: Arc<HashMap<SessionId, String>>,
     session_map: Arc<HashMap<GlyphName, SessionId>>,
     // really just a store of the fully resolved Beziers of all glyphs.
     cache: Arc<BezCache>,
     pub info: SimpleFontInfo,
+}
+
+/// An object that acts like a font loaded from disk.
+///
+/// This lets us interact with harfbuzz as if we were just a normal compiled
+/// font file.
+#[derive(Debug, Clone)]
+struct VirtualFont {
+    glyph_ids: Vec<(char, GlyphName)>,
+    cmap: Vec<u8>,
+    hhea: Vec<u8>,
+    hmtx: Vec<u8>,
 }
 
 #[derive(Clone, Data)]
@@ -101,6 +114,13 @@ pub struct EditorState {
     pub session: Arc<EditSession>,
 }
 
+/// The state for a preview window.
+#[derive(Clone, Data, Lens)]
+pub struct PreviewState {
+    pub text: String,
+    pub font: Workspace,
+}
+
 /// A type constructed by a lens to represent our sidebearings.
 #[derive(Debug, Clone, Data, Lens)]
 pub struct Sidebearings {
@@ -112,6 +132,11 @@ impl Workspace {
     /// a lens into a particular editor view.
     pub(crate) fn editor_state(id: SessionId) -> impl Lens<Workspace, EditorState> {
         lenses::EditorState(id)
+    }
+
+    /// a lens into a particular editor view.
+    pub(crate) fn preview_state(id: SessionId) -> impl Lens<Workspace, PreviewState> {
+        lenses::PreviewState(id)
     }
 
     /// a lens for getting a `GridGlyph`.
@@ -193,6 +218,13 @@ impl Workspace {
                 Arc::make_mut(&mut self.session_map).insert(glyph_name.clone(), session_id);
                 session
             })
+    }
+
+    pub fn new_preview_session(&mut self) -> SessionId {
+        let id = SessionId::next();
+        let text = "Hamburgler".to_string();
+        Arc::make_mut(&mut self.previews).insert(id, text);
+        id
     }
 
     pub(crate) fn get_bezier(&self, name: &GlyphName) -> Option<Arc<BezPath>> {
@@ -494,6 +526,10 @@ impl SimpleFontInfo {
                 .unwrap_or_default(),
         }
     }
+
+    pub(crate) fn font_metrics(&self) -> &FontMetrics {
+        &self.metrics
+    }
 }
 
 impl Default for SimpleFontInfo {
@@ -542,12 +578,15 @@ mod lenses {
     use norad::GlyphName as GlyphName_;
 
     use super::{
-        EditorState as EditorState_, GlyphDetail, GridGlyph as GridGlyph_, SessionId,
-        Sidebearings as Sidebearings_, Workspace,
+        EditorState as EditorState_, GlyphDetail, GridGlyph as GridGlyph_,
+        PreviewState as PreviewState_, SessionId, Sidebearings as Sidebearings_, Workspace,
     };
 
     /// Workspace -> EditorState
     pub struct EditorState(pub SessionId);
+
+    /// Workspace -> PreviewState
+    pub struct PreviewState(pub SessionId);
 
     /// Workspace -> GridGlyph
     pub struct GridGlyph(pub GlyphName_);
@@ -599,6 +638,39 @@ mod lenses {
                 let name = glyph.session.name.clone();
                 Arc::make_mut(&mut data.sessions).insert(self.0, glyph.session);
                 data.invalidate_path(&name);
+            }
+            v
+        }
+    }
+
+    impl Lens<Workspace, PreviewState_> for PreviewState {
+        fn with<V, F: FnOnce(&PreviewState_) -> V>(&self, data: &Workspace, f: F) -> V {
+            //let metrics = data.info.metrics.clone();
+            let text = data.previews.get(&self.0).cloned().unwrap();
+            //let session = data.sessions.get(&self.0).cloned().unwrap();
+            let session = PreviewState_ {
+                font: data.clone(),
+                text,
+            };
+            f(&session)
+        }
+
+        fn with_mut<V, F: FnOnce(&mut PreviewState_) -> V>(&self, data: &mut Workspace, f: F) -> V {
+            //let metrics = data.info.metrics.clone();
+            let text = data.previews.get(&self.0).cloned().unwrap();
+            //let session = data.sessions.get(&self.0).cloned().unwrap();
+            let mut session = PreviewState_ {
+                font: data.clone(),
+                text,
+            };
+            let v = f(&mut session);
+            if !data
+                .previews
+                .get(&self.0)
+                .map(|s| s.same(&session.text))
+                .unwrap_or(true)
+            {
+                Arc::make_mut(&mut data.previews).insert(self.0, session.text);
             }
             v
         }

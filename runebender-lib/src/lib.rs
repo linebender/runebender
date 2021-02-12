@@ -31,6 +31,7 @@ mod quadrant;
 mod selection;
 mod tools;
 mod undo;
+mod virtual_font;
 
 pub mod data;
 pub mod menus;

@@ -30,7 +30,7 @@ pub const ON_CURVE_PENALTY: f64 = MIN_CLICK_DISTANCE / 2.0;
 pub struct SessionId(usize);
 
 impl SessionId {
-    fn next() -> SessionId {
+    pub(crate) fn next() -> SessionId {
         use std::sync::atomic::{AtomicUsize, Ordering};
         static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
         SessionId(NEXT_ID.fetch_add(1, Ordering::Relaxed))

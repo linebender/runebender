@@ -1,9 +1,9 @@
-use druid::kurbo::{BezPath, Shape};
+use druid::kurbo::Shape;
 use norad::{GlyphName, Ufo};
-use runebender_lib::BezCache;
+
+use crate::data::Workspace;
 
 use std::convert::TryInto;
-use std::sync::Arc;
 
 pub type GlyphId = u16;
 
@@ -11,10 +11,8 @@ pub type GlyphId = u16;
 ///
 /// This lets us interact with harfbuzz as if we were just a normal compiled
 /// font file.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct VirtualFont {
-    ufo: Ufo,
-    paths: BezCache,
     glyph_ids: Vec<(char, GlyphName)>,
     cmap: Vec<u8>,
     hhea: Vec<u8>,
@@ -49,15 +47,15 @@ fn glyph_ids(font: &Ufo) -> Vec<(char, GlyphName)> {
 impl VirtualFont {
     /// Given a loaded [`Ufo`] object, resolve the glyphs and generate
     /// the font tables.
-    pub fn new(ufo: Ufo) -> Self {
-        let mut paths = BezCache::default();
-        paths.reset(&ufo, &|name| ufo.get_glyph(name));
-        let glyph_ids = glyph_ids(&ufo);
+    pub fn new(workspace: &Workspace) -> Self {
+        //let mut paths = BezCache::default();
+        //paths.reset(&ufo, &|name| ufo.get_glyph(name));
+        let glyph_ids = glyph_ids(&workspace.font.ufo);
         let cmap = make_cmap_table(&glyph_ids);
-        let (hhea, hmtx) = make_horiz_tables(&ufo, &glyph_ids, &paths);
+        let (hhea, hmtx) = make_horiz_tables(workspace, &glyph_ids);
         VirtualFont {
-            ufo,
-            paths,
+            //ufo,
+            //paths,
             glyph_ids,
             cmap,
             hhea,
@@ -65,25 +63,25 @@ impl VirtualFont {
         }
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn test_tables(&self) {
-        let table = ttf_parser::cmap::parse(self.cmap())
-            .unwrap()
-            .next()
-            .unwrap();
-        table.codepoints(|c| eprintln!("{}", c));
-        for chr in &[' ', 'A', 'B', 'F', 'a', 'b', 'c'] {
-            eprintln!("{}: {:?}", chr, table.glyph_index(*chr as u32));
-        }
-    }
+    //#[allow(dead_code)]
+    //pub(crate) fn test_tables(&self) {
+    //let table = ttf_parser::cmap::parse(self.cmap())
+    //.unwrap()
+    //.next()
+    //.unwrap();
+    //table.codepoints(|c| eprintln!("{}", c));
+    //for chr in &[' ', 'A', 'B', 'F', 'a', 'b', 'c'] {
+    //eprintln!("{}: {:?}", chr, table.glyph_index(*chr as u32));
+    //}
+    //}
 
-    fn glyph_for_id(&self, id: GlyphId) -> Option<&GlyphName> {
+    pub(crate) fn glyph_for_id(&self, id: GlyphId) -> Option<&GlyphName> {
         self.glyph_ids.get(id as usize).map(|(_, g)| g)
     }
 
-    pub fn bez_path_for_glyph(&self, id: GlyphId) -> Option<Arc<BezPath>> {
-        self.glyph_for_id(id).and_then(|name| self.paths.get(name))
-    }
+    //pub fn glyph_for_id(&self, id: GlyphId) -> Option<GlyphName> {
+    //self.glyph_for_id(id).and_then(|name| self.workspace.get_glyph(name))
+    //}
 
     pub fn cmap(&self) -> &[u8] {
         &self.cmap
@@ -161,14 +159,16 @@ fn make_cmap_table(glyphs: &[(char, GlyphName)]) -> Vec<u8> {
 }
 
 fn make_horiz_tables(
-    font: &Ufo,
+    workspace: &Workspace,
     glyphs: &[(char, GlyphName)],
-    paths: &BezCache,
+    //paths: &BezCache,
 ) -> (Vec<u8>, Vec<u8>) {
     let records = glyphs
         .iter()
         .map(|(_, name)| {
-            let advance_width = font
+            let advance_width = workspace
+                .font
+                .ufo
                 .get_glyph(name)
                 .unwrap()
                 .advance_width()
@@ -176,8 +176,9 @@ fn make_horiz_tables(
                 .unwrap_or_default();
             HorizontalMetricRecord {
                 advance_width,
-                left_side_bearing: paths
-                    .get(name)
+                left_side_bearing: workspace
+                    .get_bezier(name)
+                    //.get(name)
                     .map(|path| path.bounding_box().x0 as i16)
                     .unwrap_or_default(),
             }
@@ -190,17 +191,21 @@ fn make_horiz_tables(
 
     let hhea = HorizontalHeader {
         version: (1, 0),
-        ascender: font
-            .font_info
-            .as_ref()
-            .and_then(|info| info.ascender.map(|n| n.get() as i16))
+        ascender: workspace
+            .info
+            .font_metrics()
+            .ascender
+            .map(|n| n as i16)
             .unwrap_or_default(),
-        descender: font
-            .font_info
-            .as_ref()
-            .and_then(|info| info.descender.map(|n| n.get() as i16))
+        descender: workspace
+            .info
+            .font_metrics()
+            .descender
+            .map(|n| n as i16)
             .unwrap_or_default(),
-        line_gap: font
+        line_gap: workspace
+            .font
+            .ufo
             .font_info
             .as_ref()
             .and_then(|info| info.open_type_hhea_line_gap)
@@ -217,6 +222,7 @@ fn make_horiz_tables(
             .map(|r| r.left_side_bearing)
             .min()
             .unwrap_or_default(),
+        //FIXME: these are currently just made-up
         right_side_bearing_min: 6,
         max_x_extent: 900,
         caret_slope_rise: 1,
@@ -296,11 +302,11 @@ impl HorizontalMetrics {
     }
 }
 
-fn debug_print_cmap(map: &[u8]) {
-    for (i, slice) in map.chunks(2).enumerate() {
-        if i % 8 == 0 {
-            eprintln!("");
-        }
-        eprintln!("{:02X} {:02X}", slice[0], slice[1]);
-    }
-}
+//fn debug_print_cmap(map: &[u8]) {
+//for (i, slice) in map.chunks(2).enumerate() {
+//if i % 8 == 0 {
+//eprintln!("");
+//}
+//eprintln!("{:02X} {:02X}", slice[0], slice[1]);
+//}
+//}
