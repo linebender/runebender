@@ -2,7 +2,7 @@
 
 use druid::kurbo::Affine;
 use druid::widget::prelude::*;
-use harfbuzz_rs::{Blob, Face, Font, UnicodeBuffer};
+use harfbuzz_rs::{Blob, Face, Font, GlyphBuffer, UnicodeBuffer};
 
 use crate::data::PreviewState;
 use crate::theme;
@@ -12,10 +12,32 @@ const CMAP: [u8; 4] = [b'c', b'm', b'a', b'p'];
 const HHEA: [u8; 4] = [b'h', b'h', b'e', b'a'];
 const HMTX: [u8; 4] = [b'h', b'm', b't', b'x'];
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct Preview {
     virtual_font: VirtualFont,
-    layout: Vec<(GlyphId, f64)>,
+    layout: Vec<Run>,
+}
+
+#[derive(Debug, Default)]
+struct Run {
+    // glyphs + advances
+    glyphs: Vec<(GlyphId, i32)>,
+    // the total width of the run in design points
+    width: i32,
+}
+
+impl Run {
+    fn new(hb_output: &GlyphBuffer) -> Self {
+        let info = hb_output.get_glyph_infos();
+        let positions = hb_output.get_glyph_positions();
+        let mut pos = 0;
+        let mut glyphs = Vec::with_capacity(info.len());
+        for (info, position) in info.iter().zip(positions.iter()) {
+            glyphs.push((info.codepoint as u16, pos + position.x_offset));
+            pos += position.x_advance;
+        }
+        Run { glyphs, width: pos }
+    }
 }
 
 impl Widget<PreviewState> for Preview {
@@ -66,36 +88,45 @@ impl Widget<PreviewState> for Preview {
         });
 
         let mut font = Font::new(face);
-        font.set_ppem(1000, 1000);
-        let buffer = UnicodeBuffer::new().add_str(data.text());
-        let output = harfbuzz_rs::shape(&font, buffer, &[]);
-        let positions = output.get_glyph_positions();
-        let info = output.get_glyph_infos();
+        let upm = data.font.units_per_em();
+        font.set_ppem(upm as u32, upm as u32);
+        let mut reuseable_buffer = None;
         self.layout.clear();
-        let scale = data.font_size() / 1000.0;
-        let mut pos = 0.0;
-        for (info, position) in info.iter().zip(positions.iter()) {
-            self.layout.push((
-                info.codepoint as u16,
-                pos + position.x_offset as f64 * scale,
-            ));
-            pos += position.x_advance as f64 * scale;
+        for line in data.text().lines() {
+            let buffer = reuseable_buffer
+                .take()
+                .unwrap_or_else(UnicodeBuffer::new)
+                .add_str(line);
+            let output = harfbuzz_rs::shape(&font, buffer, &[]);
+            self.layout.push(Run::new(&output));
+            reuseable_buffer = Some(output.clear());
         }
-        bc.constrain((pos, bc.max().height))
+        let width = self
+            .layout
+            .iter()
+            .map(|run| run.width)
+            .max()
+            .unwrap_or_default();
+        bc.constrain((width as f64, bc.max().height))
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &PreviewState, env: &Env) {
         let glyph_color = env.get(theme::PRIMARY_TEXT_COLOR);
-        for (glyph, pos) in &self.layout {
-            if let Some(bez) = self
-                .virtual_font
-                .glyph_for_id(*glyph)
-                .and_then(|name| data.font.get_bezier(name))
-            {
-                let scale = data.font_size() / 1000.0;
-                //FIXME: actually calculate the baseline
-                let transform = Affine::new([scale, 0., 0., -scale, *pos, data.font_size()]);
-                ctx.fill(transform * &*bez, &glyph_color);
+        let font_size = data.font_size();
+        let scale = font_size / data.font.units_per_em();
+        for (line_n, run) in self.layout.iter().enumerate() {
+            let y_pos = (line_n + 1) as f64 * font_size;
+            for (glyph, pos) in &run.glyphs {
+                if let Some(bez) = self
+                    .virtual_font
+                    .glyph_for_id(*glyph)
+                    .and_then(|name| data.font.get_bezier(name))
+                {
+                    //FIXME: actually calculate the baseline
+                    let transform =
+                        Affine::new([scale, 0., 0., -scale, *pos as f64 * scale, y_pos]);
+                    ctx.fill(transform * &*bez, &glyph_color);
+                }
             }
         }
     }
