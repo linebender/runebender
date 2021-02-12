@@ -48,14 +48,10 @@ impl VirtualFont {
     /// Given a loaded [`Ufo`] object, resolve the glyphs and generate
     /// the font tables.
     pub fn new(workspace: &Workspace) -> Self {
-        //let mut paths = BezCache::default();
-        //paths.reset(&ufo, &|name| ufo.get_glyph(name));
         let glyph_ids = glyph_ids(&workspace.font.ufo);
         let cmap = make_cmap_table(&glyph_ids);
         let (hhea, hmtx) = make_horiz_tables(workspace, &glyph_ids);
         VirtualFont {
-            //ufo,
-            //paths,
             glyph_ids,
             cmap,
             hhea,
@@ -78,10 +74,6 @@ impl VirtualFont {
     pub(crate) fn glyph_for_id(&self, id: GlyphId) -> Option<&GlyphName> {
         self.glyph_ids.get(id as usize).map(|(_, g)| g)
     }
-
-    //pub fn glyph_for_id(&self, id: GlyphId) -> Option<GlyphName> {
-    //self.glyph_for_id(id).and_then(|name| self.workspace.get_glyph(name))
-    //}
 
     pub fn cmap(&self) -> &[u8] {
         &self.cmap
@@ -301,12 +293,3 @@ impl HorizontalMetrics {
         result
     }
 }
-
-//fn debug_print_cmap(map: &[u8]) {
-//for (i, slice) in map.chunks(2).enumerate() {
-//if i % 8 == 0 {
-//eprintln!("");
-//}
-//eprintln!("{:02X} {:02X}", slice[0], slice[1]);
-//}
-//}
