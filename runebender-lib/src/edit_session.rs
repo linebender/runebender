@@ -463,7 +463,7 @@ impl EditSession {
     }
 
     pub(crate) fn scale_selection(&mut self, scale: Vec2, anchor: DPoint) {
-        assert!(scale.x.is_finite(), scale.y.is_finite());
+        assert!(scale.x.is_finite() && scale.y.is_finite());
         if !self.selection.is_empty() {
             let sel = self.selection.per_path_selection();
             for path_points in sel.iter() {
