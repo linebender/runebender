@@ -8,6 +8,8 @@ use runebender_lib::data::{AppState, Workspace};
 use runebender_lib::widgets::{self, GlyphGrid, ModalHost, RootWindowController, Sidebar};
 use runebender_lib::{menus, theme, Delegate};
 
+//TODO: use `log_to_console` when https://github.com/linebender/druid/pull/1621 lands
+#[allow(deprecated)]
 fn main() {
     let state = get_initial_state();
 

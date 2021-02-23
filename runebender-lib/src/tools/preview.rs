@@ -49,6 +49,7 @@ impl Tool for Preview {
         let pre_state = self.state;
         mouse.mouse_event(event, data, self);
         if pre_state != self.state {
+            #[allow(deprecated)]
             match self.state {
                 State::Ready => ctx.set_cursor(&Cursor::OpenHand),
                 State::Dragging => ctx.set_cursor(&Cursor::OpenHand),
@@ -57,6 +58,7 @@ impl Tool for Preview {
         None
     }
 
+    #[allow(deprecated)]
     fn default_cursor(&self) -> Cursor {
         Cursor::OpenHand
     }
