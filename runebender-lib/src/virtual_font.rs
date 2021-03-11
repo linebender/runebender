@@ -162,9 +162,7 @@ fn make_horiz_tables(
                 .font
                 .ufo
                 .get_glyph(name)
-                .unwrap()
-                .advance_width()
-                .map(|adv| adv as u16)
+                .and_then(|glyph| glyph.advance_width().map(|adv| adv as u16))
                 .unwrap_or_default();
             HorizontalMetricRecord {
                 advance_width,
