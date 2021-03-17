@@ -16,7 +16,6 @@
 //!
 //! This is a bit hacky, and depends on implementation details of other widgets.
 
-use druid::text::EditAction;
 use druid::widget::prelude::*;
 use druid::widget::{LabelText, TextBox};
 use druid::{Color, Data, FontDescriptor, HotKey, KbKey, KeyOrValue, Selector, TextAlignment};
@@ -126,12 +125,6 @@ impl<T: Data> EditableLabel<T> {
             if !ctx.has_focus() {
                 ctx.request_focus();
             }
-            ctx.submit_command(
-                TextBox::PERFORM_EDIT
-                    .with(EditAction::SelectAll)
-                    .to(ctx.widget_id()),
-            );
-            // our content isn't valid
             // ideally we would flash the background or something
         }
     }
@@ -227,11 +220,11 @@ impl<T: Data> Widget<T> for EditableLabel<T> {
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, _data: &T, env: &Env) {
-        if self.editing {
-            self.text_box.paint(ctx, &self.buffer, env);
-        } else {
-            let text_pos = self.text_box.text_position();
-            self.text_box.editor().layout().draw(ctx, text_pos);
-        }
+        //FIXME: we want to paint differently when we aren't editing
+        //if self.editing {
+        //self.text_box.paint(ctx, &self.buffer, env);
+        //} else {
+        self.text_box.paint(ctx, &self.buffer, env);
+        //}
     }
 }

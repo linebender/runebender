@@ -19,7 +19,7 @@ fn main() {
     AppLauncher::with_window(main_window)
         .delegate(Delegate::default())
         .configure_env(|env, _| theme::configure_env(env))
-        .use_simple_logger()
+        .log_to_console()
         .launch(state)
         .expect("launch failed");
 }
