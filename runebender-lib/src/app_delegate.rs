@@ -15,7 +15,7 @@ use norad::{GlyphName, Ufo};
 use crate::consts;
 use crate::data::{AppState, PreviewSession, PreviewState, Workspace};
 use crate::edit_session::{EditSession, SessionId};
-use crate::widgets::{Editor, EditorController, Preview, RootWindowController, ScrollZoom};
+use crate::widgets::{Editor, EditorController, Preview, ScrollZoom};
 
 pub const EDIT_GLYPH: Selector<GlyphName> = Selector::new("runebender.open-editor-with-glyph");
 
@@ -36,7 +36,6 @@ impl AppDelegate<AppState> for Delegate {
                 Ok(ufo) => data.workspace.set_file(ufo, info.path().to_owned()),
                 Err(e) => log::error!("failed to open file {:?}: '{:?}'", info.path(), e),
             };
-            ctx.submit_command(consts::cmd::REBUILD_MENUS);
             Handled::Yes
         } else if cmd.is(druid::commands::SAVE_FILE) {
             if let Err(e) = data.workspace.save() {
@@ -45,7 +44,6 @@ impl AppDelegate<AppState> for Delegate {
             Handled::Yes
         } else if let Some(info) = cmd.get(druid::commands::SAVE_FILE_AS) {
             Arc::make_mut(&mut data.workspace.font).path = Some(info.path().into());
-            ctx.submit_command(consts::cmd::REBUILD_MENUS);
             if let Err(e) = data.workspace.save() {
                 log::error!("saving failed: '{}'", e);
             }
@@ -67,7 +65,7 @@ impl AppDelegate<AppState> for Delegate {
             let new_win = WindowDesc::new(make_preview(session_id))
                 .title("Preview")
                 .window_size(Size::new(800.0, 400.0))
-                .menu(crate::menus::make_menu(&data));
+                .menu(crate::menus::make_menu);
             ctx.new_window(new_win);
             Handled::Yes
         } else if let Some(payload) = cmd.get(EDIT_GLYPH) {
@@ -87,7 +85,7 @@ impl AppDelegate<AppState> for Delegate {
                                 .unwrap_or_else(|| "Unknown".to_string())
                         })
                         .window_size(Size::new(900.0, 800.0))
-                        .menu(crate::menus::make_menu(&data));
+                        .menu(crate::menus::make_menu);
 
                     let id = new_win.id;
                     ctx.new_window(new_win);
@@ -129,8 +127,7 @@ impl AppDelegate<AppState> for Delegate {
 fn make_editor(session: &Arc<EditSession>) -> impl Widget<AppState> {
     crate::theme::wrap_in_theme_loader(
         EditorController::new(ScrollZoom::new(Editor::new(session.clone())))
-            .lens(AppState::workspace.then(Workspace::editor_state(session.id)))
-            .controller(RootWindowController::default()),
+            .lens(AppState::workspace.then(Workspace::editor_state(session.id))),
     )
 }
 
@@ -169,7 +166,6 @@ fn make_preview(session: SessionId) -> impl Widget<AppState> {
             )
             .with_flex_child(Preview::default().padding(8.0), 1.0)
             .background(crate::theme::GLYPH_LIST_BACKGROUND)
-            .lens(AppState::workspace.then(Workspace::preview_state(session)))
-            .controller(RootWindowController::default()),
+            .lens(AppState::workspace.then(Workspace::preview_state(session))),
     )
 }

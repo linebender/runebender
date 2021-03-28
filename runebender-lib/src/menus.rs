@@ -3,7 +3,8 @@
 use druid::commands;
 use druid::platform_menus;
 use druid::{
-    Data, FileDialogOptions, FileSpec, KbKey, LocalizedString, MenuDesc, MenuItem, Point, SysMods,
+    Data, Env, FileDialogOptions, FileSpec, KbKey, LocalizedString, Menu, MenuItem, Point, SysMods,
+    WindowId,
 };
 
 use crate::consts;
@@ -12,184 +13,201 @@ use crate::data::{AppState, EditorState};
 pub const UFO_FILE_TYPE: FileSpec = FileSpec::new("Font Object", &["ufo"]);
 
 /// Context menu's inner menu must have type T == the root app state.
-pub fn make_context_menu(data: &EditorState, pos: Point) -> MenuDesc<AppState> {
-    let mut menu = MenuDesc::empty().append(MenuItem::new(
-        LocalizedString::new("menu-item-add-guide").with_placeholder("Add Guide"),
-        consts::cmd::ADD_GUIDE.with(pos),
-    ));
+pub fn make_context_menu(data: &EditorState, pos: Point) -> Menu<AppState> {
+    let mut menu = Menu::empty().entry(
+        MenuItem::new(LocalizedString::new("menu-item-add-guide").with_placeholder("Add Guide"))
+            .on_activate(move |ctx, _, _| ctx.submit_command(consts::cmd::ADD_GUIDE.with(pos))),
+    );
 
     // only show 'toggle guide' if a guide is selected
     if data.session.selection.len() == 1 && data.session.selection.iter().all(|s| s.is_guide()) {
         let id = *data.session.selection.iter().next().unwrap();
-        let args = consts::cmd::ToggleGuideCmdArgs { id, pos };
-        menu = menu.append(MenuItem::new(
-            LocalizedString::new("menu-item-toggle-guide")
-                .with_placeholder("Toggle Guide Orientation"),
-            consts::cmd::TOGGLE_GUIDE.with(args),
-        ));
+        menu = menu.entry(
+            MenuItem::new(
+                LocalizedString::new("menu-item-toggle-guide")
+                    .with_placeholder("Toggle Guide Orientation"),
+            )
+            .on_activate(move |ctx, _, _| {
+                let args = consts::cmd::ToggleGuideCmdArgs { id, pos };
+                ctx.submit_command(consts::cmd::TOGGLE_GUIDE.with(args))
+            }),
+        );
     }
     menu
 }
 
 /// The main window/app menu.
-#[allow(unused_mut)]
-pub fn make_menu(data: &AppState) -> MenuDesc<AppState> {
-    let mut menu = MenuDesc::empty();
-    #[cfg(target_os = "macos")]
-    {
-        menu = menu.append(platform_menus::mac::application::default());
-    }
+pub fn make_menu(_window: Option<WindowId>, data: &AppState, _: &Env) -> Menu<AppState> {
+    let menu = if cfg!(target_os = "macos") {
+        Menu::empty().entry(platform_menus::mac::application::default())
+    } else {
+        Menu::empty()
+    };
 
-    menu.append(file_menu(data))
-        .append(edit_menu())
-        .append(view_menu())
-        .append(glyph_menu(data))
-        .append(paths_menu())
-        .append(window_menu(data))
+    menu.entry(file_menu(data))
+        .entry(edit_menu())
+        .entry(view_menu())
+        .entry(glyph_menu(data))
+        .entry(paths_menu())
+        .entry(window_menu(data))
 }
 
-fn file_menu(data: &AppState) -> MenuDesc<AppState> {
+fn file_menu(data: &AppState) -> Menu<AppState> {
     let has_path = data.workspace.font.path.is_some();
-    let mut menu = MenuDesc::new(LocalizedString::new("common-menu-file-menu"))
-        .append(platform_menus::mac::file::new_file().disabled())
-        .append(
-            MenuItem::new(
-                LocalizedString::new("common-menu-file-open"),
-                commands::SHOW_OPEN_PANEL
-                    .with(FileDialogOptions::new().allowed_types(vec![UFO_FILE_TYPE])),
-            )
-            .hotkey(SysMods::Cmd, "o"),
+    let mut menu = Menu::new(LocalizedString::new("common-menu-file-menu"))
+        .entry(platform_menus::mac::file::new_file().enabled(false))
+        .entry(
+            MenuItem::new(LocalizedString::new("common-menu-file-open"))
+                .on_activate(|ctx, _, _| {
+                    ctx.submit_command(
+                        commands::SHOW_OPEN_PANEL
+                            .with(FileDialogOptions::new().allowed_types(vec![UFO_FILE_TYPE])),
+                    )
+                })
+                .hotkey(SysMods::Cmd, "o"),
         )
-        .append_separator()
-        .append(platform_menus::mac::file::close());
+        .separator()
+        .entry(platform_menus::mac::file::close());
     if has_path {
-        menu = menu.append(platform_menus::mac::file::save()).append(
-            MenuItem::new(
-                LocalizedString::new("common-menu-file-save-as"),
-                commands::SHOW_SAVE_PANEL
-                    .with(FileDialogOptions::new().allowed_types(vec![UFO_FILE_TYPE])),
-            )
-            .hotkey(SysMods::CmdShift, "S"),
+        menu = menu.entry(platform_menus::mac::file::save()).entry(
+            MenuItem::new(LocalizedString::new("common-menu-file-save-as"))
+                .on_activate(|ctx, _, _| {
+                    ctx.submit_command(
+                        commands::SHOW_SAVE_PANEL
+                            .with(FileDialogOptions::new().allowed_types(vec![UFO_FILE_TYPE])),
+                    )
+                })
+                .hotkey(SysMods::CmdShift, "S"),
         );
     } else {
-        menu = menu.append(
-            MenuItem::new(
-                LocalizedString::new("common-menu-file-save-as"),
-                commands::SHOW_SAVE_PANEL
-                    .with(FileDialogOptions::new().allowed_types(vec![UFO_FILE_TYPE])),
-            )
-            .hotkey(SysMods::Cmd, "s"),
+        menu = menu.entry(
+            MenuItem::new(LocalizedString::new("common-menu-file-save-as"))
+                .on_activate(|ctx, _, _| {
+                    ctx.submit_command(
+                        commands::SHOW_SAVE_PANEL
+                            .with(FileDialogOptions::new().allowed_types(vec![UFO_FILE_TYPE])),
+                    )
+                })
+                .hotkey(SysMods::Cmd, "s"),
         );
     }
-    menu.append_separator()
-        .append(platform_menus::mac::file::page_setup().disabled())
-        .append(platform_menus::mac::file::print().disabled())
+    menu.separator()
+        .entry(platform_menus::mac::file::page_setup().enabled(false))
+        .entry(platform_menus::mac::file::print().enabled(false))
 }
 
-fn edit_menu<T: Data>() -> MenuDesc<T> {
-    MenuDesc::new(LocalizedString::new("common-menu-edit-menu"))
-        .append(platform_menus::common::undo())
-        .append(platform_menus::common::redo())
-        .append_separator()
-        .append(platform_menus::common::cut().disabled())
-        .append(platform_menus::common::copy())
-        .append(platform_menus::common::paste())
-        .append(MenuItem::new(
-            LocalizedString::new("menu-item-delete").with_placeholder("Delete"),
-            consts::cmd::DELETE,
-        ))
-        .append_separator()
-        .append(
+fn edit_menu<T: Data>() -> Menu<T> {
+    Menu::new(LocalizedString::new("common-menu-edit-menu"))
+        .entry(platform_menus::common::undo())
+        .entry(platform_menus::common::redo())
+        .separator()
+        .entry(platform_menus::common::cut().enabled(false))
+        .entry(platform_menus::common::copy())
+        .entry(platform_menus::common::paste())
+        .entry(
+            MenuItem::new(LocalizedString::new("menu-item-delete").with_placeholder("Delete"))
+                .on_activate(|ctx, _, _| ctx.submit_command(consts::cmd::DELETE)),
+        )
+        .separator()
+        .entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-select-all").with_placeholder("Select All"),
-                consts::cmd::SELECT_ALL,
             )
+            .on_activate(|ctx, _, _| ctx.submit_command(consts::cmd::SELECT_ALL))
             .hotkey(SysMods::Cmd, "a"),
         )
-        .append(
+        .entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-deselect-all").with_placeholder("Deselect All"),
-                consts::cmd::DESELECT_ALL,
             )
+            .on_activate(|ctx, _, _| ctx.submit_command(consts::cmd::DESELECT_ALL))
             .hotkey(SysMods::AltCmd, "A"),
         )
 }
 
-fn view_menu<T: Data>() -> MenuDesc<T> {
-    MenuDesc::new(LocalizedString::new("menu-view-menu").with_placeholder("View"))
-        .append(
+fn view_menu<T: Data>() -> Menu<T> {
+    Menu::new(LocalizedString::new("menu-view-menu").with_placeholder("View"))
+        .entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-increase-zoom").with_placeholder("Zoom In"),
-                consts::cmd::ZOOM_IN,
             )
+            .on_activate(|ctx, _, _| ctx.submit_command(consts::cmd::ZOOM_IN))
             .hotkey(SysMods::Cmd, "+"),
         )
-        .append(
+        .entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-decrease-zoom").with_placeholder("Zoom Out"),
-                consts::cmd::ZOOM_OUT,
             )
+            .on_activate(|ctx, _, _| ctx.submit_command(consts::cmd::ZOOM_OUT))
             .hotkey(SysMods::Cmd, "-"),
         )
-        .append(
+        .entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-reset-zoom").with_placeholder("Reset Zoom"),
-                consts::cmd::ZOOM_DEFAULT,
             )
+            .on_activate(|ctx, _, _| ctx.submit_command(consts::cmd::ZOOM_DEFAULT))
             .hotkey(SysMods::Cmd, "0"),
         )
 }
 
-fn glyph_menu(data: &AppState) -> MenuDesc<AppState> {
-    MenuDesc::new(LocalizedString::new("menu-glyph-menu").with_placeholder("Glyph"))
-        .append(
+fn glyph_menu(_data: &AppState) -> Menu<AppState> {
+    Menu::new(LocalizedString::new("menu-glyph-menu").with_placeholder("Glyph"))
+        .entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-new-glyph").with_placeholder("New Glyph"),
-                consts::cmd::NEW_GLYPH,
             )
+            .on_activate(|ctx, _, _| ctx.submit_command(consts::cmd::NEW_GLYPH))
             .hotkey(SysMods::CmdShift, "N"),
         )
-        .append(
+        .entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-delete-glyph").with_placeholder("Delete Glyph"),
-                consts::cmd::DELETE_SELECTED_GLYPH,
             )
+            .on_activate(|ctx, _, _| ctx.submit_command(consts::cmd::DELETE_SELECTED_GLYPH))
             .hotkey(SysMods::Cmd, KbKey::Backspace)
-            .disabled_if(|| data.workspace.selected.is_none()),
+            .enabled_if(|data: &AppState, _| data.workspace.selected.is_some()),
         )
-        .append(
+        .entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-add-component").with_placeholder("Add Component"),
-                consts::cmd::ADD_COMPONENT,
             )
+            .on_activate(|ctx, _, _| ctx.submit_command(consts::cmd::ADD_COMPONENT))
             .hotkey(SysMods::CmdShift, "C")
-            .disabled(),
+            .enabled(false),
         )
+        .refresh_on(|old, new, _| old.workspace.selected != new.workspace.selected)
 }
 
-fn paths_menu<T: Data>() -> MenuDesc<T> {
-    MenuDesc::new(LocalizedString::new("menu-paths-menu").with_placeholder("Paths"))
-        .append(MenuItem::new(
-            LocalizedString::new("menu-item-reverse-contours").with_placeholder("Reverse Contours"),
-            consts::cmd::REVERSE_CONTOURS,
-            // TODO: hotkey on mac should be ctrl-alt-cmd R, but what about non-mac?
-        ))
-        .append(
+fn paths_menu<T: Data>() -> Menu<T> {
+    Menu::new(LocalizedString::new("menu-paths-menu").with_placeholder("Paths"))
+        .entry(
+            MenuItem::new(
+                LocalizedString::new("menu-item-reverse-contours")
+                    .with_placeholder("Reverse Contours"),
+            )
+            .on_activate(|ctx, _, _| {
+                ctx.submit_command(
+                    consts::cmd::REVERSE_CONTOURS,
+                    // TODO: hotkey on mac should be ctrl-alt-cmd R, but what about non-mac?
+                )
+            }),
+        )
+        .entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-align-selection")
                     .with_placeholder("Align Selection"),
-                consts::cmd::ALIGN_SELECTION,
             )
+            .on_activate(|ctx, _, _| ctx.submit_command(consts::cmd::ALIGN_SELECTION))
             .hotkey(SysMods::CmdShift, "A"),
         )
 }
 
-fn window_menu(_app_state: &AppState) -> MenuDesc<AppState> {
-    MenuDesc::new(LocalizedString::new("menu-window-menu").with_placeholder("Window")).append(
+fn window_menu(_app_state: &AppState) -> Menu<AppState> {
+    Menu::new(LocalizedString::new("menu-window-menu").with_placeholder("Window")).entry(
         MenuItem::new(
             LocalizedString::new("menu-item-new-preview").with_placeholder("New Preview"),
-            consts::cmd::NEW_PREVIEW_WINDOW,
         )
+        .on_activate(|ctx, _, _| ctx.submit_command(consts::cmd::NEW_PREVIEW_WINDOW))
         .hotkey(SysMods::AltCmd, "p"),
     )
 }
