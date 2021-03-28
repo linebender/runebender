@@ -17,9 +17,6 @@ pub mod cmd {
     use crate::point::EntityId;
     use crate::tools::ToolId;
 
-    /// Sent when windows should rebuild their menus.
-    pub const REBUILD_MENUS: Selector = Selector::new("runebender.rebuid-menus");
-
     /// sent by the 'delete' menu item
     pub const DELETE: Selector = Selector::new("runebender.delete");
 

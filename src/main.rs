@@ -5,7 +5,7 @@ use druid::widget::{Button, Flex, Label, Painter, Scroll, WidgetExt};
 use druid::{AppLauncher, Env, LocalizedString, RenderContext, Size, Widget, WindowDesc};
 
 use runebender_lib::data::{AppState, Workspace};
-use runebender_lib::widgets::{self, GlyphGrid, ModalHost, RootWindowController, Sidebar};
+use runebender_lib::widgets::{self, GlyphGrid, ModalHost, Sidebar};
 use runebender_lib::{menus, theme, Delegate};
 
 fn main() {
@@ -13,7 +13,7 @@ fn main() {
 
     let main_window = WindowDesc::new(make_ui())
         .title(LocalizedString::new("Runebender"))
-        .menu(menus::make_menu(&state))
+        .menu(menus::make_menu)
         .window_size(Size::new(900.0, 800.0));
 
     AppLauncher::with_window(main_window)
@@ -63,11 +63,7 @@ fn make_ui() -> impl Widget<AppState> {
             1.,
         );
 
-    crate::theme::wrap_in_theme_loader(
-        ModalHost::new(main_view)
-            .lens(AppState::workspace)
-            .controller(RootWindowController::default()),
-    )
+    crate::theme::wrap_in_theme_loader(ModalHost::new(main_view).lens(AppState::workspace))
 }
 
 /// If there was an argument passed at the command line, try to open it as a .ufo

@@ -15,7 +15,7 @@ mod scroll_zoom;
 mod sidebar;
 mod toolbar;
 
-pub use controller::{EditorController, RootWindowController};
+pub use controller::EditorController;
 pub use coord_pane::CoordPane;
 pub use editable_label::EditableLabel;
 pub use editor::Editor;

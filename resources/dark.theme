@@ -15,7 +15,7 @@ SECONDARY_TEXT_COLOR:               #222
 SELECTION_RECT_STROKE_COLOR:        #0f2
 SELECTION_RECT_FILL_COLOR:          #0f25
 
-SELECTION_COLOR:                #a6ccff
+SELECTED_TEXT_BACKGROUND_COLOR: #a6ccff
 LABEL_COLOR:                    #05f
 WINDOW_BACKGROUND_COLOR:        #fff
 BACKGROUND_LIGHT:               #eee
