@@ -6,14 +6,9 @@ A font editor written in Rust, currently in very early stages.
 
 ## Building
 
-### macOS
-
-You need to have `libcairo` installed.
-There is currently an [issue](https://github.com/gtk-rs/cairo/issues/263) when `libcairo` is installed via `homebrew`.
-
-Until this is fixed please compile using
-
-    PKG_CONFIG_PATH="/usr/local/opt/libffi/lib/pkgconfig" cargo build
+The only way to run Runebender is to build it yourself, from source. This
+requires installing Rust; instructions are available at
+[rustup.rs](https://rustup.rs).
 
 ## Running
 
