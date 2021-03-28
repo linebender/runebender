@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use druid::widget::prelude::*;
-use druid::{Application, Clipboard, ClipboardFormat, Command, ContextMenu, Data, KbKey};
+use druid::{Application, Clipboard, ClipboardFormat, Command, Data, KbKey};
 
 use crate::consts::{self, CANVAS_SIZE};
 use crate::data::EditorState;
@@ -59,8 +59,7 @@ impl Editor {
             return tool.mouse_event(event, &mut self.mouse, ctx, data.session_mut(), env);
         } else if let TaggedEvent::Down(m) = event {
             let menu = crate::menus::make_context_menu(data, m.pos);
-            let menu = ContextMenu::new(menu, m.window_pos);
-            ctx.show_context_menu(menu);
+            ctx.show_context_menu(menu, m.pos);
         }
         None
     }

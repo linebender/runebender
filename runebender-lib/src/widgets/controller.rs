@@ -1,54 +1,15 @@
 //! Controller widgets
 
-use druid::widget::{prelude::*, Controller};
+use druid::widget::prelude::*;
 use druid::{InternalLifeCycle, LensExt, Rect, WidgetExt, WidgetPod};
 
 use crate::consts;
-use crate::data::{AppState, EditorState};
+use crate::data::EditorState;
 use crate::edit_session::EditSession;
-use crate::menus;
 use crate::widgets::{CoordPane, FloatingPanel, GlyphPane, Toolbar};
 
 /// the distance from the edge of a floating panel to the edge of the window.
 const FLOATING_PANEL_PADDING: f64 = 20.0;
-
-/// A widget that wraps all root widgets
-#[derive(Debug, Default)]
-pub struct RootWindowController;
-
-impl<W: Widget<AppState>> Controller<AppState, W> for RootWindowController {
-    fn event(
-        &mut self,
-        child: &mut W,
-        ctx: &mut EventCtx,
-        event: &Event,
-        data: &mut AppState,
-        env: &Env,
-    ) {
-        match event {
-            Event::Command(cmd) if cmd.is(consts::cmd::REBUILD_MENUS) => {
-                let menu = menus::make_menu(data);
-                ctx.set_menu(menu);
-            }
-            other => child.event(ctx, other, data, env),
-        }
-    }
-
-    fn update(
-        &mut self,
-        child: &mut W,
-        ctx: &mut UpdateCtx,
-        old_data: &AppState,
-        data: &AppState,
-        env: &Env,
-    ) {
-        if old_data.workspace.selected.is_none() != data.workspace.selected.is_none() {
-            let menu = menus::make_menu(data);
-            ctx.set_menu(menu);
-        }
-        child.update(ctx, old_data, data, env);
-    }
-}
 
 /// More like this is 'Editor' and 'Editor' is 'Canvas'?
 //TODO: we could combine this with controller above if we wanted?

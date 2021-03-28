@@ -20,7 +20,7 @@ druid-theme-loader = { version = "0.1.0", path = "druid-theme-loader", features 
 
 [patch.crates-io]
 #druid = { version = "0.7.0", path = "../../druid/druid" }
-druid = { version = "0.7.0", git = "https://github.com/linebender/druid.git", rev = "31c39744" }
+druid = { version = "0.7.0", git = "https://github.com/linebender/druid.git", rev = "75e83ae5" }
 spline = { version = "0.3.0", git = "https://github.com/linebender/spline.git", rev = "229f7e7" }
 
 [workspace]

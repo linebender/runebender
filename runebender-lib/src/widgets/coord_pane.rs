@@ -97,7 +97,7 @@ impl Widget<Quadrant> for CoordRepresentationPicker {
         for quadrant in Quadrant::all() {
             let pt = quadrant.point_in_rect(rect);
             let color = if data == quadrant {
-                env.get(druid::theme::SELECTION_COLOR)
+                env.get(druid::theme::SELECTED_TEXT_BACKGROUND_COLOR)
             } else {
                 Color::BLACK
             };
