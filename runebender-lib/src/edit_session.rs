@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use druid::kurbo::{BezPath, Point, Rect, Shape, Size, Vec2};
+use druid::kurbo::{BezPath, Nearest, Point, Rect, Shape, Size, Vec2};
 use druid::{Data, Lens};
 use norad::glyph::Outline;
 use norad::{Glyph, GlyphName};
@@ -246,18 +246,22 @@ impl EditSession {
     pub fn hit_test_segments(&self, point: Point, max_dist: Option<f64>) -> Option<(Segment, f64)> {
         let max_dist = max_dist.unwrap_or(MIN_CLICK_DISTANCE);
         let dpt = self.viewport.from_screen(point);
-        let mut best = None;
+        let mut best: Option<(Segment, Nearest)> = None;
         for path in &*self.paths {
             for seg in path.iter_segments() {
-                let (t, d2) = seg.nearest(dpt);
-                if best.as_ref().map(|(_seg, _t, d)| d2 < *d).unwrap_or(true) {
-                    best = Some((seg, t, d2));
+                let next = seg.nearest(dpt);
+                if best
+                    .as_ref()
+                    .map(|(_seg, nearest)| next.distance_sq < nearest.distance_sq)
+                    .unwrap_or(true)
+                {
+                    best = Some((seg, next));
                 }
             }
         }
-        if let Some((seg, t, d2)) = best {
-            if d2 * self.viewport.zoom.powi(2) < max_dist.powi(2) {
-                return Some((seg, t));
+        if let Some((seg, nearest)) = best {
+            if nearest.distance_sq * self.viewport.zoom.powi(2) < max_dist.powi(2) {
+                return Some((seg, nearest.t));
             }
         }
         None

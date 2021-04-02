@@ -67,8 +67,8 @@ impl Guide {
                 let p1 = p2 - vec * 5000.; // an arbitrary number
                 let p2 = p2 + vec * 5000.;
                 let line = Line::new(p1, p2);
-                let (t, _) = line.nearest(point, 0.1);
-                line.eval(t)
+                let nearest = line.nearest(point, 0.1);
+                line.eval(nearest.t)
             }
         }
     }

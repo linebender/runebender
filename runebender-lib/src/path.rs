@@ -4,7 +4,8 @@ use super::hyper_path::{HyperPath, HyperSegment, HYPERBEZ_LIB_VERSION_KEY};
 use super::point::{EntityId, PathPoint};
 use super::point_list::{PathPoints, RawSegment};
 use druid::kurbo::{
-    Affine, BezPath, Line, LineIntersection, ParamCurve, ParamCurveNearest, PathSeg, Point, Vec2,
+    Affine, BezPath, Line, LineIntersection, Nearest, ParamCurve, ParamCurveNearest, PathSeg,
+    Point, Vec2,
 };
 use druid::Data;
 
@@ -223,7 +224,7 @@ impl Path {
         let screen_bez = vport.affine() * self.bezier();
         screen_bez
             .segments()
-            .map(|seg| seg.nearest(point, 0.1).1)
+            .map(|seg| seg.nearest(point, 0.1).distance_sq)
             .fold(f64::MAX, |a, b| a.min(b))
     }
 
@@ -482,7 +483,7 @@ impl Segment {
         matches!(self.raw_segment(), RawSegment::Line(..))
     }
 
-    pub(crate) fn nearest(&self, point: DPoint) -> (f64, f64) {
+    pub(crate) fn nearest(&self, point: DPoint) -> Nearest {
         match self {
             Self::Cubic(seg) => seg
                 .to_kurbo()
@@ -494,8 +495,8 @@ impl Segment {
     /// This returns a point and not a DPoint because the location may
     /// not fall on the grid.
     pub(crate) fn nearest_point(&self, point: DPoint) -> Point {
-        let (t, _) = self.nearest(point);
-        self.eval(t)
+        let nearest = self.nearest(point);
+        self.eval(nearest.t)
     }
 
     pub(crate) fn intersect_line(&self, line: Line) -> Vec<LineIntersection> {

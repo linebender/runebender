@@ -132,7 +132,7 @@ impl<T: Widget<EditorState>> ScrollZoom<T> {
 impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
     fn paint(&mut self, ctx: &mut PaintCtx, data: &EditorState, env: &Env) {
         //TODO: paint grid here?
-        ctx.clear(Color::rgb8(100, 100, 20));
+        ctx.clear(None, Color::rgb8(100, 100, 20));
         self.child.paint(ctx, data, env);
     }
 

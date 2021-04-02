@@ -15,13 +15,13 @@ use crate::theme;
 use crate::tools::{EditType, Tool};
 
 const MAX_RECURSE: usize = 16;
+const KNIFE_STROKE: StrokeStyle = StrokeStyle::new().dash_pattern(&[4.0, 2.0]);
 
 /// The state of the rectangle tool.
 #[derive(Debug, Clone)]
 pub struct Knife {
     gesture: GestureState,
     shift_locked: bool,
-    stroke_style: StrokeStyle,
     /// during a drag, the places where we intersect a path; we just hold
     /// on to this so we don't always need to reallocate.
     intersections: Vec<DPoint>,
@@ -47,12 +47,9 @@ struct Hit {
 
 impl Default for Knife {
     fn default() -> Self {
-        let mut stroke_style = StrokeStyle::new();
-        stroke_style.set_dash(vec![4.0, 2.0], 0.0);
         Knife {
             gesture: Default::default(),
             shift_locked: false,
-            stroke_style,
             intersections: Vec::new(),
         }
     }
@@ -188,7 +185,7 @@ impl Tool for Knife {
             let unit_vec = (line.end() - line.start()).normalize();
             //let perp = druid::kurbo::Vec2::new(-unit_vec.y, unit_vec.x);
 
-            ctx.stroke_styled(line, &_env.get(theme::KNIFE_GUIDE), 2.0, &self.stroke_style);
+            ctx.stroke_styled(line, &_env.get(theme::KNIFE_GUIDE), 2.0, &KNIFE_STROKE);
 
             for point in &self.intersections {
                 let point = data.viewport.to_screen(*point);

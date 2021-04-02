@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use druid::kurbo::{BezPath, ParamCurve, ParamCurveNearest, PathEl, PathSeg, Point};
+use druid::kurbo::{BezPath, Nearest, ParamCurve, ParamCurveNearest, PathEl, PathSeg, Point};
 use druid::Data;
 use spline::{Element, Segment as SplineSegment, SplineSpec};
 
@@ -384,22 +384,27 @@ impl HyperSegment {
     /// it will be returned as a negative number, the integer component
     /// of which will correspond to the rendered segment and the fractional
     /// component will correspond to the param within that segment.
-    pub(crate) fn nearest(&self, point: DPoint) -> (f64, f64) {
+    pub(crate) fn nearest(&self, point: DPoint) -> Nearest {
         let point = point.to_raw();
         const ACC: f64 = druid::kurbo::DEFAULT_ACCURACY;
         if self.spline_seg.is_line() {
             self.path_seg.to_kurbo().nearest(point, ACC)
         } else {
-            self.kurbo_segments()
-                .enumerate()
-                .fold((-0.0, f64::MAX), |acc, (i, seg)| {
-                    let (t, dist) = seg.nearest(point, ACC);
-                    if acc.1 < dist {
+            self.kurbo_segments().enumerate().fold(
+                Nearest {
+                    t: -0.0,
+                    distance_sq: f64::MAX,
+                },
+                |acc, (i, seg)| {
+                    let mut next = seg.nearest(point, ACC);
+                    if acc.distance_sq < next.distance_sq {
                         acc
                     } else {
-                        (-t - i as f64, dist)
+                        next.t -= i as f64;
+                        next
                     }
-                })
+                },
+            )
         }
     }
 

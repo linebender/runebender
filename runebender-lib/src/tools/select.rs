@@ -17,6 +17,7 @@ use crate::{
 // distance from edges of the selection bbox to where we draw the handles
 const SELECTION_BBOX_HANDLE_PADDING: Insets = Insets::uniform(6.0);
 const SELECTION_HANDLE_RADIUS: f64 = 4.;
+const BBOX_STROKE: StrokeStyle = StrokeStyle::new().dash_pattern(&[2.0, 4.0]);
 
 /// An item that can be selected.
 #[derive(Debug, Clone)]
@@ -141,8 +142,7 @@ impl Tool for Select {
                         1.0,
                     );
                     let bbox = data.viewport.rect_to_screen(data.selection_dpoint_bbox());
-                    let style = StrokeStyle::new().dash(vec![2.0, 4.0], 0.0);
-                    ctx.stroke_styled(&bbox, &selection_stroke, 0.5, &style);
+                    ctx.stroke_styled(&bbox, &selection_stroke, 0.5, &BBOX_STROKE);
 
                     for (_loc, circle) in iter_handle_circles(data) {
                         //FIXME: we don't fill while dragging because we would
@@ -594,8 +594,7 @@ fn paint_selection_bbox(
     if data.selection.len() > 1 {
         let selection_stroke = env.get(theme::SELECTION_RECT_STROKE_COLOR);
         let bbox = data.viewport.rect_to_screen(data.selection_dpoint_bbox());
-        let style = StrokeStyle::new().dash(vec![2.0, 4.0], 0.0);
-        ctx.stroke_styled(&bbox, &selection_stroke, 0.5, &style);
+        ctx.stroke_styled(&bbox, &selection_stroke, 0.5, &BBOX_STROKE);
 
         for (quad, circle) in iter_handle_circles(data) {
             if Some(quad) == hot_quad {

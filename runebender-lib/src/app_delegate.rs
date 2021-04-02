@@ -8,7 +8,7 @@ use druid::{
 
 use druid::kurbo::Line;
 use druid::lens::LensExt;
-use druid::text::format::ParseFormatter;
+use druid::text::ParseFormatter;
 use druid::widget::{prelude::*, Flex, Label, Painter, TextBox, WidgetExt};
 use norad::{GlyphName, Ufo};
 
