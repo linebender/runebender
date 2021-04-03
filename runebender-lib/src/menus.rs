@@ -45,7 +45,6 @@ pub fn make_menu(data: &AppState) -> MenuDesc<AppState> {
         .append(view_menu())
         .append(glyph_menu(data))
         .append(paths_menu())
-        .append(tools_menu())
         .append(window_menu(data))
 }
 
@@ -182,66 +181,6 @@ fn paths_menu<T: Data>() -> MenuDesc<T> {
                 consts::cmd::ALIGN_SELECTION,
             )
             .hotkey(SysMods::CmdShift, "A"),
-        )
-}
-
-fn tools_menu<T: Data>() -> MenuDesc<T> {
-    MenuDesc::new(LocalizedString::new("menu-tools-menu").with_placeholder("Tools"))
-        .append(
-            MenuItem::new(
-                LocalizedString::new("menu-item-select-tool").with_placeholder("Select"),
-                consts::cmd::SET_TOOL.with("Select"),
-            )
-            .hotkey(SysMods::None, "v"),
-        )
-        .append(
-            MenuItem::new(
-                LocalizedString::new("menu-item-pen-tool").with_placeholder("Pen"),
-                consts::cmd::SET_TOOL.with("Pen"),
-            )
-            .hotkey(SysMods::None, "p"),
-        )
-        .append(
-            MenuItem::new(
-                LocalizedString::new("menu-item-hyperpen-tool").with_placeholder("Pen"),
-                consts::cmd::SET_TOOL.with("HyperPen"),
-            )
-            .hotkey(SysMods::Shift, "P"),
-        )
-        .append(
-            MenuItem::new(
-                LocalizedString::new("menu-item-preview-tool").with_placeholder("Preview"),
-                consts::cmd::SET_TOOL.with("Preview"),
-            )
-            .hotkey(SysMods::None, "h"),
-        )
-        .append(
-            MenuItem::new(
-                LocalizedString::new("menu-item-rectangle-tool").with_placeholder("Rectangle"),
-                consts::cmd::SET_TOOL.with("Rectangle"),
-            )
-            .hotkey(SysMods::None, "u"),
-        )
-        .append(
-            MenuItem::new(
-                LocalizedString::new("menu-item-ellipse-tool").with_placeholder("Ellipse"),
-                consts::cmd::SET_TOOL.with("Ellipse"),
-            )
-            .hotkey(SysMods::Shift, "U"),
-        )
-        .append(
-            MenuItem::new(
-                LocalizedString::new("menu-item-knife-tool").with_placeholder("Knife"),
-                consts::cmd::SET_TOOL.with("Knife"),
-            )
-            .hotkey(SysMods::None, "e"),
-        )
-        .append(
-            MenuItem::new(
-                LocalizedString::new("menu-item-measure-tool").with_placeholder("Measure"),
-                consts::cmd::SET_TOOL.with("Measure"),
-            )
-            .hotkey(SysMods::None, "m"),
         )
 }
 
