@@ -458,14 +458,16 @@ impl PathPoints {
         let mut to_xform = HashSet::new();
         for point in points {
             let cursor = self.cursor(Some(*point));
-            if cursor.point().is_some() {
+            if let Some(current) = cursor.point() {
                 to_xform.insert(*point);
-                if let Some(prev) = cursor.peek_prev().filter(|pp| pp.is_off_curve()) {
-                    to_xform.insert(prev.id);
-                }
+                if current.is_on_curve() {
+                    if let Some(prev) = cursor.peek_prev().filter(|pp| pp.is_off_curve()) {
+                        to_xform.insert(prev.id);
+                    }
 
-                if let Some(next) = cursor.peek_next().filter(|pp| pp.is_off_curve()) {
-                    to_xform.insert(next.id);
+                    if let Some(next) = cursor.peek_next().filter(|pp| pp.is_off_curve()) {
+                        to_xform.insert(next.id);
+                    }
                 }
             }
         }
