@@ -87,6 +87,8 @@ pub struct GlyphDetail {
     // the full outline, including things like components
     pub outline: Arc<BezPath>,
     metrics: FontMetrics,
+    pub kern1_group: String,
+    pub kern2_group: String,
     is_placeholder: bool,
 }
 
@@ -599,6 +601,7 @@ mod lenses {
     use std::sync::Arc;
 
     use druid::{Data, Lens};
+    use norad::glyph::Glyph;
     use norad::GlyphName as GlyphName_;
 
     use super::{
@@ -722,10 +725,13 @@ mod lenses {
             let outline = state.font.get_bezier(&glyph.name);
             let is_placeholder = outline.is_none();
             let metrics = state.font.info.metrics.clone();
+            let (kern1_group, kern2_group) = find_kern_groups(&state.font, &glyph);
             GlyphDetail {
                 glyph,
                 outline: outline.unwrap_or_else(|| state.font.font.placeholder.clone()),
                 is_placeholder,
+                kern1_group,
+                kern2_group,
                 metrics,
             }
         }
@@ -762,10 +768,13 @@ mod lenses {
                 let outline = data.get_bezier(&glyph.name);
                 let is_placeholder = outline.is_none();
                 let metrics = data.info.metrics.clone();
+                let (kern1_group, kern2_group) = find_kern_groups(data, glyph);
                 GlyphDetail {
                     glyph: Arc::clone(glyph),
                     outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
                     metrics,
+                    kern1_group,
+                    kern2_group,
                     is_placeholder,
                 }
             });
@@ -786,10 +795,13 @@ mod lenses {
                 let outline = data.get_bezier(&glyph.name);
                 let is_placeholder = outline.is_none();
                 let metrics = data.info.metrics.clone();
+                let (kern1_group, kern2_group) = find_kern_groups(data, glyph);
                 GlyphDetail {
                     glyph: Arc::clone(glyph),
                     outline: outline.unwrap_or_else(|| data.font.placeholder.clone()),
                     metrics,
+                    kern1_group,
+                    kern2_group,
                     is_placeholder,
                 }
             });
@@ -910,6 +922,25 @@ mod lenses {
             let mut s = data.glyph.name.clone();
             f(&mut s)
         }
+    }
+
+    fn find_kern_groups(data: &Workspace, glyph: &Glyph) -> (String, String) {
+        let mut kern1_group = "".to_string();
+        let mut kern2_group = "".to_string();
+        if let Some(gs) = &data.font.ufo.groups {
+            for (gk, gv) in gs.iter() {
+                if let Some(gn) = gk.strip_prefix("public.kern1.") {
+                    if (*gv).iter().any(|n| *n == glyph.name) {
+                        kern1_group = gn.to_string();
+                    }
+                } else if let Some(gn) = gk.strip_prefix("public.kern2.") {
+                    if (*gv).iter().any(|n| *n == glyph.name) {
+                        kern2_group = gn.to_string();
+                    }
+                }
+            }
+        }
+        (kern1_group, kern2_group)
     }
 }
 

@@ -63,13 +63,13 @@ fn selected_glyph_widget() -> impl Widget<GlyphDetail> {
         .with_child(
             Flex::row()
                 .with_child(
-                    Label::new("kern group")
+                    Label::dynamic(|d: &GlyphDetail, _| (*d.kern2_group).to_string())
                         .with_text_color(theme::SECONDARY_TEXT_COLOR)
                         .with_font(theme::UI_DETAIL_FONT),
                 )
                 .with_flex_spacer(1.0)
                 .with_child(
-                    Label::new("kern group")
+                    Label::dynamic(|d: &GlyphDetail, _| (*d.kern1_group).to_string())
                         .with_text_color(theme::SECONDARY_TEXT_COLOR)
                         .with_font(theme::UI_DETAIL_FONT),
                 )
