@@ -358,6 +358,33 @@ impl Workspace {
         }
     }
 
+    pub fn set_glyph_group(&mut self, prefix: &str, glyph_name: GlyphName, group_name: String) {
+        let font = self.font_mut();
+        if let Some(mut groups) = font.ufo.groups.clone() {
+            let mut do_remove = Vec::<String>::new(); // BTreeMap retain is nightly for now
+            for (gk, gv) in groups.iter_mut() {
+                if let Some(gn) = gk.strip_prefix(prefix) {
+                    if gn != group_name {
+                        (*gv).retain(|n| *n != glyph_name);
+                        if (*gv).len() == 0 {
+                            do_remove.push(gk.clone());
+                        }
+                    }
+                }
+            }
+            for gk in do_remove {
+                groups.remove(&gk);
+            }
+            if group_name != "" {
+                let k = [prefix, &group_name].join("");
+                let entry = groups.entry(k).or_insert_with(Vec::<GlyphName>::new);
+                entry.push(glyph_name);
+                entry.sort();
+            }
+            font.ufo.groups = Some(groups);
+        }
+    }
+
     pub fn update_glyph_metadata(&mut self, changed: &Arc<Glyph>) {
         // update the active session, if one exists
         if let Some(session_id) = self.session_map.get(&changed.name) {

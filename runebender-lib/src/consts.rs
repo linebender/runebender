@@ -49,6 +49,20 @@ pub mod cmd {
         pub new: GlyphName,
     }
 
+    /// Change the kern1 group of a glyph.
+    pub const SET_GLYPH_KERN1_GROUP: Selector<SetGlyphKernGroupArgs> =
+        Selector::new("runebender.set-glyph-kern1-group");
+
+    /// Change the kern2 group of a glyph.
+    pub const SET_GLYPH_KERN2_GROUP: Selector<SetGlyphKernGroupArgs> =
+        Selector::new("runebender.set-glyph-kern2-group");
+
+    /// Arguments passed with the SET_GLYPH_KERN1_GROUP AND SET_GLYPH_KERN2_GROUP commands.
+    pub struct SetGlyphKernGroupArgs {
+        pub glyph_name: GlyphName,
+        pub group_key: String,
+    }
+
     /// sent by the 'add component' menu item
     pub const ADD_COMPONENT: Selector = Selector::new("runebender.add-component");
 
