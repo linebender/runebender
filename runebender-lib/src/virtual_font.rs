@@ -5,6 +5,8 @@ use crate::data::Workspace;
 
 use std::convert::TryInto;
 
+use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
+
 pub type GlyphId = u16;
 
 /// An object that acts like a font loaded from disk.
@@ -17,6 +19,7 @@ pub struct VirtualFont {
     cmap: Vec<u8>,
     hhea: Vec<u8>,
     hmtx: Vec<u8>,
+    kern: Vec<u8>,
 }
 
 /// Given a ufo, generate a vector of (codepoint, glyph name) pairs,
@@ -51,11 +54,13 @@ impl VirtualFont {
         let glyph_ids = glyph_ids(&workspace.font.ufo);
         let cmap = make_cmap_table(&glyph_ids);
         let (hhea, hmtx) = make_horiz_tables(workspace, &glyph_ids);
+        let kern = make_kern_table(workspace, &glyph_ids);
         VirtualFont {
             glyph_ids,
             cmap,
             hhea,
             hmtx,
+            kern,
         }
     }
 
@@ -85,6 +90,10 @@ impl VirtualFont {
 
     pub fn hmtx(&self) -> &[u8] {
         &self.hmtx
+    }
+
+    pub fn kern(&self) -> &[u8] {
+        &self.kern
     }
 }
 
@@ -289,5 +298,193 @@ impl HorizontalMetrics {
             result.extend_from_slice(&lsb.to_be_bytes());
         }
         result
+    }
+}
+
+fn expand_group(
+    prefix: &str,
+    workspace: &Workspace,
+    glyphs: &[(char, GlyphName)],
+    k: &str,
+) -> Vec<u16> {
+    if k.starts_with(prefix) {
+        if let Some(groups) = &workspace.font.ufo.groups {
+            match groups.get(k) {
+                Some(v) => v
+                    .iter()
+                    .filter_map(|x| {
+                        glyphs
+                            .iter()
+                            .position(|(_, n)| (*n).to_string() == (*x).to_string())
+                            .map(|x| x as u16)
+                    })
+                    .collect(),
+                None => vec![],
+            }
+        } else {
+            vec![]
+        }
+    } else {
+        match glyphs.iter().position(|(_, n)| (*n).to_string() == *k) {
+            Some(id) => vec![id as u16],
+            None => vec![],
+        }
+    }
+}
+
+fn make_kern_table(
+    workspace: &Workspace,
+    glyphs: &[(char, GlyphName)],
+    //paths: &BezCache,
+) -> Vec<u8> {
+    let mut pairs = Vec::<KernFormat0Pair>::new();
+
+    if let Some(kerning) = &workspace.font.ufo.kerning {
+        for (kern1, kern2s) in kerning {
+            let kern1ids = expand_group("public.kern1.", workspace, glyphs, kern1);
+            let kern2kvs = kern2s
+                .iter()
+                .map(|(kern2, v)| (expand_group("public.kern2.", workspace, glyphs, kern2), *v))
+                .collect::<Vec<(Vec<u16>, f32)>>();
+            for k1id in kern1ids {
+                for (k2ids, k2v) in &kern2kvs {
+                    for k2id in k2ids {
+                        pairs.push(KernFormat0Pair {
+                            left: k1id,
+                            right: *k2id,
+                            value: *k2v as i16,
+                        })
+                    }
+                }
+            }
+        }
+    }
+
+    KernTable {
+        version: 0,
+        subtables: vec![KernSubtable {
+            version: 0,
+            coverage: KernSubtableCoverage::default(),
+            pairs,
+        }],
+    }
+    .encode()
+}
+
+struct KernTable {
+    version: u16,
+    subtables: Vec<KernSubtable>,
+}
+
+impl KernTable {
+    fn encode(&self) -> Vec<u8> {
+        let mut result = Vec::<u8>::new();
+        result.extend_from_slice(&self.version.to_be_bytes());
+        result.extend_from_slice(&(self.subtables.len() as u16).to_be_bytes());
+        for subtable in &self.subtables {
+            result.extend(subtable.encode());
+        }
+        result
+    }
+}
+
+struct KernSubtable {
+    version: u16,
+    coverage: KernSubtableCoverage,
+    pairs: Vec<KernFormat0Pair>,
+}
+
+impl KernSubtable {
+    fn encode(&self) -> Vec<u8> {
+        let length = 6 + self.pairs.len() * 6;
+        let mut result = Vec::with_capacity(length);
+        result.extend_from_slice(&self.version.to_be_bytes());
+        result.extend_from_slice(&length.to_be_bytes());
+        result.extend_from_slice(&self.coverage.encode().to_be_bytes());
+
+        let n_pairs = self.pairs.len() as u16;
+        result.extend_from_slice(&n_pairs.to_be_bytes());
+        let search_range: u16 = (1 << (15 - n_pairs.leading_zeros())) * 6;
+        result.extend_from_slice(&search_range.to_be_bytes());
+        let entry_selector: u16 = (1 << (16 - n_pairs.leading_zeros())) * 6;
+        result.extend_from_slice(&entry_selector.to_be_bytes());
+        let range_shift: u16 = n_pairs - search_range;
+        result.extend_from_slice(&range_shift.to_be_bytes());
+        let mut pairs = self.pairs.clone();
+        pairs.sort();
+        for pair in pairs {
+            result.extend(pair.encode());
+        }
+        result
+    }
+}
+
+struct KernSubtableCoverage {
+    horizontal: bool,
+    minimum: bool,
+    cross_stream: bool,
+    over_ride: bool,
+    format: u8,
+}
+
+impl KernSubtableCoverage {
+    fn default() -> Self {
+        KernSubtableCoverage {
+            horizontal: true,
+            minimum: false,
+            cross_stream: false,
+            over_ride: false,
+            format: 0,
+        }
+    }
+
+    fn encode(&self) -> u16 {
+        let mut r: u16 = 0;
+        if self.horizontal {
+            r |= 0b1;
+        }
+        if self.minimum {
+            r |= 0b10;
+        }
+        if self.cross_stream {
+            r |= 0b100;
+        }
+        if self.over_ride {
+            r |= 0b1000;
+        }
+        r |= (self.format as u16) << 8;
+        r
+    }
+}
+
+#[derive(PartialEq, Eq, Clone)]
+struct KernFormat0Pair {
+    left: u16,
+    right: u16,
+    value: i16,
+}
+
+impl KernFormat0Pair {
+    fn encode(&self) -> Vec<u8> {
+        let mut result = Vec::with_capacity(6);
+        result.extend_from_slice(&self.left.to_be_bytes());
+        result.extend_from_slice(&self.right.to_be_bytes());
+        result.extend_from_slice(&self.value.to_be_bytes());
+        result
+    }
+}
+
+impl PartialOrd for KernFormat0Pair {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for KernFormat0Pair {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.left.cmp(&other.left) {
+            Ordering::Equal => self.right.cmp(&other.right),
+            o => o,
+        }
     }
 }

@@ -11,6 +11,7 @@ use crate::virtual_font::{GlyphId, VirtualFont};
 const CMAP: [u8; 4] = [b'c', b'm', b'a', b'p'];
 const HHEA: [u8; 4] = [b'h', b'h', b'e', b'a'];
 const HMTX: [u8; 4] = [b'h', b'm', b't', b'x'];
+const KERN: [u8; 4] = [b'k', b'e', b'r', b'n'];
 
 #[derive(Debug, Default)]
 pub struct Preview {
@@ -84,6 +85,7 @@ impl Widget<PreviewState> for Preview {
             CMAP => Some(Blob::with_bytes(virtual_font.cmap()).to_shared()),
             HHEA => Some(Blob::with_bytes(virtual_font.hhea()).to_shared()),
             HMTX => Some(Blob::with_bytes(virtual_font.hmtx()).to_shared()),
+            KERN => Some(Blob::with_bytes(virtual_font.kern()).to_shared()),
             _ => None,
         });
 

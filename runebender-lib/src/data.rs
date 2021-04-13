@@ -55,6 +55,7 @@ struct VirtualFont {
     cmap: Vec<u8>,
     hhea: Vec<u8>,
     hmtx: Vec<u8>,
+    kern: Vec<u8>,
 }
 
 #[derive(Clone, Data)]
