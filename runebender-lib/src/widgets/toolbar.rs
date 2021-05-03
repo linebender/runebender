@@ -1,6 +1,6 @@
 //! The toolbar widget
 
-use druid::kurbo::{Affine, BezPath, Circle, Line, Shape, Vec2};
+use druid::kurbo::{Affine, BezPath, Line, Shape, Vec2};
 use druid::widget::prelude::*;
 use druid::widget::{Painter, WidgetExt};
 use druid::{Color, Data, HotKey, KeyEvent, Rect, SysMods, WidgetPod};
@@ -274,155 +274,223 @@ fn constrain_path(mut path: BezPath) -> BezPath {
 fn select_path() -> BezPath {
     let mut bez = BezPath::new();
 
-    bez.move_to((111.0, 483.0));
-    bez.line_to((202.0, 483.0));
-    bez.line_to((202.0, 328.0));
-    bez.line_to((312.0, 361.0));
-    bez.line_to((156.0, 0.0));
-    bez.line_to((0.0, 360.0));
-    bez.line_to((111.0, 330.0));
-    bez.line_to((111.0, 483.0));
+    bez.move_to((110.0, 500.0));
+    bez.line_to((110.0, 380.0));
+    bez.line_to((2.0, 410.0));
+    bez.line_to((0.0, 410.0));
+    bez.line_to((159.0, 0.0));
+    bez.line_to((161.0, 0.0));
+    bez.line_to((320.0, 410.0));
+    bez.line_to((318.0, 410.0));
+    bez.line_to((210.0, 380.0));
+    bez.line_to((210.0, 500.0));
+    bez.line_to((110.0, 500.0));
     bez.close_path();
-
-    bez.apply_affine(Affine::rotate(-0.5));
-    let origin = bez.bounding_box().origin();
-    bez.apply_affine(Affine::translate(-origin.to_vec2()));
     bez
 }
 
 fn pen_path() -> BezPath {
     let mut bez = BezPath::new();
 
-    bez.move_to((97.0, 0.0));
-    bez.line_to((214.0, 0.0));
-    bez.line_to((273.0, 241.0));
-    bez.line_to((315.0, 321.0));
-    bez.line_to((260.0, 438.0));
-    bez.line_to((260.0, 621.0));
-    bez.line_to((50.0, 621.0));
-    bez.line_to((50.0, 438.0));
-    bez.line_to((0.0, 321.0));
-    bez.line_to((45.0, 241.0));
-    bez.line_to((97.0, 0.0));
+    bez.move_to((40.0, 500.0));
+    bez.line_to((240.0, 500.0));
+    bez.line_to((240.0, 410.0));
+    bez.line_to((40.0, 410.0));
+    bez.line_to((40.0, 500.0));
     bez.close_path();
 
-    bez.move_to((155.0, 311.0));
-    bez.line_to((155.0, 0.0));
+    bez.move_to((40.0, 410.0));
+    bez.line_to((240.0, 410.0));
+    bez.line_to((239.0, 370.0));
+    bez.line_to((280.0, 290.0));
+    bez.curve_to((240.0, 220.0), (205.0, 130.0), (195.0, 0.0));
+    bez.line_to((85.0, 0.0));
+    bez.curve_to((75.0, 130.0), (40.0, 220.0), (0.0, 290.0));
+    bez.line_to((40.0, 370.0));
+    bez.line_to((40.0, 410.0));
     bez.close_path();
-    let circle = Circle::new((155.0, 361.0), 50.0);
-    bez.extend(circle.path_elements(0.1));
+
+    bez.move_to((140.0, 0.0));
+    bez.line_to((140.0, 266.0));
+
+    bez.move_to((173.0, 300.0));
+    bez.curve_to((173.0, 283.0), (159.0, 267.0), (140.0, 267.0));
+    bez.curve_to((121.0, 267.0), (107.0, 283.0), (107.0, 300.0));
+    bez.curve_to((107.0, 317.0), (121.0, 333.0), (140.0, 333.0));
+    bez.curve_to((159.0, 333.0), (173.0, 317.0), (173.0, 300.0));
+    bez.close_path();
     bez
 }
 
 fn hyperpen_path() -> BezPath {
     let mut bez = BezPath::new();
 
-    bez.move_to((87.0, 481.0));
-    bez.line_to((191.0, 481.0));
-    bez.line_to((191.0, 388.0));
-    bez.curve_to((191.0, 388.0), (278.0, 295.0), (278.0, 216.0));
-    bez.curve_to((278.0, 137.0), (139.0, 0.0), (139.0, 0.0));
-    bez.curve_to((139.0, 0.0), (0.0, 137.0), (0.0, 216.0));
-    bez.curve_to((0.0, 295.0), (87.0, 388.0), (87.0, 388.0));
-    bez.line_to((87.0, 481.0));
+    bez.move_to((40.0, 500.0));
+    bez.line_to((240.0, 500.0));
+    bez.line_to((240.0, 320.0));
+    bez.line_to((40.0, 320.0));
+    bez.line_to((40.0, 500.0));
     bez.close_path();
 
-    bez.move_to((82.0, 124.0));
-    bez.line_to((82.0, 324.0));
-
-    bez.move_to((196.0, 124.0));
-    bez.line_to((196.0, 324.0));
-
-    bez.move_to((82.0, 234.0));
-    bez.line_to((196.0, 234.0));
-    bez
-}
-
-fn preview_path() -> BezPath {
-    let mut bez = BezPath::new();
-
-    bez.move_to((320.0, 500.0)); // Bottom right: wrist
-    bez.line_to((140.0, 500.0)); // Bottom left: wrist
-    bez.line_to((140.0, 440.0));
-    bez.line_to((30.0, 320.0));
-    bez.line_to((0.0, 185.0));
-    bez.line_to((20.0, 175.0)); // Top: thumb
-    bez.line_to((40.0, 185.0));
-    bez.line_to((75.0, 255.0));
-    bez.line_to((110.0, 275.0));
-    bez.line_to((125.0, 220.0));
-    bez.line_to((120.0, 50.0)); // Top left: index finger
-    bez.line_to((130.0, 40.0));
-    bez.line_to((155.0, 40.0));
-    bez.line_to((165.0, 50.0));
-    bez.line_to((185.0, 215.0));
-    bez.line_to((190.0, 15.0)); // Top left: middle finger
-    bez.line_to((205.0, 0.0));
-    bez.line_to((220.0, 0.0));
-    bez.line_to((235.0, 15.0));
-    bez.line_to((250.0, 210.0));
-    bez.line_to((260.0, 210.0));
-    bez.line_to((270.0, 110.0));
-    bez.line_to((270.0, 30.0)); // Top left: ring finger
-    bez.line_to((280.0, 20.0));
-    bez.line_to((305.0, 20.0));
-    bez.line_to((315.0, 30.0));
-    bez.line_to((320.0, 130.0));
-    bez.line_to((315.0, 225.0));
-    bez.line_to((325.0, 230.0));
-    bez.line_to((340.0, 165.0));
-    bez.line_to((345.0, 90.0)); // Top left: little finger
-    bez.line_to((355.0, 80.0));
-    bez.line_to((355.0, 80.0));
-    bez.line_to((385.0, 90.0));
-    bez.line_to((385.0, 200.0));
-    bez.line_to((365.0, 320.0));
-    bez.line_to((320.0, 420.0));
-    bez.line_to((320.0, 500.0));
-    bez.close_path();
-    bez
-}
-
-fn rect_path() -> BezPath {
-    let mut bez = BezPath::new();
-
-    bez.move_to((0.0, 0.0));
-    bez.line_to((246.0, 0.0));
-    bez.line_to((246.0, 246.0));
-    bez.line_to((0.0, 246.0));
-    bez.line_to((0.0, 0.0));
+    bez.move_to((40.0, 320.0));
+    bez.line_to((240.0, 320.0));
+    bez.curve_to((260.0, 300.0), (280.0, 280.0), (280.0, 240.0));
+    bez.curve_to((280.0, 190.0), (210.0, 130.0), (210.0, 90.0));
+    bez.curve_to((210.0, 30.0), (180.0, 0.0), (140.0, 0.0));
+    bez.curve_to((100.0, 0.0), (70.0, 30.0), (70.0, 90.0));
+    bez.curve_to((70.0, 130.0), (0.0, 190.0), (0.0, 240.0));
+    bez.curve_to((0.0, 280.0), (20.0, 300.0), (40.0, 320.0));
     bez.close_path();
 
-    bez.move_to((404.0, 404.0));
-    bez.line_to((140.0, 404.0));
-    bez.line_to((140.0, 140.0));
-    bez.line_to((404.0, 140.0));
-    bez.line_to((404.0, 404.0));
-    bez.close_path();
+    bez.move_to((100.0, 470.0));
+    bez.line_to((100.0, 350.0));
+
+    bez.move_to((100.0, 405.0));
+    bez.line_to((180.0, 405.0));
+
+    bez.move_to((180.0, 470.0));
+    bez.line_to((180.0, 350.0));
     bez
 }
 
 fn knife_path() -> BezPath {
     let mut bez = BezPath::new();
 
-    bez.move_to((174.0, 647.0));
-    bez.line_to((50.0, 647.0));
-    bez.line_to((50.0, 218.0));
-    bez.line_to((174.0, 218.0));
-    bez.line_to((174.0, 647.0));
+    bez.move_to((30.0, 500.0));
+    bez.line_to((190.0, 500.0));
+    bez.line_to((190.0, 410.0));
+    bez.line_to((30.0, 410.0));
+    bez.line_to((30.0, 500.0));
     bez.close_path();
 
-    bez.move_to((50.0, 183.0));
-    bez.line_to((50.0, 0.0));
-    bez.line_to((175.0, 183.0));
-    bez.line_to((50.0, 183.0));
+    bez.move_to((40.0, 360.0));
+    bez.line_to((180.0, 360.0));
+    bez.line_to((180.0, 330.0));
+    bez.line_to((220.0, 290.0));
+    bez.line_to((42.0, 0.0));
+    bez.line_to((40.0, 0.0));
+    bez.line_to((40.0, 360.0));
     bez.close_path();
 
-    bez.move_to((0.0, 311.0));
-    bez.curve_to((0.0, 281.0), (30.0, 261.0), (50.0, 261.0));
-    bez.curve_to((74.0, 261.0), (100.0, 289.0), (100.0, 311.0));
-    bez.curve_to((100.0, 333.0), (71.0, 361.0), (50.0, 361.0));
-    bez.curve_to((29.0, 361.0), (0.0, 340.0), (0.0, 311.0));
+    bez.move_to((30.0, 410.0));
+    bez.line_to((190.0, 410.0));
+    bez.curve_to((205.0, 410.0), (220.0, 405.0), (220.0, 385.0));
+    bez.curve_to((220.0, 365.0), (205.0, 360.0), (190.0, 360.0));
+    bez.line_to((30.0, 360.0));
+    bez.curve_to((15.0, 360.0), (0.0, 365.0), (0.0, 385.0));
+    bez.curve_to((0.0, 405.0), (15.0, 410.0), (30.0, 410.0));
+    bez.close_path();
+    bez
+}
+
+fn preview_path() -> BezPath {
+    let mut bez = BezPath::new();
+
+    bez.move_to((130.0, 500.0));
+    bez.line_to((310.0, 500.0));
+    bez.line_to((310.0, 410.0));
+    bez.curve_to((336.0, 375.0), (360.0, 351.0), (360.0, 310.0));
+    bez.line_to((360.0, 131.0));
+    bez.curve_to((360.0, 89.0), (352.0, 70.0), (336.0, 70.0));
+    bez.curve_to((316.0, 70.0), (310.0, 85.0), (310.0, 101.0));
+    bez.curve_to((310.0, 60.0), (309.0, 20.0), (280.0, 20.0));
+    bez.curve_to((260.0, 20.0), (250.0, 36.0), (250.0, 60.0));
+    bez.curve_to((250.0, 26.0), (242.0, 0.0), (216.0, 0.0));
+    bez.curve_to((192.0, 0.0), (180.0, 16.0), (180.0, 75.0));
+    bez.curve_to((180.0, 48.0), (169.0, 30.0), (150.0, 30.0));
+    bez.curve_to((130.0, 30.0), (120.0, 53.0), (120.0, 75.0));
+    bez.line_to((120.0, 250.0));
+    bez.curve_to((120.0, 270.0), (110.0, 270.0), (100.0, 270.0));
+    bez.curve_to((85.0, 270.0), (77.0, 264.0), (70.0, 250.0));
+    bez.curve_to((45.0, 199.0), (32.0, 190.0), (20.0, 190.0));
+    bez.curve_to((8.0, 190.0), (0.0, 197.0), (0.0, 210.0));
+    bez.curve_to((0.0, 234.0), (19.0, 313.0), (30.0, 330.0));
+    bez.curve_to((41.0, 347.0), (87.0, 383.0), (130.0, 410.0));
+    bez.line_to((130.0, 500.0));
+    bez.close_path();
+
+    bez.move_to((130.0, 410.0));
+    bez.line_to((310.0, 410.0));
+
+    bez.move_to((180.0, 75.0));
+    bez.line_to((180.0, 210.0));
+
+    bez.move_to((250.0, 60.0));
+    bez.line_to((250.0, 210.0));
+
+    bez.move_to((310.0, 101.0));
+    bez.line_to((310.0, 220.0));
+    bez
+}
+
+fn measure_path() -> BezPath {
+    let mut bez = BezPath::new();
+
+    bez.move_to((0.0, 500.0));
+    bez.line_to((140.0, 500.0));
+    bez.line_to((140.0, 0.0));
+    bez.line_to((0.0, 0.0));
+    bez.line_to((0.0, 500.0));
+    bez.close_path();
+
+    bez.move_to((190.0, 0.0));
+    bez.line_to((330.0, 0.0));
+
+    bez.move_to((190.0, 500.0));
+    bez.line_to((330.0, 500.0));
+
+    bez.move_to((210.0, 100.0));
+    bez.line_to((310.0, 100.0));
+    bez.line_to((260.0, 10.0));
+    bez.line_to((210.0, 100.0));
+    bez.close_path();
+
+    bez.move_to((210.0, 400.0));
+    bez.line_to((310.0, 400.0));
+    bez.line_to((260.0, 490.0));
+    bez.line_to((210.0, 400.0));
+    bez.close_path();
+
+    bez.move_to((260.0, 100.0));
+    bez.line_to((260.0, 400.0));
+
+    bez.move_to((70.0, 350.0));
+    bez.line_to((140.0, 350.0));
+
+    bez.move_to((100.0, 400.0));
+    bez.line_to((140.0, 400.0));
+
+    bez.move_to((50.0, 450.0));
+    bez.line_to((140.0, 450.0));
+
+    bez.move_to((100.0, 300.0));
+    bez.line_to((140.0, 300.0));
+
+    bez.move_to((50.0, 250.0));
+    bez.line_to((140.0, 250.0));
+
+    bez.move_to((70.0, 150.0));
+    bez.line_to((140.0, 150.0));
+
+    bez.move_to((100.0, 200.0));
+    bez.line_to((140.0, 200.0));
+
+    bez.move_to((100.0, 100.0));
+    bez.line_to((140.0, 100.0));
+
+    bez.move_to((50.0, 50.0));
+    bez.line_to((140.0, 50.0));
+    bez
+}
+
+fn rect_path() -> BezPath {
+    let mut bez = BezPath::new();
+
+    bez.move_to((0.0, 500.0));
+    bez.line_to((220.0, 500.0));
+    bez.line_to((220.0, 0.0));
+    bez.line_to((0.0, 0.0));
+    bez.line_to((0.0, 500.0));
     bez.close_path();
     bez
 }
@@ -430,57 +498,11 @@ fn knife_path() -> BezPath {
 fn ellipse_path() -> BezPath {
     let mut bez = BezPath::new();
 
-    bez.move_to((73.0, 0.0));
-    bez.curve_to((33.0, 0.0), (0.0, 49.0), (0.0, 109.0));
-    bez.curve_to((0.0, 170.0), (33.0, 219.0), (73.0, 219.0));
-    bez.curve_to((113.0, 219.0), (146.0, 170.0), (146.0, 109.0));
-    bez.curve_to((146.0, 49.0), (113.0, 0.0), (73.0, 0.0));
-    bez.close_path();
-
-    bez.move_to((243.0, 109.0));
-    bez.curve_to((243.0, 79.0), (196.0, 54.0), (137.0, 54.0));
-    bez.curve_to((78.0, 54.0), (31.0, 79.0), (31.0, 109.0));
-    bez.curve_to((31.0, 140.0), (78.0, 165.0), (137.0, 165.0));
-    bez.curve_to((196.0, 165.0), (243.0, 140.0), (243.0, 109.0));
-    bez.close_path();
-    bez
-}
-
-fn measure_path() -> BezPath {
-    let mut bez = BezPath::new();
-
-    bez.move_to((0.0, 0.0));
-    bez.line_to((50.0, 0.0));
-    bez.line_to((50.0, 200.0));
-    bez.line_to((0.0, 200.0));
-    bez.close_path();
-
-    bez.move_to((50.0, 175.0));
-    bez.line_to((30.0, 175.0));
-    bez.close_path();
-
-    bez.move_to((50.0, 150.0));
-    bez.line_to((25.0, 150.0));
-    bez.close_path();
-
-    bez.move_to((50.0, 125.0));
-    bez.line_to((30.0, 125.0));
-    bez.close_path();
-
-    bez.move_to((50.0, 100.0));
-    bez.line_to((20.0, 100.0));
-    bez.close_path();
-
-    bez.move_to((50.0, 75.0));
-    bez.line_to((30.0, 75.0));
-    bez.close_path();
-
-    bez.move_to((50.0, 50.0));
-    bez.line_to((25.0, 50.0));
-    bez.close_path();
-
-    bez.move_to((50.0, 25.0));
-    bez.line_to((30.0, 25.0));
+    bez.move_to((110.0, 0.0));
+    bez.curve_to((50.0, 0.0), (0.0, 100.0), (0.0, 240.0));
+    bez.curve_to((0.0, 380.0), (50.0, 480.0), (110.0, 480.0));
+    bez.curve_to((170.0, 480.0), (220.0, 380.0), (220.0, 240.0));
+    bez.curve_to((220.0, 100.0), (170.0, 0.0), (110.0, 0.0));
     bez.close_path();
     bez
 }
