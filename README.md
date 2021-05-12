@@ -20,6 +20,12 @@ cargo run -- optional/path/to/some/unifedfontobject.ufo
 
 UFO files may also be opened with file>open in the running program.
 
+If you want to contribute bug reports, first set this shell environment variable and then run the above command, so that if you have any unexpected panics, you can post them into the issue tracker and we can try to track them down:
+
+```sh
+export RUST_BACKTRACE=1
+```
+
 ## Contributions
 
 Contributions are welcome. The [Rust Code of Conduct] applies. Please feel free to add your name to the [AUTHORS] file in any substantive pull request.
