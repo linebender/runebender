@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use druid::kurbo::{BezPath, Point, Rect, Shape, Size};
+use druid::kurbo::{Affine, BezPath, Point, Rect, Shape, Size, Vec2};
 use druid::{Data, Lens, WindowId};
 use norad::glyph::{Contour, ContourPoint, Glyph, GlyphName, PointType};
 use norad::{FontInfo, Ufo};
@@ -1034,6 +1034,8 @@ fn placeholder_outline() -> BezPath {
     bez.curve_to((76.0, 299.0), (72.0, 310.0), (72.0, 325.0));
     bez.line_to((72.0, 400.0));
     bez.close_path();
+    bez.apply_affine(Affine::FLIP_Y);
+    bez.apply_affine(Affine::translate(Vec2::new(0.0, 500.0)));
     bez
 }
 
