@@ -151,7 +151,6 @@ fn build_widget() -> impl Widget<CoordinateSelection> {
                     Label::new("y")
                         .with_font(coord_label_font.clone())
                         .with_text_color(theme::SECONDARY_TEXT_COLOR),
-                        //.padding((0.0, 0.0, 0.0, 8.0)),
                 )
                 .with_child(
                     EditableLabel::parse()
@@ -171,7 +170,7 @@ fn build_widget() -> impl Widget<CoordinateSelection> {
                         Label::new("w")
                             .with_font(coord_label_font.clone())
                             .with_text_color(theme::SECONDARY_TEXT_COLOR)
-                            .padding((0.0, 0.0, 0.0, 8.0)),
+                            .padding((-0.0, 0.0, 0.0, 8.0)),
                     )
                     .with_spacer(4.0)
                     .with_child(
@@ -187,16 +186,14 @@ fn build_widget() -> impl Widget<CoordinateSelection> {
                     .with_child(
                         Label::new("h")
                             .with_font(coord_label_font)
-                            .with_text_color(theme::SECONDARY_TEXT_COLOR)
-                            .padding((0.0, 0.0, 0.0, 0.0)),
+                            .with_text_color(theme::SECONDARY_TEXT_COLOR),
                     )
                     .with_spacer(4.0)
                     .with_child(
                         EditableLabel::parse()
                             .with_font(theme::UI_DETAIL_FONT)
                             .lens(size_height_lens)
-                            .fix_width(40.0)
-                            .padding((0.0, 0.0, 0.0, 0.0)),
+                            .fix_width(40.0),
                     ),
             )
             .lens(CoordinateSelection::quadrant_bbox),
