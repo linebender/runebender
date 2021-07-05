@@ -73,8 +73,8 @@ fn build_widget() -> impl Widget<EditorState> {
                     GlyphPainter::new()
                         .color(theme::SECONDARY_TEXT_COLOR)
                         .draw_layout_frame(true)
-                        .fix_height(40.0)
-                        .padding((0., 8.0))
+                        .fix_height(200.0)
+                        .padding((8.0, 8.0))
                         .lens(EditorState::detail_glyph),
                 )
                 .with_child(
@@ -94,5 +94,5 @@ fn build_widget() -> impl Widget<EditorState> {
                 .lens(EditorState::detail_glyph.then(GlyphDetail::advance))
                 .fix_width(40.0),
         )
-        .padding(4.0)
+        .padding(8.0)
 }
