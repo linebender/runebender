@@ -200,6 +200,14 @@ fn paths_menu<T: Data>() -> Menu<T> {
             .on_activate(|ctx, _, _| ctx.submit_command(consts::cmd::ALIGN_SELECTION))
             .hotkey(SysMods::CmdShift, "A"),
         )
+        .entry(
+            MenuItem::new(
+                LocalizedString::new("menu-item-rotate-start-point")
+                    .with_placeholder("Rotate Start Point"),
+            )
+            .on_activate(|ctx, _, _| ctx.submit_command(consts::cmd::ROTATE_START_POINT))
+            .hotkey(SysMods::CmdShift, "R"),
+        )
 }
 
 fn window_menu(_app_state: &AppState) -> Menu<AppState> {

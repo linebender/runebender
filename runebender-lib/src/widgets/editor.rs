@@ -215,6 +215,10 @@ impl Editor {
                 data.session_mut().reverse_contours();
                 return (true, Some(EditType::Normal));
             }
+            c if c.is(consts::cmd::ROTATE_START_POINT) => {
+                data.session_mut().rotate_start_point();
+                return (true, Some(EditType::Normal));
+            }
             // all unhandled commands:
             _ => return (false, None),
         }

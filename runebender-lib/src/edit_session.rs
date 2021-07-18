@@ -511,6 +511,10 @@ impl EditSession {
         }
     }
 
+    pub(crate) fn rotate_start_point(&mut self) {
+        log::info!("Rotate start point")
+    }
+
     pub(crate) fn add_guide(&mut self, point: Point) {
         // if one or two points are selected, use them. else use argument point.
         let guide = match self.selection.len() {
