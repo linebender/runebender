@@ -512,7 +512,7 @@ impl EditSession {
     }
 
     pub(crate) fn rotate_start_point(&mut self) {
-        log::info!("Rotate start point")
+        self.paths_mut().rotate_right(1);
     }
 
     pub(crate) fn add_guide(&mut self, point: Point) {
