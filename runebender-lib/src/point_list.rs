@@ -398,6 +398,10 @@ impl PathPoints {
         self.points.as_ref().get(self.first_idx()).unwrap()
     }
 
+    pub fn make_start(&mut self, _point: EntityId) {
+        log::info!("make_start");
+    }
+
     /// Returns the 'last' on-curve point.
     ///
     /// In a closed path, this is the on-curve point preceding the start point.

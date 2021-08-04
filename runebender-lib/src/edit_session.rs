@@ -511,6 +511,18 @@ impl EditSession {
         }
     }
 
+    pub(crate) fn set_start_point(&mut self, point: EntityId) {
+        if self.selection.len() == 1 {
+            log::info!("single point selected, setting start point");
+            for path in self.paths_mut() {
+                path.make_start(point);
+            }
+        } else {
+            log::info!("Multiple points selected, do nothing");
+            return;
+        }
+    }
+
     pub(crate) fn add_guide(&mut self, point: Point) {
         // if one or two points are selected, use them. else use argument point.
         let guide = match self.selection.len() {

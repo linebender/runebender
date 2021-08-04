@@ -10,6 +10,7 @@ use crate::data::EditorState;
 use crate::draw;
 use crate::edit_session::EditSession;
 use crate::mouse::{Mouse, TaggedEvent};
+use crate::point::EntityId;
 use crate::theme;
 use crate::tools::{EditType, Preview, Select, Tool};
 use crate::undo::UndoState;
@@ -213,6 +214,14 @@ impl Editor {
             }
             c if c.is(consts::cmd::REVERSE_CONTOURS) => {
                 data.session_mut().reverse_contours();
+                return (true, Some(EditType::Normal));
+            }
+            c if c.is(consts::cmd::SET_START_POINT) => {
+                // This is just here to get an EntityId to get the editor to compile.
+                // I'm not sure what the best way to do this with a real EntityId is
+                // - Eli H
+                let id = EntityId::next();
+                data.session_mut().set_start_point(id);
                 return (true, Some(EditType::Normal));
             }
             // all unhandled commands:

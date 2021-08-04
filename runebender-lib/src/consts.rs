@@ -55,6 +55,9 @@ pub mod cmd {
     // sent by 'reverse contours' menu item in Paths menu
     pub const REVERSE_CONTOURS: Selector = Selector::new("runebender.reverse-contours");
 
+    /// sent by 'set start point' menu item in Paths menu
+    pub const SET_START_POINT: Selector = Selector::new("runebender.set-start-point");
+
     /// Sent when a new tool has been selected.
     ///
     /// The payload must be a `ToolId`.
