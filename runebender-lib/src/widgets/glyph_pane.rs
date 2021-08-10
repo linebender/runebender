@@ -57,8 +57,7 @@ impl<W: Widget<Sidebearings>> Controller<Sidebearings, W> for GlyphPane {
 }
 
 fn build_widget() -> impl Widget<EditorState> {
-    let glyph_font: FontDescriptor =
-        FontDescriptor::new(FontFamily::MONOSPACE);
+    let glyph_font: FontDescriptor = FontDescriptor::new(FontFamily::MONOSPACE);
     Flex::column()
         .with_child(
             Flex::row()
