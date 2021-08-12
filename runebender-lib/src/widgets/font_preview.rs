@@ -66,7 +66,7 @@ impl Widget<PreviewState> for Preview {
         if !old_data.font.same(&data.font) {
             self.virtual_font = VirtualFont::new(&data.font);
         }
-        if !old_data.same(&data) {
+        if !old_data.same(data) {
             ctx.request_layout();
         }
     }

@@ -74,7 +74,7 @@ impl AppDelegate<AppState> for Delegate {
                     ctx.submit_command(druid::commands::SHOW_WINDOW.to(*id));
                 }
                 None => {
-                    let session = data.workspace.get_or_create_session(&payload);
+                    let session = data.workspace.get_or_create_session(payload);
                     let session_id = session.id;
                     let new_win = WindowDesc::new(make_editor(&session))
                         .title(move |d: &AppState, _: &_| {

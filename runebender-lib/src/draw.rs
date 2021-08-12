@@ -32,7 +32,7 @@ impl<'a, 'b> std::ops::Deref for DrawCtx<'a, 'b> {
     type Target = Piet<'b>;
 
     fn deref(&self) -> &Self::Target {
-        &self.ctx
+        self.ctx
     }
 }
 
@@ -413,7 +413,7 @@ impl<'a> std::iter::Iterator for PointIter<'a> {
     }
 }
 
-#[allow(clippy::clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn draw_session(
     ctx: &mut PaintCtx,
     env: &Env,

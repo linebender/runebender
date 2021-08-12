@@ -104,8 +104,8 @@ impl Path {
             .map(move |(i, path_seg)| {
                 if let Some(spline_seg) = hyper_segments.and_then(|segs| segs.get(i).cloned()) {
                     Segment::Hyper(HyperSegment {
-                        spline_seg,
                         path_seg,
+                        spline_seg,
                     })
                 } else {
                     Segment::Cubic(path_seg)

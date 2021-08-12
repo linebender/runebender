@@ -165,7 +165,7 @@ impl BezCache {
         {
             match self.rebuild_without_inval(&comp.base, glyph_getter) {
                 Some(component) => {
-                    let affine: Affine = comp.transform.clone().into();
+                    let affine: Affine = comp.transform.into();
                     for comp_elem in (affine * &*component).elements() {
                         path.push(*comp_elem);
                     }

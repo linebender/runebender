@@ -229,7 +229,7 @@ impl PathPoint {
         self.point = DPoint::from_raw(new);
     }
 
-    pub fn to_kurbo(&self) -> Point {
+    pub fn to_kurbo(self) -> Point {
         self.point.to_raw()
     }
 
@@ -240,6 +240,7 @@ impl PathPoint {
     }
 
     /// Convert this point to point in screen space.
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_screen(&self, vport: ViewPort) -> Point {
         self.point.to_screen(vport)
     }

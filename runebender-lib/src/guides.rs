@@ -104,7 +104,7 @@ impl Guide {
         };
 
         let id = EntityId::new_for_guide();
-        Guide { guide, id }
+        Guide { id, guide }
     }
 
     pub fn to_norad(&self) -> norad::Guideline {

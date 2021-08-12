@@ -255,7 +255,7 @@ impl Workspace {
         } = self;
         let to_inval = cache.glyphs_containing_component(name).to_vec();
         for name in std::iter::once(name).chain(to_inval.iter()) {
-            Arc::make_mut(cache).rebuild(&name, &|name| {
+            Arc::make_mut(cache).rebuild(name, &|name| {
                 sessions
                     .values()
                     .find(|sesh| sesh.name == *name)
@@ -360,7 +360,7 @@ impl Workspace {
         // update the active session, if one exists
         if let Some(session_id) = self.session_map.get(&changed.name) {
             let sessions = Arc::make_mut(&mut self.sessions);
-            let session = sessions.get_mut(&session_id).unwrap();
+            let session = sessions.get_mut(session_id).unwrap();
             let session = Arc::make_mut(session);
             session.update_glyph_metadata(changed);
         }
@@ -476,7 +476,7 @@ impl FontObject {
     fn update_info(&mut self, info: &SimpleFontInfo) {
         // we don't want to change anything if we don't have to:
         let existing_info = SimpleFontInfo::from_font(self);
-        if !existing_info.same(&info) {
+        if !existing_info.same(info) {
             let font_info = self.ufo.font_info.get_or_insert_with(Default::default);
             // we don't want to set anything that hasn't changed.
             if existing_info.family_name != info.family_name {

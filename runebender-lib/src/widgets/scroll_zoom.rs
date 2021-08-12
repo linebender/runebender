@@ -157,7 +157,7 @@ impl<T: Widget<EditorState>> Widget<EditorState> for ScrollZoom<T> {
             Event::Command(c)
                 if c.is(cmd::ZOOM_IN) || c.is(cmd::ZOOM_OUT) || c.is(cmd::ZOOM_DEFAULT) =>
             {
-                self.handle_zoom_cmd(&c, ctx.size(), data);
+                self.handle_zoom_cmd(c, ctx.size(), data);
                 self.after_zoom_changed(ctx, env);
                 return;
             }
