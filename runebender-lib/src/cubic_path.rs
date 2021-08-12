@@ -126,7 +126,7 @@ impl CubicPath {
 
         for n_pt in &src.points {
             let point = DPoint::new(n_pt.x.round() as f64, n_pt.y.round() as f64);
-            let typ = PointType::from_norad(&n_pt);
+            let typ = PointType::from_norad(n_pt);
             let id = EntityId::new_with_parent(path_id);
             if let Some(ident) = n_pt.identifier() {
                 idents.insert(id, ident.to_owned());

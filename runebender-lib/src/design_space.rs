@@ -179,11 +179,13 @@ impl ViewPort {
         self.affine().inverse()
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn from_screen(&self, point: impl Into<Point>) -> DPoint {
         let point = self.inverse_affine() * point.into();
         DPoint::new(point.x.round(), point.y.round())
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_screen(&self, point: impl Into<DPoint>) -> Point {
         self.affine() * point.into().to_raw()
     }

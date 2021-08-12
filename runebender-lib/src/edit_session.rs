@@ -590,8 +590,8 @@ pub mod lenses {
             let quadrant = data.quadrant;
             f(&CoordinateSelection {
                 count,
-                quadrant,
                 frame,
+                quadrant,
             })
         }
 
@@ -605,8 +605,8 @@ pub mod lenses {
             let quadrant = data.quadrant;
             let mut sel = CoordinateSelection {
                 count,
-                quadrant,
                 frame,
+                quadrant,
             };
             let r = f(&mut sel);
             data.quadrant = sel.quadrant;

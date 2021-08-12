@@ -164,7 +164,7 @@ impl<W: Widget<GlyphName>> Controller<GlyphName, W> for RenameController {
     ) {
         let pre_data = data.clone();
         child.event(ctx, event, data, env);
-        if !pre_data.same(&data) {
+        if !pre_data.same(data) {
             let args = crate::consts::cmd::RenameGlyphArgs {
                 old: pre_data,
                 new: data.clone(),

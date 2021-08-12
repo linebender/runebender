@@ -300,7 +300,7 @@ fn iter_paths_for_bez_path(src: &BezPath) -> impl Iterator<Item = CubicPath> + '
             Some(el) => el,
             None => {
                 if !cur_points.is_empty() {
-                    let points = std::mem::replace(&mut cur_points, Vec::new());
+                    let points = std::mem::take(&mut cur_points);
                     return Some(CubicPath::from_raw_parts(cur_path_id, points, None, closed));
                 }
                 return None;
@@ -309,7 +309,7 @@ fn iter_paths_for_bez_path(src: &BezPath) -> impl Iterator<Item = CubicPath> + '
 
         match path_el {
             PathEl::MoveTo(pt) => {
-                let points = std::mem::replace(&mut cur_points, Vec::new());
+                let points = std::mem::take(&mut cur_points);
                 let path = if points.is_empty() {
                     None
                 } else {
