@@ -102,8 +102,8 @@ impl<W: Widget<EditorState>> Widget<EditorState> for EditorController<W> {
         let our_size = self.inner.layout(ctx, bc, data, env);
         let coords_size = self.coord_panel.layout(ctx, &child_bc, data, env);
         let coords_origin = (
-            (our_size.width) - coords_size.width - 24.0,
-            our_size.height - coords_size.height - 24.0,
+            (our_size.width) - coords_size.width - FLOATING_PANEL_PADDING,
+            our_size.height - coords_size.height - FLOATING_PANEL_PADDING,
         );
         let coord_frame = Rect::from_origin_size(coords_origin, coords_size);
         self.coord_panel
