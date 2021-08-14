@@ -2,7 +2,7 @@
 //! glyph metrics
 
 use druid::widget::{prelude::*, Controller, Flex};
-use druid::{LensExt, WidgetExt};
+use druid::{FontDescriptor, FontFamily, LensExt, WidgetExt};
 
 use crate::data::{EditorState, GlyphDetail, Sidebearings};
 use crate::widgets::{EditableLabel, GlyphPainter};
@@ -57,12 +57,14 @@ impl<W: Widget<Sidebearings>> Controller<Sidebearings, W> for GlyphPane {
 }
 
 fn build_widget() -> impl Widget<EditorState> {
+    let glyph_font: FontDescriptor = FontDescriptor::new(FontFamily::MONOSPACE);
     Flex::column()
         .with_child(
             Flex::row()
                 .with_child(
                     EditableLabel::parse()
-                        .with_font(theme::UI_DETAIL_FONT)
+                        .with_font(glyph_font.clone())
+                        .with_text_size(16.0)
                         .with_text_alignment(druid::TextAlignment::End)
                         .lens(Sidebearings::left)
                         .controller(GlyphPane)
@@ -73,13 +75,14 @@ fn build_widget() -> impl Widget<EditorState> {
                     GlyphPainter::new()
                         .color(theme::SECONDARY_TEXT_COLOR)
                         .draw_layout_frame(true)
-                        .fix_height(200.0)
+                        .fix_height(128.0)
                         .padding((8.0, 8.0))
                         .lens(EditorState::detail_glyph),
                 )
                 .with_child(
                     EditableLabel::parse()
-                        .with_font(theme::UI_DETAIL_FONT)
+                        .with_font(glyph_font.clone())
+                        .with_text_size(16.0)
                         .with_text_alignment(druid::TextAlignment::Start)
                         .lens(Sidebearings::right)
                         .controller(GlyphPane)
@@ -89,10 +92,11 @@ fn build_widget() -> impl Widget<EditorState> {
         )
         .with_child(
             EditableLabel::parse()
-                .with_font(theme::UI_DETAIL_FONT)
+                .with_font(glyph_font.clone())
+                .with_text_size(16.0)
                 .with_text_alignment(druid::TextAlignment::Center)
                 .lens(EditorState::detail_glyph.then(GlyphDetail::advance))
-                .fix_width(40.0),
+                .fix_width(64.0),
         )
         .padding(8.0)
 }

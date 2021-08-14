@@ -8,9 +8,9 @@ use druid::{Color, Data, HotKey, KeyEvent, Rect, SysMods, WidgetPod};
 use crate::consts;
 use crate::tools::ToolId;
 
-const TOOLBAR_ITEM_SIZE: Size = Size::new(40.0, 40.0);
+const TOOLBAR_ITEM_SIZE: Size = Size::new(48.0, 48.0);
 const TOOLBAR_ITEM_PADDING: f64 = 2.0;
-const TOOLBAR_ICON_PADDING: f64 = 5.0;
+const TOOLBAR_ICON_PADDING: f64 = 6.0;
 const TOOLBAR_BORDER_STROKE_WIDTH: f64 = 2.0;
 const TOOLBAR_ITEM_STROKE_WIDTH: f64 = 1.5;
 // TODO: move these to theme

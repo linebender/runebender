@@ -9,7 +9,7 @@ use crate::edit_session::EditSession;
 use crate::widgets::{CoordPane, FloatingPanel, GlyphPane, Toolbar};
 
 /// the distance from the edge of a floating panel to the edge of the window.
-const FLOATING_PANEL_PADDING: f64 = 20.0;
+const FLOATING_PANEL_PADDING: f64 = 24.0;
 
 /// More like this is 'Editor' and 'Editor' is 'Canvas'?
 //TODO: we could combine this with controller above if we wanted?
@@ -102,8 +102,8 @@ impl<W: Widget<EditorState>> Widget<EditorState> for EditorController<W> {
         let our_size = self.inner.layout(ctx, bc, data, env);
         let coords_size = self.coord_panel.layout(ctx, &child_bc, data, env);
         let coords_origin = (
-            (our_size.width / 2.0) - coords_size.width / 2.0,
-            our_size.height - coords_size.height - 20.0,
+            (our_size.width) - coords_size.width - FLOATING_PANEL_PADDING,
+            our_size.height - coords_size.height - FLOATING_PANEL_PADDING,
         );
         let coord_frame = Rect::from_origin_size(coords_origin, coords_size);
         self.coord_panel
