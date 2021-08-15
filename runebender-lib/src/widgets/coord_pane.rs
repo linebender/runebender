@@ -201,7 +201,7 @@ fn build_widget() -> impl Widget<CoordinateSelection> {
                     .with_spacer(0.0)
                     .with_child(
                         EditableLabel::parse()
-                            .with_font(coord_font.clone())
+                            .with_font(coord_font)
                             .with_text_size(16.0)
                             .lens(size_height_lens)
                             .fix_width(64.0),
