@@ -512,6 +512,7 @@ fn iter_handle_circles(session: &EditSession) -> impl Iterator<Item = (Quadrant,
         .viewport
         .rect_to_screen(session.selection_dpoint_bbox());
     let handle_frame = bbox + SELECTION_BBOX_HANDLE_PADDING;
+    #[allow(clippy::nonminimal_bool)]
     Quadrant::all()
         .iter()
         .filter(move |q| {

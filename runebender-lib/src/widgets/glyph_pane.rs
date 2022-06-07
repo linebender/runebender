@@ -92,7 +92,7 @@ fn build_widget() -> impl Widget<EditorState> {
         )
         .with_child(
             EditableLabel::parse()
-                .with_font(glyph_font.clone())
+                .with_font(glyph_font)
                 .with_text_size(16.0)
                 .with_text_alignment(druid::TextAlignment::Center)
                 .lens(EditorState::detail_glyph.then(GlyphDetail::advance))
