@@ -424,7 +424,7 @@ pub(crate) fn draw_session(
     font: &Workspace,
     is_preview: bool,
 ) {
-    let mut draw_ctx = DrawCtx::new(&mut ctx.render_ctx, env, space, visible_rect);
+    let mut draw_ctx = DrawCtx::new(ctx.render_ctx, env, space, visible_rect);
 
     if is_preview {
         draw_ctx.draw_filled(session, font);

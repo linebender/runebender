@@ -45,18 +45,6 @@ pub struct Workspace {
     pub info: SimpleFontInfo,
 }
 
-/// An object that acts like a font loaded from disk.
-///
-/// This lets us interact with harfbuzz as if we were just a normal compiled
-/// font file.
-#[derive(Debug, Clone)]
-struct VirtualFont {
-    glyph_ids: Vec<(char, GlyphName)>,
-    cmap: Vec<u8>,
-    hhea: Vec<u8>,
-    hmtx: Vec<u8>,
-}
-
 #[derive(Clone, Data)]
 pub struct FontObject {
     pub path: Option<Arc<Path>>,
@@ -345,8 +333,8 @@ impl Workspace {
             session_map.insert(new_name.clone(), session_id);
 
             let sessions = Arc::make_mut(&mut self.sessions);
-            let mut session = sessions.get_mut(&session_id).unwrap();
-            Arc::make_mut(&mut session).rename(new_name.clone());
+            let session = sessions.get_mut(&session_id).unwrap();
+            Arc::make_mut(session).rename(new_name.clone());
         }
 
         if self.open_glyphs.contains_key(&old_name) {
