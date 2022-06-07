@@ -10,6 +10,7 @@ edition = "2018"
 norad = { version = "0.3.1", features = ["druid", "rayon"] }
 druid = "0.7"
 druid-theme-loader = { version = "0.1.0", path = "../druid-theme-loader", features = ["notify"] }
+spline = { version = "0.3.0", git = "https://github.com/linebender/spline.git", rev = "229f7e7" }
 
 harfbuzz_rs = "1.2"
 log = "0.4.8"
@@ -18,7 +19,6 @@ serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 base64 = "0.13.0"
-lopdf = "0.26.0"
-svg = "0.8.0"
-spline = "0.3.0"
+lopdf = "0.27.0"
+svg = "0.10.0"
 chrono = "0.4"
