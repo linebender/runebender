@@ -3,7 +3,8 @@
 use std::sync::Arc;
 
 use druid::{
-    AppDelegate, Command, DelegateCtx, Handled, Selector, Target, Widget, WindowDesc, WindowId,
+    AppDelegate, Command, DelegateCtx, FontDescriptor, FontFamily, Handled, Selector, Target,
+    Widget, WindowDesc, WindowId,
 };
 
 use druid::kurbo::Line;
@@ -141,6 +142,7 @@ fn make_preview(session: SessionId) -> impl Widget<AppState> {
         ctx.fill(rect, &env.get(crate::theme::GLYPH_LIST_BACKGROUND));
         ctx.stroke(line, &env.get(crate::theme::SIDEBAR_EDGE_STROKE), 1.0);
     });
+    let preview_ui_font: FontDescriptor = FontDescriptor::new(FontFamily::MONOSPACE);
     crate::theme::wrap_in_theme_loader(
         Flex::column()
             .cross_axis_alignment(druid::widget::CrossAxisAlignment::Start)
@@ -151,12 +153,16 @@ fn make_preview(session: SessionId) -> impl Widget<AppState> {
                     .with_default_spacer()
                     .with_child(
                         TextBox::new()
+                            .with_font(preview_ui_font.clone())
+                            .with_text_size(16.0)
                             .with_formatter(ParseFormatter::new())
                             .lens(PreviewState::session.then(PreviewSession::font_size)),
                     )
                     .with_default_spacer()
                     .with_flex_child(
                         TextBox::multiline()
+                            .with_font(preview_ui_font.clone())
+                            .with_text_size(16.0)
                             .expand_width()
                             .lens(PreviewState::session.then(PreviewSession::text)),
                         1.0,
