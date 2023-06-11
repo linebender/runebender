@@ -60,6 +60,22 @@ impl AppDelegate<AppState> for Delegate {
         {
             data.workspace.rename_glyph(old.clone(), new.clone());
             Handled::Yes
+        } else if let Some(consts::cmd::SetGlyphKernGroupArgs {
+            glyph_name,
+            group_key,
+        }) = cmd.get(consts::cmd::SET_GLYPH_KERN1_GROUP)
+        {
+            data.workspace
+                .set_glyph_group("public.kern1.", glyph_name.clone(), group_key.clone());
+            Handled::Yes
+        } else if let Some(consts::cmd::SetGlyphKernGroupArgs {
+            glyph_name,
+            group_key,
+        }) = cmd.get(consts::cmd::SET_GLYPH_KERN2_GROUP)
+        {
+            data.workspace
+                .set_glyph_group("public.kern2.", glyph_name.clone(), group_key.clone());
+            Handled::Yes
         } else if cmd.is(consts::cmd::NEW_PREVIEW_WINDOW) {
             let session_id = data.workspace.new_preview_session();
             let new_win = WindowDesc::new(make_preview(session_id))
