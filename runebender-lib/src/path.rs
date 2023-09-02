@@ -185,6 +185,12 @@ impl Path {
         self.path_points().start_point()
     }
 
+    pub fn make_start(&mut self, point: EntityId) {
+        log::info!("make_start called from path.rs!");
+        self.path_points_mut().make_start(point);
+        self.after_change();
+    }
+
     /// Delete a collection of points from this path.
     ///
     /// If only a single point was deleted from this path, we will return
